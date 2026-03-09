@@ -20,7 +20,10 @@ def user_roles(request):
         if staff.avatar:
             avatar_url = staff.avatar.url
     except Staff.DoesNotExist:
-        patient = getattr(user, 'patient_profile', None)
+        try:
+            patient = user.patient_profile
+        except Patient.DoesNotExist:
+            patient = None
         if patient:
             clinic = patient.clinic
             if patient.avatar:
