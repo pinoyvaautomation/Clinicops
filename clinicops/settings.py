@@ -31,10 +31,13 @@ except Exception:
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-0*w2i$(6=$93#uiufsulhsc*yaol)^s%tppm!3efrk%dy+s0f2'
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    'django-insecure-0*w2i$(6=$93#uiufsulhsc*yaol)^s%tppm!3efrk%dy+s0f2',
+)
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get('DEBUG', 'true').lower() == 'true'
 
 _allowed_hosts = os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1')
 ALLOWED_HOSTS = [h.strip() for h in _allowed_hosts.split(',') if h.strip()]
@@ -60,6 +63,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -151,6 +155,9 @@ SITE_ID = 1
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = BASE_DIR / 'staticfiles'
+if not DEBUG:
+    STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
@@ -158,6 +165,7 @@ LOGIN_REDIRECT_URL = '/post-login/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
 DJANGO_SECURE = os.environ.get('DJANGO_SECURE', 'false').lower() == 'true'
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if DJANGO_SECURE else None
 SECURE_SSL_REDIRECT = DJANGO_SECURE
 SESSION_COOKIE_SECURE = DJANGO_SECURE
 CSRF_COOKIE_SECURE = DJANGO_SECURE
@@ -187,6 +195,7 @@ EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('SMTP_USE_TLS', 'false').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'ClinicOps <noreply@clinicops.local>')
+RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 
 _secured_keys = os.environ.get('SECURED_FIELDS_KEY')
 if _secured_keys:
