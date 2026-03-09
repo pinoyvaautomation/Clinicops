@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ clinic.name }} - Patient Signup</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      form { max-width: 420px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input { width: 100%; padding: 8px; margin-top: 4px; }
+      button { margin-top: 16px; padding: 10px 14px; }
+      .muted { color: #6b7280; }
+      .errorlist { color: #b91c1c; margin: 8px 0; }
+      .success { color: #047857; }
+    </style>
+  </head>
+  <body>
+    <h1>{{ clinic.name }} Patient Signup</h1>
+    <p class="muted">Create a patient account to manage your appointments.</p>
+
+    {% if verification_sent %}
+      <p class="success">
+        Verification email sent. Please check your inbox to activate your account.
+        <a href="{% url 'resend-verification' %}?email={{ form.email.value }}">Resend verification</a>
+      </p>
+    {% endif %}
+
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <label for="id_first_name">First name</label>
+      {{ form.first_name }}
+      {{ form.first_name.errors }}
+
+      <label for="id_last_name">Last name</label>
+      {{ form.last_name }}
+      {{ form.last_name.errors }}
+
+      <label for="id_email">Email</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+
+      <label for="id_phone">Phone</label>
+      {{ form.phone }}
+      {{ form.phone.errors }}
+
+      <label for="id_dob">Date of birth</label>
+      {{ form.dob }}
+      {{ form.dob.errors }}
+
+      <label for="id_password">Password</label>
+      {{ form.password }}
+      {{ form.password.errors }}
+
+      <label for="id_confirm_password">Confirm password</label>
+      {{ form.confirm_password }}
+      {{ form.confirm_password.errors }}
+
+      <button type="submit">Create account</button>
+    </form>
+    <p class="muted">Already have an account? <a href="{% url 'login' %}">Sign in</a>.</p>
+  </body>
+</html>

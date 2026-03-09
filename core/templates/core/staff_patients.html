@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Patients</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+      th { background: #f3f4f6; }
+      .muted { color: #6b7280; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Patients</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Phone</th>
+          <th>DOB</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for patient in patients %}
+          <tr>
+            <td>{{ patient.first_name }} {{ patient.last_name }}</td>
+            <td>{{ patient.email }}</td>
+            <td>{{ patient.phone }}</td>
+            <td>{{ patient.dob|date:"Y-m-d" }}</td>
+            <td>
+              {% if can_edit %}
+                <a href="{% url 'staff-patient-edit' patient.id %}">Edit</a>
+              {% else %}
+                <a href="{% url 'staff-patient-edit' patient.id %}">View</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5">No patients found.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

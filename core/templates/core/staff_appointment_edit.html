@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Update Appointment</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      form { max-width: 420px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      select, textarea { width: 100%; padding: 8px; margin-top: 4px; }
+      button { margin-top: 16px; padding: 10px 14px; }
+      .muted { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Update Appointment</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+    <p class="muted">Patient: {{ appointment.patient }} | Staff: {{ appointment.staff }}</p>
+    <p><a href="{% url 'staff-appointment-history' appointment.id %}">View history</a></p>
+    {% if is_frontdesk %}
+      <p class="muted">Front desk can reassign staff, reschedule within the same day, or cancel appointments.</p>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      {% if form.staff %}
+        <label for="id_staff">Staff</label>
+        {{ form.staff }}
+        {{ form.staff.errors }}
+      {% endif %}
+
+      <label for="id_status">Status</label>
+      {{ form.status }}
+      {{ form.status.errors }}
+
+      {% if form.start_at %}
+        <label for="id_start_at">Start time</label>
+        {{ form.start_at }}
+        {{ form.start_at.errors }}
+      {% endif %}
+
+      {% if form.cancel_reason_choice %}
+        <div id="cancel-reason-block" style="display:none;">
+          <label for="id_cancel_reason_choice">Cancellation reason</label>
+          {{ form.cancel_reason_choice }}
+          {{ form.cancel_reason_choice.errors }}
+        </div>
+      {% endif %}
+
+      {% if form.cancel_reason_other %}
+        <div id="cancel-reason-other" style="display:none;">
+          <label for="id_cancel_reason_other">Other reason</label>
+          {{ form.cancel_reason_other }}
+          {{ form.cancel_reason_other.errors }}
+        </div>
+      {% endif %}
+
+      {% if form.confirm_short_notice %}
+        <div id="confirm-short-notice" style="display:none;">
+          <label style="display:flex; gap:8px; align-items:center; font-weight:500;">
+            {{ form.confirm_short_notice }}
+            {{ form.confirm_short_notice.label }}
+          </label>
+          <div class="muted">Required only when cancelling within 24 hours.</div>
+          {{ form.confirm_short_notice.errors }}
+        </div>
+      {% endif %}
+
+      {% if form.notes %}
+        <label for="id_notes">Notes</label>
+        {{ form.notes }}
+        {{ form.notes.errors }}
+      {% endif %}
+
+      <button type="submit">Save</button>
+      <a href="{% url 'staff-appointments' %}" style="margin-left: 8px;">Back</a>
+    </form>
+
+    <script>
+      (function() {
+        const statusField = document.getElementById('id_status');
+        const cancelReason = document.getElementById('cancel-reason-block');
+        const cancelOther = document.getElementById('cancel-reason-other');
+        const reasonChoice = document.getElementById('id_cancel_reason_choice');
+        const confirmBlock = document.getElementById('confirm-short-notice');
+
+        function toggleCancelFields() {
+          if (!statusField) return;
+          const isCancelled = statusField.value === 'cancelled';
+          if (cancelReason) cancelReason.style.display = isCancelled ? 'block' : 'none';
+          if (confirmBlock) confirmBlock.style.display = isCancelled ? 'block' : 'none';
+          if (cancelOther) {
+            const showOther = isCancelled && reasonChoice && reasonChoice.value === 'other';
+            cancelOther.style.display = showOther ? 'block' : 'none';
+          }
+        }
+
+        if (statusField) {
+          statusField.addEventListener('change', toggleCancelFields);
+        }
+        if (reasonChoice) {
+          reasonChoice.addEventListener('change', toggleCancelFields);
+        }
+        toggleCancelFields();
+      })();
+    </script>
+  </body>
+</html>

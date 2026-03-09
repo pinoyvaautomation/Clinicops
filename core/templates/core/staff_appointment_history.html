@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Appointment History</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+      th { background: #f3f4f6; }
+      .muted { color: #6b7280; font-size: 14px; }
+      .badge { display: inline-block; padding: 2px 8px; border-radius: 999px; background: #e2e8f0; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Appointment History</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+    <p class="muted">Patient: {{ appointment.patient }} | Staff: {{ appointment.staff }}</p>
+    <a href="{% url 'staff-appointment-edit' appointment.id %}">Back to appointment</a>
+
+    <table>
+      <thead>
+        <tr>
+          <th>When</th>
+          {% if limited_history %}
+            <th>Status</th>
+            <th>Cancel reason</th>
+          {% else %}
+            <th>Type</th>
+            <th>Staff</th>
+            <th>Status</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Cancel reason</th>
+            <th>By</th>
+            <th>Change reason</th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in history %}
+          <tr>
+            <td>{{ item.history_date|date:"Y-m-d H:i" }}</td>
+            {% if limited_history %}
+              <td>{{ item.get_status_display }}</td>
+              <td>{{ item.cancel_reason|default:"-" }}</td>
+            {% else %}
+              <td>
+                {% if item.history_type == "+" %}<span class="badge">Created</span>{% endif %}
+                {% if item.history_type == "~" %}<span class="badge">Changed</span>{% endif %}
+                {% if item.history_type == "-" %}<span class="badge">Deleted</span>{% endif %}
+              </td>
+              <td>{{ item.staff }}</td>
+              <td>{{ item.get_status_display }}</td>
+              <td>{{ item.start_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ item.end_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ item.cancel_reason|default:"-" }}</td>
+              <td>{{ item.history_user|default:"-" }}</td>
+              <td>{{ item.history_change_reason|default:"-" }}</td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="{% if limited_history %}3{% else %}9{% endif %}">No history records.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

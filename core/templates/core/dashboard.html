@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>ClinicOps Dashboard</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&display=swap');
+      :root {
+        --ink: #0f172a;
+        --muted: #64748b;
+        --surface: #ffffff;
+        --border: #e2e8f0;
+        --accent: #0ea5a6;
+        --accent-dark: #0f766e;
+        --bg: linear-gradient(160deg, #f1f5f9 0%, #eef2ff 100%);
+      }
+      body {
+        margin: 0;
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        background: var(--bg);
+        color: var(--ink);
+      }
+      .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 48px; }
+      header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+      header h1 { margin: 0; font-size: 32px; }
+      header p { margin: 4px 0 0; color: var(--muted); }
+      .pill {
+        display: inline-flex; align-items: center; gap: 8px;
+        padding: 6px 12px; border-radius: 999px; background: #ecfeff; color: var(--accent-dark);
+        font-size: 13px; font-weight: 600;
+      }
+      .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); }
+      .card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 14px;
+        padding: 16px;
+        box-shadow: 0 8px 16px rgba(15, 23, 42, 0.06);
+      }
+      .stat { font-size: 28px; font-weight: 700; margin: 8px 0; }
+      .muted { color: var(--muted); }
+      .split {
+        display: grid;
+        grid-template-columns: 2fr 1fr;
+        gap: 16px;
+        margin-top: 20px;
+      }
+      @media (max-width: 900px) { .split { grid-template-columns: 1fr; } }
+      table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+      th, td { border-bottom: 1px solid var(--border); padding: 10px 8px; text-align: left; font-size: 14px; }
+      th { color: var(--muted); font-weight: 600; }
+      .cta {
+        display: inline-block; padding: 10px 14px; border-radius: 8px; background: var(--accent);
+        color: #fff; text-decoration: none; font-weight: 600;
+      }
+      .cta.secondary { background: #e2e8f0; color: #0f172a; }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+      input, select { width: 100%; padding: 8px; margin-top: 4px; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <div class="wrap">
+      <header>
+        <div>
+          <h1>{{ clinic.name }} Dashboard</h1>
+          <p>Week of {{ start_date }} -> {{ end_date }}</p>
+        </div>
+        {% if current_subscription %}
+          <span class="pill">Plan: {{ current_subscription.plan.name }} - {{ current_subscription.status|title }}</span>
+        {% else %}
+          <span class="pill">No active plan</span>
+        {% endif %}
+      </header>
+
+      <section class="card" style="margin-bottom: 16px;">
+        <form method="get">
+          <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+            <div>
+              <label class="muted">Start date</label>
+              <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div>
+              <label class="muted">End date</label>
+              <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+            <div>
+              <label class="muted">Staff</label>
+              <select name="staff">
+                <option value="">All staff</option>
+                {% for staff in staff_list %}
+                  <option value="{{ staff.id }}" {% if staff.id|stringformat:"s" == selected_staff_id %}selected{% endif %}>
+                    {{ staff }}
+                  </option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label class="muted">Status</label>
+              <select name="status">
+                <option value="">All statuses</option>
+                <option value="scheduled" {% if selected_status == "scheduled" %}selected{% endif %}>Scheduled</option>
+                <option value="completed" {% if selected_status == "completed" %}selected{% endif %}>Completed</option>
+                <option value="cancelled" {% if selected_status == "cancelled" %}selected{% endif %}>Cancelled</option>
+              </select>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top: 12px;">
+            <button class="cta" type="submit">Apply filters</button>
+            <a class="cta secondary" href="{% url 'dashboard' %}">Reset</a>
+            <a class="cta secondary" href="{% url 'calendar' %}?start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}{% if selected_staff_id %}&staff={{ selected_staff_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">
+              View calendar
+            </a>
+          </div>
+        </form>
+      </section>
+
+      <section class="grid">
+        <div class="card">
+          <div class="muted">Appointments (range)</div>
+          <div class="stat">{{ total_count }}</div>
+        </div>
+        <div class="card">
+          <div class="muted">Today</div>
+          <div class="stat">{{ today_count }}</div>
+        </div>
+        <div class="card">
+          <div class="muted">Upcoming</div>
+          <div class="stat">{{ upcoming_count }}</div>
+        </div>
+        <div class="card">
+          <div class="muted">Completed</div>
+          <div class="stat">{{ completed_count }}</div>
+        </div>
+        <div class="card">
+          <div class="muted">Cancelled</div>
+          <div class="stat">{{ cancelled_count }}</div>
+        </div>
+      </section>
+
+      <section class="split">
+        <div class="card">
+          <h2>Appointments over time</h2>
+          {% if chart_points %}
+            <div style="display:flex; align-items:flex-end; gap:10px; height:160px; margin-top:16px;">
+              {% for point in chart_points %}
+                <div style="flex:1; text-align:center;">
+                  <div style="height:120px; display:flex; align-items:flex-end; justify-content:center;">
+                    <div style="width:100%; max-width:36px; height: {{ point.percent }}%; background: var(--accent); border-radius: 6px;"></div>
+                  </div>
+                  <div class="muted" style="font-size:12px;">{{ point.label }}</div>
+                  <div style="font-size:12px; font-weight:600;">{{ point.count }}</div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <p class="muted">No data for this range.</p>
+          {% endif %}
+        </div>
+
+        <div class="card">
+          <h2>Billing</h2>
+          {% if current_subscription %}
+            <p class="muted">Status: {{ current_subscription.status|title }}</p>
+            <p class="muted">Plan: {{ current_subscription.plan.name }}</p>
+            {% if current_subscription.current_period_end %}
+              <p class="muted">Next bill: {{ current_subscription.current_period_end|date:"Y-m-d" }}</p>
+            {% endif %}
+          {% else %}
+            <p class="muted">No subscription found.</p>
+          {% endif %}
+
+          <div class="toolbar">
+            <a class="cta secondary" href="{% url 'billing' %}">Manage billing</a>
+            {% if is_admin and current_subscription %}
+              <button class="cta" id="sync-button" type="button">Sync with PayPal</button>
+            {% endif %}
+          </div>
+          <p id="sync-message" class="muted" style="display:none; margin-top:8px;"></p>
+        </div>
+      </section>
+
+      <section class="card" style="margin-top: 16px;">
+        <h2>Upcoming schedule</h2>
+        {% if appointments %}
+          <table>
+            <thead>
+              <tr>
+                <th>Start</th>
+                <th>End</th>
+                <th>Staff</th>
+                <th>Patient</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for appt in appointments %}
+                <tr>
+                  <td>{{ appt.start_at|date:"Y-m-d H:i" }}</td>
+                  <td>{{ appt.end_at|date:"H:i" }}</td>
+                  <td>{{ appt.staff }}</td>
+                  <td>{{ appt.patient }}</td>
+                  <td>{{ appt.status|title }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        {% else %}
+          <p class="muted">No appointments scheduled for this range.</p>
+        {% endif %}
+      </section>
+    </div>
+    {% if is_admin and current_subscription %}
+      <form id="sync-form">{% csrf_token %}</form>
+      <script>
+        const syncButton = document.getElementById('sync-button');
+        const message = document.getElementById('sync-message');
+        const csrfToken = document.querySelector('#sync-form input[name=csrfmiddlewaretoken]').value;
+
+        if (syncButton) {
+          syncButton.addEventListener('click', function() {
+            message.style.display = 'none';
+            fetch('{% url "billing-sync" %}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({})
+            }).then(async function(response) {
+              const text = await response.text();
+              if (!response.ok) {
+                throw new Error(text || 'Sync failed');
+              }
+              message.textContent = 'Synced. Refreshing...';
+              message.style.display = 'block';
+              window.location.reload();
+            }).catch(function(err) {
+              message.textContent = 'Sync failed: ' + err.message;
+              message.style.display = 'block';
+            });
+          });
+        }
+      </script>
+    {% endif %}
+  </body>
+</html>

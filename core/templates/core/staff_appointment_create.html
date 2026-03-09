@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Create Walk-in Appointment</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      form { max-width: 520px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; }
+      button { margin-top: 16px; padding: 10px 14px; }
+      .muted { color: #6b7280; font-size: 14px; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Create Walk-in Appointment</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+    <p class="muted">Times are in clinic timezone.</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <label for="id_first_name">First name</label>
+      {{ form.first_name }}
+      {{ form.first_name.errors }}
+
+      <label for="id_last_name">Last name</label>
+      {{ form.last_name }}
+      {{ form.last_name.errors }}
+
+      <label for="id_email">Email</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+
+      <label for="id_phone">Phone</label>
+      {{ form.phone }}
+      {{ form.phone.errors }}
+
+      <label for="id_dob">Date of birth</label>
+      {{ form.dob }}
+      {{ form.dob.errors }}
+
+      <label for="id_staff">Staff</label>
+      {{ form.staff }}
+      {{ form.staff.errors }}
+
+      <label for="id_appointment_type">Appointment type (optional)</label>
+      {{ form.appointment_type }}
+      {{ form.appointment_type.errors }}
+
+      <label for="id_start_at">Start time</label>
+      {{ form.start_at }}
+      {{ form.start_at.errors }}
+
+      <label for="id_notes">Notes</label>
+      {{ form.notes }}
+      {{ form.notes.errors }}
+
+      <button type="submit">Create appointment</button>
+      <a href="{% url 'staff-appointments' %}" style="margin-left: 8px;">Back</a>
+    </form>
+  </body>
+</html>

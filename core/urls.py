@@ -1,0 +1,31 @@
+from django.urls import path
+
+from . import views
+
+urlpatterns = [
+    path('', views.post_login_redirect, name='home'),
+    path('dashboard/', views.dashboard_view, name='dashboard'),
+    path('calendar/', views.calendar_view, name='calendar'),
+    path('staff/appointments/', views.staff_appointments, name='staff-appointments'),
+    path('staff/appointments/new/', views.staff_appointment_create, name='staff-appointment-create'),
+    path('staff/appointments/<int:appointment_id>/', views.staff_appointment_edit, name='staff-appointment-edit'),
+    path('staff/appointments/<int:appointment_id>/history/', views.staff_appointment_history, name='staff-appointment-history'),
+    path('staff/patients/', views.staff_patients, name='staff-patients'),
+    path('staff/patients/<int:patient_id>/', views.staff_patient_edit, name='staff-patient-edit'),
+    path('clinic/<int:clinic_id>/', views.clinic_booking, name='clinic-booking'),
+    path('clinic/<int:clinic_id>/patient-signup/', views.patient_signup, name='patient-signup'),
+    path('clinic/<slug:clinic_slug>/', views.clinic_booking_slug, name='clinic-booking-slug'),
+    path('clinic/<slug:clinic_slug>/patient-signup/', views.patient_signup_slug, name='patient-signup-slug'),
+    path('signup/', views.clinic_signup, name='clinic-signup'),
+    path('signup/activate/', views.signup_activate, name='signup-activate'),
+    path('verify-email/<uidb64>/<token>/', views.verify_email, name='verify-email'),
+    path('resend-verification/', views.resend_verification, name='resend-verification'),
+    path('settings/', views.settings_view, name='settings'),
+    path('post-login/', views.post_login_redirect, name='post-login'),
+    path('appointments/lookup/', views.appointment_lookup, name='appointment-lookup'),
+    path('portal/', views.patient_portal, name='patient-portal'),
+    path('billing/', views.billing_view, name='billing'),
+    path('billing/activate/', views.billing_activate, name='billing-activate'),
+    path('billing/sync/', views.billing_sync, name='billing-sync'),
+    path('webhooks/paypal/', views.paypal_webhook, name='paypal-webhook'),
+]

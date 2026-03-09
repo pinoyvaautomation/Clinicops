@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Email verification</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 48px; color: #1f2937; }
+      .ok { color: #047857; }
+      .error { color: #b91c1c; }
+    </style>
+  </head>
+  <body>
+    {% if status == 'ok' %}
+      <h1 class="ok">Email verified</h1>
+      <p>Your account is now active. You can <a href="{% url 'login' %}">sign in</a>.</p>
+    {% else %}
+      <h1 class="error">Verification link invalid</h1>
+      <p>This link is invalid or expired.</p>
+    {% endif %}
+  </body>
+</html>

@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Edit Patient</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      form { max-width: 420px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input { width: 100%; padding: 8px; margin-top: 4px; }
+      button { margin-top: 16px; padding: 10px 14px; }
+      .muted { color: #6b7280; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+      th { background: #f3f4f6; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Edit Patient</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+    {% if not can_edit %}
+      <p class="muted">Read-only view. Update appointment status below.</p>
+    {% endif %}
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <label for="id_first_name">First name</label>
+      {{ form.first_name }}
+      {{ form.first_name.errors }}
+
+      <label for="id_last_name">Last name</label>
+      {{ form.last_name }}
+      {{ form.last_name.errors }}
+
+      <label for="id_email">Email</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+
+      <label for="id_phone">Phone</label>
+      {{ form.phone }}
+      {{ form.phone.errors }}
+
+      <label for="id_dob">Date of birth</label>
+      {{ form.dob }}
+      {{ form.dob.errors }}
+
+      {% if can_edit %}
+        <button type="submit">Save</button>
+      {% endif %}
+      <a href="{% url 'staff-patients' %}" style="margin-left: 8px;">Back</a>
+    </form>
+
+    <h2 style="margin-top: 32px;">Appointments</h2>
+    <p class="muted">Update appointment status from the list below.</p>
+    <table>
+      <thead>
+        <tr>
+          <th>Start</th>
+          <th>End</th>
+          <th>Type</th>
+          <th>Staff</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for appt in appointments %}
+          <tr>
+            <td>{{ appt.start_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ appt.end_at|date:"Y-m-d H:i" }}</td>
+            <td>{% if appt.appointment_type %}{{ appt.appointment_type.name }}{% else %}-{% endif %}</td>
+            <td>{{ appt.staff }}</td>
+            <td>{{ appt.get_status_display }}</td>
+            <td>
+              {% if can_update_appointments %}
+                <a href="{% url 'staff-appointment-edit' appt.id %}">Update</a>
+              {% else %}
+                <span class="muted">View only</span>
+              {% endif %}
+              {% if can_view_history %}
+                | <a href="{% url 'staff-appointment-history' appt.id %}">History</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="6">No appointments found for this patient.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

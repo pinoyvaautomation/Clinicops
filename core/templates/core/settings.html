@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Account Settings</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      .card { max-width: 520px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
+      .muted { color: #6b7280; }
+      .actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
+      a.button, button { padding: 8px 12px; border-radius: 6px; border: none; background: #0ea5a6; color: #fff; text-decoration: none; }
+      a.secondary { background: #e5e7eb; color: #0f172a; }
+      ul { padding-left: 16px; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Account Settings</h1>
+    <div class="card">
+      <p><strong>Name:</strong> {{ request.user.get_full_name|default:request.user.username }}</p>
+      <p><strong>Email:</strong> {{ request.user.email|default:"-" }}</p>
+      <p><strong>Clinic:</strong> {{ clinic.name|default:"-" }}</p>
+      {% if clinic and clinic.slug and profile_type == 'staff' %}
+        <p>
+          <strong>Public booking link:</strong>
+          <a href="{% url 'clinic-booking-slug' clinic.slug %}">
+            {{ request.scheme }}://{{ request.get_host }}{% url 'clinic-booking-slug' clinic.slug %}
+          </a>
+        </p>
+        <p class="muted">Share this link with patients to book or create accounts.</p>
+      {% endif %}
+      <p><strong>Avatar:</strong></p>
+      {% if avatar_url %}
+        <img src="{{ avatar_url }}" alt="Avatar" style="height:72px; width:72px; border-radius:999px; object-fit:cover;">
+      {% else %}
+        <p class="muted">No avatar uploaded.</p>
+      {% endif %}
+      <form method="post" enctype="multipart/form-data" style="margin-top: 12px;">
+        {% csrf_token %}
+        {{ avatar_form.avatar.label_tag }}
+        {{ avatar_form.avatar }}
+        <button type="submit" style="margin-top: 8px;">Upload avatar</button>
+        {% if avatar_saved %}
+          <p class="muted">Avatar updated.</p>
+        {% endif %}
+      </form>
+      <p><strong>Roles:</strong></p>
+      <ul>
+        {% for role in groups %}
+          <li>{{ role }}</li>
+        {% empty %}
+          <li class="muted">No roles assigned.</li>
+        {% endfor %}
+      </ul>
+      <div class="actions">
+        <a class="button" href="{% url 'password_change' %}">Change password</a>
+        <a class="button secondary" href="{% url 'dashboard' %}">Back to dashboard</a>
+        <a class="button secondary" href="{% url 'logout' %}">Log out</a>
+      </div>
+    </div>
+  </body>
+</html>

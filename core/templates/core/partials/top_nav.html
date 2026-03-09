@@ -1,0 +1,191 @@
+<style>
+  .top-nav {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: #ffffff;
+    border-bottom: 1px solid #e5e7eb;
+    margin-bottom: 16px;
+  }
+  .top-nav .brand {
+    font-weight: 700;
+    font-size: 18px;
+    color: #0f172a;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .brand-logo {
+    height: 32px;
+    width: 32px;
+    border-radius: 8px;
+    object-fit: cover;
+    background: #f1f5f9;
+  }
+  .brand-name {
+    display: flex;
+    flex-direction: column;
+    line-height: 1.1;
+  }
+  .brand-name span {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+  }
+  .top-nav .links {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .top-nav .links a {
+    text-decoration: none;
+    color: #0f172a;
+    font-weight: 600;
+    font-size: 14px;
+  }
+  .avatar-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: none;
+    background: #111827;
+    color: #fff;
+    font-weight: 700;
+    cursor: pointer;
+    overflow: hidden;
+    padding: 0;
+  }
+  .avatar-btn img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .avatar-menu {
+    position: absolute;
+    right: 16px;
+    top: 64px;
+    width: 240px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    box-shadow: 0 16px 32px rgba(15, 23, 42, 0.12);
+    display: none;
+    z-index: 2000;
+  }
+  .avatar-menu.open { display: block; }
+  .avatar-header {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  .avatar-header .muted { color: #6b7280; font-size: 13px; }
+  .avatar-actions {
+    display: grid;
+    padding: 10px;
+    gap: 8px;
+  }
+  .avatar-actions a {
+    text-decoration: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-weight: 600;
+    text-align: center;
+  }
+  .avatar-actions form {
+    margin: 0;
+  }
+  .avatar-actions button {
+    width: 100%;
+    border: none;
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #e2e8f0;
+    color: #0f172a;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .avatar-actions a.primary { background: #0ea5a6; color: #fff; }
+</style>
+
+<div class="top-nav">
+  <div class="brand">
+    {% if nav_clinic and nav_clinic.logo_url %}
+      <img class="brand-logo" src="{{ nav_clinic.logo_url }}" alt="{{ nav_clinic.name }}">
+    {% else %}
+      <div class="brand-logo"></div>
+    {% endif %}
+    <div class="brand-name">
+      ClinicOps
+      {% if nav_clinic %}
+        <span>{{ nav_clinic.name }}</span>
+      {% endif %}
+    </div>
+  </div>
+  <div class="links">
+    {% if nav_is_staff %}
+      <a href="{% url 'dashboard' %}">Dashboard</a>
+      <a href="{% url 'calendar' %}">Calendar</a>
+      <a href="{% url 'staff-appointments' %}">Appointments</a>
+      <a href="{% url 'staff-patients' %}">Patients</a>
+      {% if nav_is_admin %}
+        <a href="{% url 'billing' %}">Billing</a>
+      {% endif %}
+    {% else %}
+      <a href="{% url 'patient-portal' %}">Portal</a>
+    {% endif %}
+  </div>
+  <div style="position: relative;">
+    <button type="button" class="avatar-btn" id="avatar-btn">
+      {% if nav_avatar_url %}
+        <img src="{{ nav_avatar_url }}" alt="Avatar">
+      {% else %}
+        {% with first=request.user.first_name|default:'' last=request.user.last_name|default:'' %}
+          {% if first or last %}
+            {{ first|slice:":1"|upper }}{{ last|slice:":1"|upper }}
+          {% else %}
+            {{ request.user.username|slice:":2"|upper }}
+          {% endif %}
+        {% endwith %}
+      {% endif %}
+    </button>
+    <div class="avatar-menu" id="avatar-menu">
+      <div class="avatar-header">
+        <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+        <div class="muted">{{ request.user.email|default:"" }}</div>
+      </div>
+      <div class="avatar-actions">
+        <a class="primary" href="{% url 'settings' %}">Account settings</a>
+        <a href="{% url 'password_change' %}">Change password</a>
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button type="submit">Log out</button>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  (function() {
+    const btn = document.getElementById('avatar-btn');
+    const menu = document.getElementById('avatar-menu');
+    if (!btn || !menu) return;
+
+    function toggleMenu() {
+      menu.classList.toggle('open');
+    }
+
+    btn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      toggleMenu();
+    });
+    document.addEventListener('click', function(e) {
+      if (!menu.contains(e.target) && e.target !== btn) {
+        menu.classList.remove('open');
+      }
+    });
+  })();
+</script>

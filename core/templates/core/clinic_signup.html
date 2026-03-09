@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Clinic Signup</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+      @media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+      .panel { border: 1px solid #e5e7eb; padding: 16px; border-radius: 6px; background: #fff; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input, select { width: 100%; padding: 8px; margin-top: 4px; }
+      button { margin-top: 16px; padding: 10px 14px; }
+      .muted { color: #6b7280; }
+      .errorlist { color: #b91c1c; margin: 8px 0; }
+      #paypal-button-container { margin-top: 16px; }
+    </style>
+  </head>
+  <body>
+    <h1>Clinic Signup</h1>
+    <p class="muted">Create your clinic account and subscribe to a plan.</p>
+
+    <div class="grid">
+      <div class="panel">
+        <h2>Step 1: Create account</h2>
+        {% if clinic %}
+          <p>Clinic created: <strong>{{ clinic.name }}</strong></p>
+          <p class="muted">You can now complete payment below.</p>
+          {% if verification_sent %}
+            <p class="muted">
+              We sent a verification email to the clinic owner. Please verify to access the dashboard.
+              <a href="{% url 'resend-verification' %}?email={{ clinic.email }}">Resend verification</a>
+            </p>
+          {% endif %}
+        {% else %}
+          <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <label for="id_clinic_name">Clinic name</label>
+            {{ form.clinic_name }}
+            {{ form.clinic_name.errors }}
+
+            <label for="id_timezone">Timezone</label>
+            {{ form.timezone }}
+            {{ form.timezone.errors }}
+
+            <label for="id_admin_first_name">First name</label>
+            {{ form.admin_first_name }}
+            {{ form.admin_first_name.errors }}
+
+            <label for="id_admin_last_name">Last name</label>
+            {{ form.admin_last_name }}
+            {{ form.admin_last_name.errors }}
+
+            <label for="id_admin_email">Email</label>
+            {{ form.admin_email }}
+            {{ form.admin_email.errors }}
+
+            <label for="id_password">Password</label>
+            {{ form.password }}
+            {{ form.password.errors }}
+
+            <label for="id_confirm_password">Confirm password</label>
+            {{ form.confirm_password }}
+            {{ form.confirm_password.errors }}
+
+            <button type="submit">Create account</button>
+          </form>
+        {% endif %}
+      </div>
+
+      <div class="panel">
+        <h2>Step 2: Choose plan</h2>
+        {% if not clinic %}
+          <p class="muted">Complete step 1 to activate payment.</p>
+        {% elif not paypal_client_id %}
+          <p class="muted">PayPal is not configured yet.</p>
+        {% elif not plans %}
+          <p class="muted">No plans available. Add plans in admin.</p>
+        {% else %}
+          <form id="csrf-form">{% csrf_token %}</form>
+          <label for="plan">Plan</label>
+          <select id="plan">
+            {% for plan in plans %}
+              <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
+                {{ plan.name }} - {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
+              </option>
+            {% endfor %}
+          </select>
+          <div id="paypal-button-container"></div>
+          <p id="signup-error" class="errorlist" style="display:none;"></p>
+          <p id="signup-success" class="muted" style="display:none;"></p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if clinic and paypal_client_id and plans %}
+      <script src="{{ paypal_sdk_url }}?client-id={{ paypal_client_id }}&vault=true&intent=subscription"></script>
+      <script>
+        const planSelect = document.getElementById('plan');
+        const container = document.getElementById('paypal-button-container');
+        const csrfTokenInput = document.querySelector('#csrf-form input[name=csrfmiddlewaretoken]');
+        const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
+        const clinicId = {{ clinic.id }};
+
+        const errorBox = document.getElementById('signup-error');
+        const successBox = document.getElementById('signup-success');
+
+        function showError(message) {
+          if (errorBox) {
+            errorBox.textContent = message;
+            errorBox.style.display = 'block';
+          } else {
+            alert(message);
+          }
+        }
+
+        function renderButtons() {
+          const selectedOption = planSelect.options[planSelect.selectedIndex];
+          const paypalPlanId = selectedOption.getAttribute('data-paypal-plan-id');
+          const planId = selectedOption.value;
+
+          container.innerHTML = '';
+          if (errorBox) {
+            errorBox.style.display = 'none';
+            errorBox.textContent = '';
+          }
+          if (successBox) {
+            successBox.style.display = 'none';
+            successBox.textContent = '';
+          }
+          if (!paypalPlanId) {
+            container.innerHTML = '<p class="muted">Selected plan missing PayPal plan ID.</p>';
+            return;
+          }
+
+          paypal.Buttons({
+            createSubscription: function(data, actions) {
+              return actions.subscription.create({
+                plan_id: paypalPlanId,
+                custom_id: 'clinic-' + clinicId
+              });
+            },
+            onApprove: function(data) {
+              return fetch('{% url "signup-activate" %}', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrfToken
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                  clinic_id: clinicId,
+                  plan_id: planId,
+                  subscription_id: data.subscriptionID
+                })
+              }).then(async function(response) {
+                const text = await response.text();
+                if (!response.ok) {
+                  throw new Error(text || 'Failed to record subscription');
+                }
+                if (successBox) {
+                  successBox.innerHTML = 'Payment recorded. Please verify your email and then <a href="{% url "login" %}">sign in</a>.';
+                  successBox.style.display = 'block';
+                }
+                container.innerHTML = '';
+              }).catch(function(err) {
+                showError('Payment recorded but subscription save failed: ' + err.message);
+                console.error(err);
+              });
+            },
+            onError: function(err) {
+              showError('PayPal error: ' + err);
+              console.error(err);
+            }
+          }).render('#paypal-button-container');
+        }
+
+        if (planSelect) {
+          planSelect.addEventListener('change', renderButtons);
+          renderButtons();
+        }
+      </script>
+    {% endif %}
+  </body>
+</html>

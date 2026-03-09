@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Patient Portal</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+      th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+      th { background: #f3f4f6; }
+      .muted { color: #6b7280; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Welcome, {{ patient.first_name }}</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+
+    <h2>Upcoming appointments</h2>
+    {% if appointments %}
+      <table>
+        <thead>
+          <tr>
+            <th>Start</th>
+            <th>End</th>
+            <th>Staff</th>
+            <th>Type</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for appt in appointments %}
+            <tr>
+              <td>{{ appt.start_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ appt.end_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ appt.staff }}</td>
+              <td>{% if appt.appointment_type %}{{ appt.appointment_type.name }}{% else %}General{% endif %}</td>
+              <td>{{ appt.status|title }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% else %}
+      <p class="muted">No upcoming appointments.</p>
+    {% endif %}
+  </body>
+</html>

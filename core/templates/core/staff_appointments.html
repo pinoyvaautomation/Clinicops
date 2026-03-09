@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Staff Appointments</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+      th { background: #f3f4f6; }
+      .muted { color: #6b7280; font-size: 14px; }
+      label { display: block; margin-bottom: 4px; }
+      input, select { width: 100%; padding: 6px; }
+      button { padding: 8px 12px; }
+      .toolbar { margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Appointments</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+    {% if messages %}
+      <ul class="muted">
+        {% for message in messages %}
+          <li>{{ message }}</li>
+        {% endfor %}
+      </ul>
+    {% endif %}
+
+    <form method="get" style="margin-top: 16px;">
+      <div style="display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
+        <div>
+          <label class="muted">Start date</label>
+          <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+        </div>
+        <div>
+          <label class="muted">End date</label>
+          <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+        </div>
+        <div>
+          <label class="muted">Status</label>
+          <select name="status">
+            <option value="">All statuses</option>
+            <option value="scheduled" {% if selected_status == "scheduled" %}selected{% endif %}>Scheduled</option>
+            <option value="completed" {% if selected_status == "completed" %}selected{% endif %}>Completed</option>
+            <option value="cancelled" {% if selected_status == "cancelled" %}selected{% endif %}>Cancelled</option>
+          </select>
+        </div>
+      </div>
+      <div class="toolbar">
+        <button type="submit">Apply filters</button>
+        <a href="{% url 'staff-appointments' %}">Reset</a>
+        {% if can_create %}
+          <a href="{% url 'staff-appointment-create' %}">Create walk-in</a>
+        {% endif %}
+      </div>
+    </form>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Start</th>
+          <th>End</th>
+          <th>Type</th>
+          <th>Staff</th>
+          <th>Patient</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for appt in appointments %}
+          <tr>
+            <td>{{ appt.start_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ appt.end_at|date:"Y-m-d H:i" }}</td>
+            <td>{% if appt.appointment_type %}{{ appt.appointment_type.name }}{% else %}-{% endif %}</td>
+            <td>{{ appt.staff }}</td>
+            <td>{{ appt.patient }}</td>
+            <td>{{ appt.get_status_display }}</td>
+            <td>
+              {% if can_update %}
+                <a href="{% url 'staff-appointment-edit' appt.id %}">Update</a>
+              {% else %}
+                <span class="muted">View only</span>
+              {% endif %}
+              {% if can_view_history %}
+                | <a href="{% url 'staff-appointment-history' appt.id %}">History</a>
+              {% endif %}
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="7">No appointments found for this range.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Clinic Billing</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      .panel { border: 1px solid #e5e7eb; padding: 16px; border-radius: 6px; max-width: 720px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      select { width: 100%; padding: 8px; margin-top: 4px; }
+      .muted { color: #6b7280; }
+      #paypal-button-container { margin-top: 16px; }
+      .error { color: #b91c1c; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <div class="panel">
+      <h1>Billing - {{ clinic.name }}</h1>
+      {% if current_subscription %}
+        <p class="muted">
+          Current status: {{ current_subscription.status }} ({{ current_subscription.plan.name }})
+        </p>
+      {% else %}
+        <p class="muted">No active subscription yet.</p>
+      {% endif %}
+
+      {% if current_subscription %}
+        <button id="sync-button" type="button">Sync with PayPal</button>
+      {% endif %}
+
+      {% if not paypal_client_id %}
+        <p class="error">PayPal client ID is not configured.</p>
+      {% endif %}
+
+      {% if plans %}
+        <label for="plan">Choose a plan</label>
+        <select id="plan">
+          {% for plan in plans %}
+            <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
+              {{ plan.name }} - {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
+            </option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <p class="error">No plans are configured. Add plans in the admin.</p>
+      {% endif %}
+
+      {% csrf_token %}
+      <div id="paypal-button-container"></div>
+      <p id="billing-error" class="error" style="display:none;"></p>
+      <p id="billing-success" class="muted" style="display:none;"></p>
+    </div>
+
+    {% if paypal_client_id %}
+      <script src="{{ paypal_sdk_url }}?client-id={{ paypal_client_id }}&vault=true&intent=subscription"></script>
+      <script>
+        const planSelect = document.getElementById('plan');
+        const container = document.getElementById('paypal-button-container');
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const syncButton = document.getElementById('sync-button');
+        const successBox = document.getElementById('billing-success');
+
+        const errorBox = document.getElementById('billing-error');
+
+        function showError(message) {
+          if (errorBox) {
+            errorBox.textContent = message;
+            errorBox.style.display = 'block';
+          } else {
+            alert(message);
+          }
+        }
+
+        function showSuccess(message) {
+          if (successBox) {
+            successBox.textContent = message;
+            successBox.style.display = 'block';
+          }
+        }
+
+        function renderButtons() {
+          const selectedOption = planSelect.options[planSelect.selectedIndex];
+          const paypalPlanId = selectedOption.getAttribute('data-paypal-plan-id');
+          const planId = selectedOption.value;
+
+          container.innerHTML = '';
+          if (errorBox) {
+            errorBox.style.display = 'none';
+            errorBox.textContent = '';
+          }
+          if (successBox) {
+            successBox.style.display = 'none';
+            successBox.textContent = '';
+          }
+          if (!paypalPlanId) {
+            container.innerHTML = '<p class="error">Selected plan is missing PayPal plan ID.</p>';
+            return;
+          }
+
+          paypal.Buttons({
+            createSubscription: function(data, actions) {
+              return actions.subscription.create({
+                plan_id: paypalPlanId,
+                custom_id: 'clinic-{{ clinic.id }}'
+              });
+            },
+            onApprove: function(data) {
+              return fetch('{% url "billing-activate" %}', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'X-CSRFToken': csrfToken
+                },
+                credentials: 'same-origin',
+                body: JSON.stringify({
+                  plan_id: planId,
+                  subscription_id: data.subscriptionID
+                })
+              }).then(async function(response) {
+                const text = await response.text();
+                if (!response.ok) {
+                  throw new Error(text || 'Failed to record subscription');
+                }
+                window.location.reload();
+              }).catch(function(err) {
+                showError('Payment recorded but subscription save failed: ' + err.message);
+                console.error(err);
+              });
+            }
+          }).render('#paypal-button-container');
+        }
+
+        if (planSelect) {
+          planSelect.addEventListener('change', renderButtons);
+          renderButtons();
+        }
+
+        if (syncButton) {
+          syncButton.addEventListener('click', function() {
+            if (errorBox) {
+              errorBox.style.display = 'none';
+              errorBox.textContent = '';
+            }
+            if (successBox) {
+              successBox.style.display = 'none';
+              successBox.textContent = '';
+            }
+            fetch('{% url "billing-sync" %}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({})
+            }).then(async function(response) {
+              const text = await response.text();
+              if (!response.ok) {
+                throw new Error(text || 'Failed to sync with PayPal');
+              }
+              showSuccess('Subscription synced. Refreshing...');
+              window.location.reload();
+            }).catch(function(err) {
+              showError('Sync failed: ' + err.message);
+              console.error(err);
+            });
+          });
+        }
+      </script>
+    {% endif %}
+  </body>
+</html>

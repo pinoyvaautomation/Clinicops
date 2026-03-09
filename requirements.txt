@@ -1,0 +1,38 @@
+ClinicMVP
+
+Client ID: AQvHQeurAnrpTAGZexyy45fq8JrKkNk2mipgVFHq-RKbFwnD_4dEVwnBXbxQvLnose0w0M_eR03XcVsl
+Secret key 1: EESaZ7f3g0K5cHt3L1hX3-S9mIovc4DBbXv6FBg5vHFOwGEo8fd27eHuoJjrUB5JRp_Brl-n-wI1c6xo
+
+PayPal Sandbox accounts:
+
+Personal
+
+Sandbox URL: https://sandbox.paypal.com
+Email: sb-gmo4m49648956@personal.example.com
+Password: Y"X<yp0m
+
+Business
+
+Email: sb-wlnzs49218558@business.example.com
+Password: GeX0<l5)
+Any 3 digits
+
+Clinica JMC Admin/Owner
+clinica.jmc@gmail.com
+p@ssw0rd123
+
+Clinica JMC Front Desk:
+
+edline.jmc@gmail.com
+p@ssw0rd123
+
+Clinica JMC Doctor: 
+/staff/appointments/ should show only their appointments.
+/staff/patients/ should show only patients they have appointments with.
+Can update appointment status/notes.
+
+arjedoc.jmc@gmail.com
+p@ssw0rd123
+
+
+
