@@ -28,6 +28,12 @@ class ResendEmailBackend(BaseEmailBackend):
             debug_setting = os.environ.get('RESEND_DEBUG', 'false')
         return str(debug_setting).lower() in {'1', 'true', 'yes'}
 
+    def _user_agent(self):
+        user_agent = getattr(settings, 'RESEND_USER_AGENT', None)
+        if not user_agent:
+            user_agent = os.environ.get('RESEND_USER_AGENT')
+        return user_agent or 'ClinicOps/1.0'
+
     def send_messages(self, email_messages):
         if not email_messages:
             return 0
@@ -74,6 +80,7 @@ class ResendEmailBackend(BaseEmailBackend):
             headers={
                 'Authorization': f'Bearer {self.api_key}',
                 'Content-Type': 'application/json',
+                'User-Agent': self._user_agent(),
             },
             method='POST',
         )
