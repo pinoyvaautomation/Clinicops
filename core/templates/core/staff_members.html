@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Staff</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+      th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
+      th { background: #f3f4f6; }
+      .muted { color: #6b7280; font-size: 14px; }
+      .actions { margin-top: 12px; }
+      .btn {
+        display: inline-block;
+        padding: 8px 12px;
+        background: #0ea5a6;
+        color: #fff;
+        text-decoration: none;
+        border-radius: 8px;
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>Staff</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+    <div class="actions">
+      <a class="btn" href="{% url 'staff-member-create' %}">Add staff</a>
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Email</th>
+          <th>Role</th>
+          <th>Status</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in staff_rows %}
+          <tr>
+            <td>{{ row.staff.user.get_full_name|default:row.staff.user.username }}</td>
+            <td>{{ row.staff.user.email|default:row.staff.user.username }}</td>
+            <td>{{ row.role }}</td>
+            <td>{% if row.staff.is_active and row.staff.user.is_active %}Active{% else %}Inactive{% endif %}</td>
+            <td><a href="{% url 'staff-member-edit' row.staff.id %}">Edit</a></td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5">No staff found.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </body>
+</html>

@@ -85,6 +85,38 @@ class AvatarUploadForm(forms.Form):
     avatar = forms.ImageField(required=False)
 
 
+STAFF_ROLE_CHOICES = [
+    ('Admin', 'Admin'),
+    ('Doctor', 'Doctor'),
+    ('Nurse', 'Nurse'),
+    ('FrontDesk', 'Front Desk'),
+]
+
+
+class StaffMemberCreateForm(forms.Form):
+    email = forms.EmailField()
+    first_name = forms.CharField(max_length=100, required=False)
+    last_name = forms.CharField(max_length=100, required=False)
+    password = forms.CharField(widget=forms.PasswordInput())
+    role = forms.ChoiceField(choices=STAFF_ROLE_CHOICES)
+    is_active = forms.BooleanField(required=False, initial=True)
+
+    def clean_email(self):
+        return self.cleaned_data['email'].strip().lower()
+
+
+class StaffMemberUpdateForm(forms.Form):
+    email = forms.EmailField()
+    first_name = forms.CharField(max_length=100, required=False)
+    last_name = forms.CharField(max_length=100, required=False)
+    password = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False)
+    role = forms.ChoiceField(choices=STAFF_ROLE_CHOICES)
+    is_active = forms.BooleanField(required=False)
+
+    def clean_email(self):
+        return self.cleaned_data['email'].strip().lower()
+
+
 class AppointmentUpdateForm(forms.ModelForm):
     class Meta:
         model = Appointment

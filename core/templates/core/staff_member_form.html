@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <style>
+      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
+      form { max-width: 460px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input, select { width: 100%; padding: 8px; margin-top: 4px; }
+      button { margin-top: 16px; padding: 10px 14px; }
+      .muted { color: #6b7280; font-size: 14px; }
+      .help { font-size: 12px; color: #6b7280; margin-top: 4px; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <h1>{{ title }}</h1>
+    <p class="muted">Clinic: {{ clinic.name }}</p>
+    <form method="post">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+
+      <label for="id_email">Email</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+
+      <label for="id_first_name">First name</label>
+      {{ form.first_name }}
+      {{ form.first_name.errors }}
+
+      <label for="id_last_name">Last name</label>
+      {{ form.last_name }}
+      {{ form.last_name.errors }}
+
+      <label for="id_role">Role</label>
+      {{ form.role }}
+      {{ form.role.errors }}
+
+      <label for="id_password">Password</label>
+      {{ form.password }}
+      {{ form.password.errors }}
+      {% if staff_member %}
+        <div class="help">Leave blank to keep the current password.</div>
+      {% endif %}
+
+      <label for="id_is_active">Active</label>
+      {{ form.is_active }}
+      {{ form.is_active.errors }}
+
+      <button type="submit">{{ submit_label }}</button>
+      <a href="{% url 'staff-members' %}" style="margin-left: 8px;">Back</a>
+    </form>
+  </body>
+</html>

@@ -34,6 +34,8 @@ from .forms import (
     ResendVerificationForm,
     AvatarUploadForm,
     WalkInAppointmentForm,
+    StaffMemberCreateForm,
+    StaffMemberUpdateForm,
 )
 from .models import (
     Appointment,
@@ -145,6 +147,14 @@ def _is_nurse(user):
 
 def _is_frontdesk(user):
     return user.groups.filter(name='FrontDesk').exists()
+
+
+def _staff_role_for_user(user):
+    return (
+        user.groups.filter(name__in=ALLOWED_GROUPS)
+        .values_list('name', flat=True)
+        .first()
+    )
 
 
 def _require_staff_portal(request):
@@ -1056,6 +1066,156 @@ def staff_patients(request):
             'clinic': clinic,
             'patients': patients,
             'can_edit': _is_admin(request.user) or _is_frontdesk(request.user),
+        },
+    )
+
+
+@login_required
+def staff_members(request):
+    staff, error = _require_admin_staff(request)
+    if error:
+        return error
+
+    clinic = staff.clinic
+    members = (
+        Staff.objects.filter(clinic=clinic)
+        .select_related('user')
+        .order_by('user__last_name', 'user__first_name')
+    )
+    staff_rows = []
+    for member in members:
+        role = _staff_role_for_user(member.user) or '-'
+        staff_rows.append({'staff': member, 'role': role})
+
+    return render(
+        request,
+        'core/staff_members.html',
+        {
+            'clinic': clinic,
+            'staff_rows': staff_rows,
+        },
+    )
+
+
+@login_required
+def staff_member_create(request):
+    staff, error = _require_admin_staff(request)
+    if error:
+        return error
+
+    clinic = staff.clinic
+    if request.method == 'POST':
+        form = StaffMemberCreateForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
+                form.add_error('email', 'An account with this email already exists.')
+            else:
+                is_active = bool(form.cleaned_data.get('is_active'))
+                user = User.objects.create_user(
+                    username=email,
+                    email=email,
+                    first_name=form.cleaned_data.get('first_name') or '',
+                    last_name=form.cleaned_data.get('last_name') or '',
+                    password=form.cleaned_data['password'],
+                    is_staff=True,
+                    is_active=is_active,
+                )
+                Staff.objects.create(
+                    user=user,
+                    clinic=clinic,
+                    is_active=is_active,
+                )
+                role = form.cleaned_data['role']
+                group = Group.objects.filter(name=role).first()
+                if group:
+                    user.groups.add(group)
+                if not is_active:
+                    _send_verification_email(request, user, clinic=clinic)
+                messages.success(request, 'Staff member created.')
+                return redirect('staff-members')
+    else:
+        form = StaffMemberCreateForm()
+
+    return render(
+        request,
+        'core/staff_member_form.html',
+        {
+            'clinic': clinic,
+            'form': form,
+            'title': 'Add staff',
+            'submit_label': 'Create staff',
+        },
+    )
+
+
+@login_required
+def staff_member_edit(request, staff_id: int):
+    staff, error = _require_admin_staff(request)
+    if error:
+        return error
+
+    clinic = staff.clinic
+    member = get_object_or_404(Staff, pk=staff_id, clinic=clinic)
+    user = member.user
+    current_role = _staff_role_for_user(user) or 'Doctor'
+
+    if request.method == 'POST':
+        form = StaffMemberUpdateForm(request.POST)
+        if form.is_valid():
+            email = form.cleaned_data['email']
+            if email.lower() != (user.email or user.username).lower():
+                if (
+                    User.objects.filter(username__iexact=email).exclude(pk=user.pk).exists()
+                    or User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists()
+                ):
+                    form.add_error('email', 'An account with this email already exists.')
+            if not form.errors:
+                user.username = email
+                user.email = email
+                user.first_name = form.cleaned_data.get('first_name') or ''
+                user.last_name = form.cleaned_data.get('last_name') or ''
+                user.is_active = bool(form.cleaned_data.get('is_active'))
+                user.is_staff = True
+                new_password = form.cleaned_data.get('password')
+                if new_password:
+                    user.set_password(new_password)
+                user.save()
+
+                member.is_active = user.is_active
+                member.save(update_fields=['is_active'])
+
+                staff_groups = Group.objects.filter(name__in=ALLOWED_GROUPS)
+                user.groups.remove(*staff_groups)
+                new_role = form.cleaned_data['role']
+                group = Group.objects.filter(name=new_role).first()
+                if group:
+                    user.groups.add(group)
+
+                if not user.is_active:
+                    _send_verification_email(request, user, clinic=clinic)
+                messages.success(request, 'Staff member updated.')
+                return redirect('staff-members')
+    else:
+        form = StaffMemberUpdateForm(
+            initial={
+                'email': user.email or user.username,
+                'first_name': user.first_name,
+                'last_name': user.last_name,
+                'role': current_role,
+                'is_active': user.is_active,
+            }
+        )
+
+    return render(
+        request,
+        'core/staff_member_form.html',
+        {
+            'clinic': clinic,
+            'form': form,
+            'title': 'Edit staff',
+            'submit_label': 'Save changes',
+            'staff_member': member,
         },
     )
 

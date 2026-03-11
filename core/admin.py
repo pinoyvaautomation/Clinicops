@@ -25,7 +25,7 @@ admin.site.index_title = 'ClinicOps Administration'
 def _admin_has_permission(request):
     if not request.user.is_active or not request.user.is_staff:
         return False
-    return request.user.is_superuser or request.user.groups.filter(name='Admin').exists()
+    return request.user.is_superuser
 
 
 admin.site.has_permission = _admin_has_permission

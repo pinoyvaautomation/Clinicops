@@ -131,6 +131,7 @@
       <a href="{% url 'staff-appointments' %}">Appointments</a>
       <a href="{% url 'staff-patients' %}">Patients</a>
       {% if nav_is_admin %}
+        <a href="{% url 'staff-members' %}">Staff</a>
         <a href="{% url 'billing' %}">Billing</a>
       {% endif %}
     {% else %}
