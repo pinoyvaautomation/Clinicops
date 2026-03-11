@@ -1,8 +1,15 @@
 import json
+import os
+import ssl
 import urllib.request
 
 from django.conf import settings
 from django.core.mail.backends.base import BaseEmailBackend
+
+try:
+    import certifi
+except Exception:  # pragma: no cover - optional dependency
+    certifi = None
 
 
 class ResendEmailBackend(BaseEmailBackend):
@@ -63,7 +70,28 @@ class ResendEmailBackend(BaseEmailBackend):
         )
 
         try:
-            with urllib.request.urlopen(request, timeout=settings.EMAIL_TIMEOUT) as response:
+            verify_setting = getattr(settings, 'RESEND_SSL_VERIFY', None)
+            if verify_setting is None:
+                verify_setting = os.environ.get('RESEND_SSL_VERIFY', 'true')
+            verify_ssl = str(verify_setting).lower() == 'true'
+
+            if not verify_ssl:
+                context = ssl._create_unverified_context()
+            else:
+                cafile = (
+                    getattr(settings, 'RESEND_CA_BUNDLE', None)
+                    or os.environ.get('RESEND_CA_BUNDLE')
+                    or os.environ.get('SSL_CERT_FILE')
+                )
+                if cafile:
+                    context = ssl.create_default_context(cafile=cafile)
+                elif certifi is not None:
+                    context = ssl.create_default_context(cafile=certifi.where())
+                else:
+                    context = ssl.create_default_context()
+            with urllib.request.urlopen(
+                request, timeout=settings.EMAIL_TIMEOUT, context=context
+            ) as response:
                 if 200 <= response.status < 300:
                     return 1
                 if self.fail_silently:
