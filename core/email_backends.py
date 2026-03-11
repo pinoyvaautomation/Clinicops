@@ -1,6 +1,8 @@
 import json
+import logging
 import os
 import ssl
+import urllib.error
 import urllib.request
 
 from django.conf import settings
@@ -18,6 +20,13 @@ class ResendEmailBackend(BaseEmailBackend):
     def __init__(self, api_key=None, **kwargs):
         super().__init__(**kwargs)
         self.api_key = api_key or getattr(settings, 'RESEND_API_KEY', '')
+        self._logger = logging.getLogger(__name__)
+
+    def _debug_enabled(self):
+        debug_setting = getattr(settings, 'RESEND_DEBUG', None)
+        if debug_setting is None:
+            debug_setting = os.environ.get('RESEND_DEBUG', 'false')
+        return str(debug_setting).lower() in {'1', 'true', 'yes'}
 
     def send_messages(self, email_messages):
         if not email_messages:
@@ -92,12 +101,38 @@ class ResendEmailBackend(BaseEmailBackend):
             with urllib.request.urlopen(
                 request, timeout=settings.EMAIL_TIMEOUT, context=context
             ) as response:
+                body = response.read()
+                if self._debug_enabled():
+                    preview = body[:500].decode('utf-8', errors='replace') if body else ''
+                    self._logger.info(
+                        'Resend response status=%s to=%s subject=%s body=%s',
+                        response.status,
+                        message.to,
+                        message.subject,
+                        preview,
+                    )
                 if 200 <= response.status < 300:
                     return 1
                 if self.fail_silently:
                     return 0
                 raise RuntimeError(f'Resend send failed with status {response.status}')
+        except urllib.error.HTTPError as exc:
+            if self._debug_enabled():
+                body = exc.read()
+                preview = body[:500].decode('utf-8', errors='replace') if body else ''
+                self._logger.error(
+                    'Resend HTTPError status=%s to=%s subject=%s body=%s',
+                    exc.code,
+                    message.to,
+                    message.subject,
+                    preview,
+                )
+            if self.fail_silently:
+                return 0
+            raise
         except Exception:
+            if self._debug_enabled():
+                self._logger.exception('Resend send failed for to=%s subject=%s', message.to, message.subject)
             if self.fail_silently:
                 return 0
             raise
