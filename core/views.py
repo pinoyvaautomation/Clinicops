@@ -6,6 +6,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
+from django.contrib.auth.views import LoginView
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.auth.tokens import default_token_generator
@@ -36,6 +37,7 @@ from .forms import (
     WalkInAppointmentForm,
     StaffMemberCreateForm,
     StaffMemberUpdateForm,
+    ClinicAuthenticationForm,
 )
 from .models import (
     Appointment,
@@ -53,6 +55,11 @@ User = get_user_model()
 
 ALLOWED_GROUPS = {'Admin', 'Doctor', 'Nurse', 'FrontDesk'}
 logger = logging.getLogger(__name__)
+
+
+class ClinicLoginView(LoginView):
+    authentication_form = ClinicAuthenticationForm
+    template_name = 'registration/login.html'
 
 
 def page_not_found(request, exception=None):

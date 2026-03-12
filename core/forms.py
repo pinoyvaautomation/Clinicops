@@ -2,6 +2,8 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from django import forms
+from django.contrib.auth.forms import AuthenticationForm
+from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
 
@@ -24,6 +26,15 @@ class BookingForm(forms.Form):
             self.fields['slot'].choices = slot_choices
         if appointment_type_id is not None:
             self.fields['appointment_type_id'].initial = appointment_type_id
+
+
+class ClinicAuthenticationForm(AuthenticationForm):
+    def confirm_login_allowed(self, user):
+        if not user.is_active:
+            raise ValidationError(
+                'Please verify your email before signing in.',
+                code='inactive',
+            )
 
 
 class AppointmentLookupForm(forms.Form):

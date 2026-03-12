@@ -19,8 +19,11 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
+from core.views import ClinicLoginView
+
 urlpatterns = [
     path('admin/', admin.site.urls),
+    path('accounts/login/', ClinicLoginView.as_view(), name='login'),
     path('accounts/', include('django.contrib.auth.urls')),
     path('', include('core.urls')),
 ]
