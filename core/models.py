@@ -37,6 +37,25 @@ class Clinic(models.Model):
         super().save(*args, **kwargs)
 
 
+class AdminBranding(models.Model):
+    site_header = models.CharField(max_length=100, default='ClinicOps Admin')
+    site_title = models.CharField(max_length=100, default='ClinicOps Admin')
+    index_title = models.CharField(max_length=200, default='ClinicOps Administration')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = 'Admin Branding'
+        verbose_name_plural = 'Admin Branding'
+
+    def __str__(self) -> str:
+        return self.site_header
+
+    @classmethod
+    def get_solo(cls):
+        branding, _ = cls.objects.get_or_create(pk=1)
+        return branding
+
+
 class Staff(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='staff_members')

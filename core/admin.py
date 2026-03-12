@@ -8,6 +8,7 @@ from simple_history.admin import SimpleHistoryAdmin
 from .models import (
     Appointment,
     AppointmentType,
+    AdminBranding,
     Clinic,
     ClinicSubscription,
     Patient,
@@ -29,6 +30,20 @@ def _admin_has_permission(request):
 
 
 admin.site.has_permission = _admin_has_permission
+
+_original_each_context = admin.site.each_context
+
+
+def _dynamic_each_context(request):
+    context = _original_each_context(request)
+    branding = AdminBranding.get_solo()
+    context['site_header'] = branding.site_header
+    context['site_title'] = branding.site_title
+    context['index_title'] = branding.index_title
+    return context
+
+
+admin.site.each_context = _dynamic_each_context
 
 
 class ClinicScopedAdmin(admin.ModelAdmin):
@@ -238,3 +253,11 @@ class ClinicSubscriptionAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
     list_display = ('clinic', 'plan', 'status', 'paypal_subscription_id', 'created_at')
     list_filter = ('status', 'plan')
     search_fields = ('clinic__name', 'paypal_subscription_id')
+
+
+@admin.register(AdminBranding)
+class AdminBrandingAdmin(admin.ModelAdmin):
+    list_display = ('site_header', 'site_title', 'index_title', 'updated_at')
+
+    def has_add_permission(self, request):
+        return not AdminBranding.objects.exists()
