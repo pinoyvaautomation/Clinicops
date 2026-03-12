@@ -519,7 +519,6 @@ def verify_email(request, uidb64, token):
 
 def resend_verification(request):
     initial_email = request.GET.get('email', '')
-    sent = False
     if request.method == 'POST':
         form = ResendVerificationForm(request.POST)
         if form.is_valid():
@@ -530,8 +529,13 @@ def resend_verification(request):
             )
             if user and not user.is_active:
                 _send_verification_email(request, user, clinic=_get_user_clinic(user))
-            sent = True
-            form = ResendVerificationForm()
+            return render(
+                request,
+                'core/resend_verification_success.html',
+                {
+                    'email': email,
+                },
+            )
     else:
         form = ResendVerificationForm(initial={'email': initial_email})
 
@@ -540,7 +544,7 @@ def resend_verification(request):
         'core/resend_verification.html',
         {
             'form': form,
-            'sent': sent,
+            'sent': False,
         },
     )
 
