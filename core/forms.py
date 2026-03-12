@@ -2,6 +2,7 @@ from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from django import forms
+from django.contrib.auth import get_user_model
 from django.contrib.auth.forms import AuthenticationForm
 from django.core.exceptions import ValidationError
 from django.conf import settings
@@ -29,6 +30,25 @@ class BookingForm(forms.Form):
 
 
 class ClinicAuthenticationForm(AuthenticationForm):
+    def clean(self):
+        username = self.data.get("username") or self.data.get("email")
+        password = self.data.get("password")
+        if username and password:
+            username = username.strip()
+            if "@" in username:
+                username = username.lower()
+            UserModel = get_user_model()
+            try:
+                user = UserModel._default_manager.get_by_natural_key(username)
+            except UserModel.DoesNotExist:
+                user = None
+            if user and not user.is_active and user.check_password(password):
+                raise ValidationError(
+                    'Please verify your email before signing in.',
+                    code='inactive',
+                )
+        return super().clean()
+
     def confirm_login_allowed(self, user):
         if not user.is_active:
             raise ValidationError(
