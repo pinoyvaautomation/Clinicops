@@ -4,49 +4,89 @@
     <meta charset="utf-8">
     <title>Appointment Lookup</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
-      .panel { border: 1px solid #e5e7eb; padding: 16px; border-radius: 6px; max-width: 520px; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+      .page {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .panel {
+        border: 1px solid #e5e7eb;
+        padding: 20px 18px 22px;
+        border-radius: 10px;
+        max-width: 520px;
+        width: 100%;
+        background: #fff;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+      }
       label { display: block; margin-top: 12px; font-weight: 600; }
-      input { width: 100%; padding: 8px; margin-top: 4px; }
-      button { margin-top: 16px; padding: 10px 14px; }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        margin-top: 6px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+      }
+      button {
+        margin-top: 16px;
+        padding: 12px;
+        border-radius: 6px;
+        width: 100%;
+        background: var(--brand, #0f5132);
+        color: #fff;
+        border: none;
+        font-weight: 700;
+      }
       .error { color: #b91c1c; margin-top: 8px; }
       .muted { color: #6b7280; }
     </style>
   </head>
   <body>
     {% include "core/partials/public_nav.html" %}
-    <div class="panel">
-      <h1>Find your appointment</h1>
-      <p class="muted">Enter your email and confirmation code.</p>
-      <form method="post">
-        {% csrf_token %}
-        {{ form.non_field_errors }}
-        <label for="id_email">Email</label>
-        {{ form.email }}
-        {{ form.email.errors }}
+    <main class="page">
+      <div class="panel">
+        <h1>Find your appointment</h1>
+        <p class="muted">Enter your email and confirmation code.</p>
+        <form method="post">
+          {% csrf_token %}
+          {{ form.non_field_errors }}
+          <label for="id_email">Email</label>
+          {{ form.email }}
+          {{ form.email.errors }}
 
-        <label for="id_confirmation_code">Confirmation code</label>
-        {{ form.confirmation_code }}
-        {{ form.confirmation_code.errors }}
+          <label for="id_confirmation_code">Confirmation code</label>
+          {{ form.confirmation_code }}
+          {{ form.confirmation_code.errors }}
 
-        <button type="submit">Find appointment</button>
-      </form>
+          <button type="submit">Find appointment</button>
+        </form>
 
-      {% if error_message %}
-        <div class="error">{{ error_message }}</div>
-      {% endif %}
-
-      {% if appointment %}
-        <hr>
-        <h2>Appointment details</h2>
-        <p><strong>Clinic:</strong> {{ appointment.clinic.name }}</p>
-        <p><strong>Staff:</strong> {{ appointment.staff }}</p>
-        <p><strong>Time:</strong> {{ appointment_local|date:"Y-m-d H:i" }}</p>
-        {% if appointment.appointment_type %}
-          <p><strong>Type:</strong> {{ appointment.appointment_type.name }}</p>
+        {% if error_message %}
+          <div class="error">{{ error_message }}</div>
         {% endif %}
-      {% endif %}
-    </div>
+
+        {% if appointment %}
+          <hr>
+          <h2>Appointment details</h2>
+          <p><strong>Clinic:</strong> {{ appointment.clinic.name }}</p>
+          <p><strong>Staff:</strong> {{ appointment.staff }}</p>
+          <p><strong>Time:</strong> {{ appointment_local|date:"Y-m-d H:i" }}</p>
+          {% if appointment.appointment_type %}
+            <p><strong>Type:</strong> {{ appointment.appointment_type.name }}</p>
+          {% endif %}
+        {% endif %}
+      </div>
+    </main>
     {% include "core/partials/site_footer.html" %}
   </body>
 </html>
