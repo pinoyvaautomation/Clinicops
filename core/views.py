@@ -20,6 +20,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -671,11 +672,13 @@ def clinic_signup(request):
     )
 
 
+@never_cache
 def patient_signup(request, clinic_id: int):
     clinic = get_object_or_404(Clinic, pk=clinic_id, is_active=True)
     return _patient_signup(request, clinic)
 
 
+@never_cache
 def patient_signup_slug(request, clinic_slug: str):
     clinic = get_object_or_404(Clinic, slug=clinic_slug, is_active=True)
     return _patient_signup(request, clinic)
