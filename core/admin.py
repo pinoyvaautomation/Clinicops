@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.db.models import QuerySet
 from simple_history.admin import SimpleHistoryAdmin
+from admin_interface.models import Theme
 
 from .models import (
     Appointment,
@@ -261,3 +262,11 @@ class AdminBrandingAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return not AdminBranding.objects.exists()
+
+    def save_model(self, request, obj, form, change):
+        super().save_model(request, obj, form, change)
+        theme = Theme.objects.filter(active=True).first() or Theme.objects.first()
+        if theme:
+            theme.title = obj.site_header
+            theme.name = obj.site_title
+            theme.save(update_fields=['title', 'name'])
