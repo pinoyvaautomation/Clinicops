@@ -31,9 +31,8 @@ class BookingForm(forms.Form):
 
 class ClinicAuthenticationForm(AuthenticationForm):
     def clean(self):
-        username = self.data.get("username") or self.data.get("email")
-        password = self.data.get("password")
-        if username and password:
+        username = self.cleaned_data.get("username")
+        if username:
             username = username.strip()
             if "@" in username:
                 username = username.lower()
@@ -42,7 +41,7 @@ class ClinicAuthenticationForm(AuthenticationForm):
                 user = UserModel._default_manager.get_by_natural_key(username)
             except UserModel.DoesNotExist:
                 user = None
-            if user and not user.is_active and user.check_password(password):
+            if user and not user.is_active:
                 raise ValidationError(
                     'Please verify your email before signing in.',
                     code='inactive',
