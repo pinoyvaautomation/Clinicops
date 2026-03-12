@@ -1224,19 +1224,22 @@ def appointment_types(request):
 
     clinic = staff.clinic
     types = AppointmentType.objects.filter(clinic=clinic).order_by('name')
-    form = AppointmentTypeForm(clinic=clinic)
+    add_form = AppointmentTypeForm(prefix='add', clinic=clinic)
+    edit_form = AppointmentTypeForm(prefix='edit', clinic=clinic)
     open_modal = False
+    open_edit_modal = False
+    edit_action_url = ''
 
     if request.method == 'POST':
-        form = AppointmentTypeForm(request.POST, clinic=clinic)
-        if form.is_valid():
-            price_cents = form.cleaned_data.get('price_cents')
+        add_form = AppointmentTypeForm(request.POST, prefix='add', clinic=clinic)
+        if add_form.is_valid():
+            price_cents = add_form.cleaned_data.get('price_cents')
             AppointmentType.objects.create(
                 clinic=clinic,
-                name=form.cleaned_data['name'],
-                duration_minutes=form.cleaned_data['duration_minutes'],
+                name=add_form.cleaned_data['name'],
+                duration_minutes=add_form.cleaned_data['duration_minutes'],
                 price_cents=price_cents if price_cents is not None else None,
-                is_active=bool(form.cleaned_data.get('is_active')),
+                is_active=bool(add_form.cleaned_data.get('is_active')),
             )
             messages.success(request, 'Service created.')
             return redirect('appointment-types')
@@ -1244,7 +1247,7 @@ def appointment_types(request):
     rows = []
     for appt_type in types:
         if appt_type.price_cents is None:
-            price_display = '—'
+            price_display = '-'
         else:
             price_display = f"${appt_type.price_cents / 100:.2f}"
         rows.append({'type': appt_type, 'price': price_display})
@@ -1255,8 +1258,11 @@ def appointment_types(request):
         {
             'clinic': clinic,
             'rows': rows,
-            'form': form,
+            'add_form': add_form,
+            'edit_form': edit_form,
             'open_modal': open_modal,
+            'open_edit_modal': open_edit_modal,
+            'edit_action_url': edit_action_url,
         },
     )
 
@@ -1306,7 +1312,7 @@ def appointment_type_edit(request, type_id: int):
     appt_type = get_object_or_404(AppointmentType, pk=type_id, clinic=clinic)
 
     if request.method == 'POST':
-        form = AppointmentTypeForm(request.POST, clinic=clinic, instance=appt_type)
+        form = AppointmentTypeForm(request.POST, prefix='edit', clinic=clinic, instance=appt_type)
         if form.is_valid():
             appt_type.name = form.cleaned_data['name']
             appt_type.duration_minutes = form.cleaned_data['duration_minutes']
@@ -1316,6 +1322,27 @@ def appointment_type_edit(request, type_id: int):
             appt_type.save(update_fields=['name', 'duration_minutes', 'price_cents', 'is_active'])
             messages.success(request, 'Service updated.')
             return redirect('appointment-types')
+        types = AppointmentType.objects.filter(clinic=clinic).order_by('name')
+        rows = []
+        for appt in types:
+            if appt.price_cents is None:
+                price_display = '-'
+            else:
+                price_display = f"${appt.price_cents / 100:.2f}"
+            rows.append({'type': appt, 'price': price_display})
+        return render(
+            request,
+            'core/appointment_types.html',
+            {
+                'clinic': clinic,
+                'rows': rows,
+                'add_form': AppointmentTypeForm(prefix='add', clinic=clinic),
+                'edit_form': form,
+                'open_modal': False,
+                'open_edit_modal': True,
+                'edit_action_url': reverse('appointment-type-edit', args=[appt_type.id]),
+            },
+        )
     else:
         form = AppointmentTypeForm(clinic=clinic, instance=appt_type)
 

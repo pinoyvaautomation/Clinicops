@@ -108,7 +108,17 @@
             <td>{{ row.type.duration_minutes }} min</td>
             <td>{{ row.price }}</td>
             <td>{% if row.type.is_active %}Active{% else %}Inactive{% endif %}</td>
-            <td><a href="{% url 'appointment-type-edit' row.type.id %}">Edit</a></td>
+            <td>
+              <a
+                href="#"
+                class="edit-service-link"
+                data-action="{% url 'appointment-type-edit' row.type.id %}"
+                data-name="{{ row.type.name }}"
+                data-duration="{{ row.type.duration_minutes }}"
+                data-price="{{ row.type.price_cents|default_if_none:'' }}"
+                data-active="{{ row.type.is_active|yesno:'true,false' }}"
+              >Edit</a>
+            </td>
           </tr>
         {% empty %}
           <tr>
@@ -123,35 +133,74 @@
       <div class="modal-card">
         <div class="modal-header">
           <span>Add service</span>
-          <button class="close-btn" type="button" id="close-service-modal">×</button>
+          <button class="close-btn" type="button" id="close-service-modal">&times;</button>
         </div>
         <div class="modal-body">
           <form method="post" action="{% url 'appointment-types' %}">
             {% csrf_token %}
-            {{ form.non_field_errors }}
+            {{ add_form.non_field_errors }}
 
-            <label for="id_name">Service name</label>
-            {{ form.name }}
-            {{ form.name.errors }}
+            <label for="{{ add_form.name.id_for_label }}">Service name</label>
+            {{ add_form.name }}
+            {{ add_form.name.errors }}
 
-            <label for="id_duration_minutes">Duration (minutes)</label>
-            {{ form.duration_minutes }}
-            {{ form.duration_minutes.errors }}
+            <label for="{{ add_form.duration_minutes.id_for_label }}">Duration (minutes)</label>
+            {{ add_form.duration_minutes }}
+            {{ add_form.duration_minutes.errors }}
 
-            <label for="id_price_cents">Price (optional)</label>
-            {{ form.price_cents }}
-            {{ form.price_cents.errors }}
+            <label for="{{ add_form.price_cents.id_for_label }}">Price (optional)</label>
+            {{ add_form.price_cents }}
+            {{ add_form.price_cents.errors }}
             <div class="help">Enter the amount in cents. Example: 500 = $5.00.</div>
 
             <div class="checkbox-row">
-              <label for="id_is_active">Active</label>
-              {{ form.is_active }}
+              <label for="{{ add_form.is_active.id_for_label }}">Active</label>
+              {{ add_form.is_active }}
             </div>
-            {{ form.is_active.errors }}
+            {{ add_form.is_active.errors }}
 
             <div class="actions-row">
               <button class="btn secondary" type="button" id="cancel-service-modal">Cancel</button>
               <button class="btn" type="submit">Create service</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal{% if open_edit_modal %} open{% endif %}" id="service-edit-modal" aria-hidden="{% if open_edit_modal %}false{% else %}true{% endif %}">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span>Edit service</span>
+          <button class="close-btn" type="button" id="close-edit-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <form method="post" action="{% if edit_action_url %}{{ edit_action_url }}{% else %}#{% endif %}" id="edit-service-form">
+            {% csrf_token %}
+            {{ edit_form.non_field_errors }}
+
+            <label for="{{ edit_form.name.id_for_label }}">Service name</label>
+            {{ edit_form.name }}
+            {{ edit_form.name.errors }}
+
+            <label for="{{ edit_form.duration_minutes.id_for_label }}">Duration (minutes)</label>
+            {{ edit_form.duration_minutes }}
+            {{ edit_form.duration_minutes.errors }}
+
+            <label for="{{ edit_form.price_cents.id_for_label }}">Price (optional)</label>
+            {{ edit_form.price_cents }}
+            {{ edit_form.price_cents.errors }}
+            <div class="help">Enter the amount in cents. Example: 500 = $5.00.</div>
+
+            <div class="checkbox-row">
+              <label for="{{ edit_form.is_active.id_for_label }}">Active</label>
+              {{ edit_form.is_active }}
+            </div>
+            {{ edit_form.is_active.errors }}
+
+            <div class="actions-row">
+              <button class="btn secondary" type="button" id="cancel-edit-modal">Cancel</button>
+              <button class="btn" type="submit">Save changes</button>
             </div>
           </form>
         </div>
@@ -184,6 +233,54 @@
         modal.addEventListener('click', function(e) {
           if (e.target === modal) {
             closeModal();
+          }
+        });
+      })();
+
+      (function() {
+        const editModal = document.getElementById('service-edit-modal');
+        const editClose = document.getElementById('close-edit-modal');
+        const editCancel = document.getElementById('cancel-edit-modal');
+        const editForm = document.getElementById('edit-service-form');
+        if (!editModal || !editForm) return;
+
+        function openEditModal() {
+          editModal.classList.add('open');
+          editModal.setAttribute('aria-hidden', 'false');
+        }
+        function closeEditModal() {
+          editModal.classList.remove('open');
+          editModal.setAttribute('aria-hidden', 'true');
+        }
+
+        document.querySelectorAll('.edit-service-link').forEach(function(link) {
+          link.addEventListener('click', function(e) {
+            e.preventDefault();
+            const action = link.getAttribute('data-action');
+            if (action) {
+              editForm.setAttribute('action', action);
+            }
+            const name = link.getAttribute('data-name') || '';
+            const duration = link.getAttribute('data-duration') || '';
+            const price = link.getAttribute('data-price') || '';
+            const active = link.getAttribute('data-active') === 'true';
+            const nameInput = document.getElementById('id_edit-name');
+            const durationInput = document.getElementById('id_edit-duration_minutes');
+            const priceInput = document.getElementById('id_edit-price_cents');
+            const activeInput = document.getElementById('id_edit-is_active');
+            if (nameInput) nameInput.value = name;
+            if (durationInput) durationInput.value = duration;
+            if (priceInput) priceInput.value = price;
+            if (activeInput) activeInput.checked = active;
+            openEditModal();
+          });
+        });
+
+        editClose?.addEventListener('click', closeEditModal);
+        editCancel?.addEventListener('click', closeEditModal);
+        editModal.addEventListener('click', function(e) {
+          if (e.target === editModal) {
+            closeEditModal();
           }
         });
       })();
