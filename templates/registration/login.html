@@ -89,7 +89,11 @@
           <span>{{ public_brand_name|default:"ClinicOps" }} Login</span>
         </div>
         <div class="login-body">
-          {% if form.errors %}
+          {% if form.non_field_errors %}
+            {% for error in form.non_field_errors %}
+              <p class="error">{{ error }}</p>
+            {% endfor %}
+          {% elif form.errors %}
             <p class="error">Invalid username or password.</p>
           {% endif %}
           <form method="post" action="{% url 'login' %}">
