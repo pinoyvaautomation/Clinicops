@@ -461,7 +461,7 @@ def _clinic_booking(request, clinic: Clinic):
                                 (
                                     f'Hello {patient.first_name},\n\n'
                                     f'Your appointment at {clinic.name} is confirmed.\n'
-                                    f'Time: {start_at_local:%Y-%m-%d %H:%M} - {end_at_local:%H:%M} ({clinic.timezone})\n'
+                                    f'Time: {start_at_local:%b %d, %Y %I:%M %p} - {end_at_local:%I:%M %p} ({clinic.timezone})\n'
                                     f'Staff: {staff}\n'
                                     f'Confirmation code: {appointment.confirmation_code}\n\n'
                                     'Thank you.'

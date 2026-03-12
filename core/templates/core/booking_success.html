@@ -69,7 +69,7 @@
           {% if appointment.appointment_type %}
             <p><strong>Type:</strong> {{ appointment.appointment_type.name }}</p>
           {% endif %}
-          <p><strong>Time:</strong> {{ appointment_local|date:"Y-m-d H:i" }}</p>
+          <p><strong>Time:</strong> {{ appointment_local|date:"M j, Y, g:i A" }}</p>
           <p><strong>Confirmation code:</strong> {{ appointment.confirmation_code }}</p>
           <p class="muted">Use this code on the appointment lookup page.</p>
           <p><a href="/appointments/lookup/">View or confirm appointment</a></p>

@@ -42,7 +42,7 @@ def send_upcoming_appointment_reminders() -> int:
             f'This is a reminder for your appointment at {appt.clinic.name}.\n'
             f'Staff: {appt.staff}\n'
             f'{appointment_type_line}'
-            f'Time: {start_local:%Y-%m-%d %H:%M} - {end_local:%H:%M} ({appt.clinic.timezone})\n\n'
+            f'Time: {start_local:%b %d, %Y %I:%M %p} - {end_local:%I:%M %p} ({appt.clinic.timezone})\n\n'
             f'Confirmation code: {appt.confirmation_code}\n\n'
             'If you need to reschedule, please contact the clinic.\n'
         )

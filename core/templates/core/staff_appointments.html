@@ -71,8 +71,8 @@
       <tbody>
         {% for appt in appointments %}
           <tr>
-            <td>{{ appt.start_at|date:"Y-m-d H:i" }}</td>
-            <td>{{ appt.end_at|date:"Y-m-d H:i" }}</td>
+            <td>{{ appt.start_at|date:"M j, Y, g:i A" }}</td>
+            <td>{{ appt.end_at|date:"M j, Y, g:i A" }}</td>
             <td>{% if appt.appointment_type %}{{ appt.appointment_type.name }}{% else %}-{% endif %}</td>
             <td>{{ appt.staff }}</td>
             <td>{{ appt.patient }}</td>

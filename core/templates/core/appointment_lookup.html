@@ -106,7 +106,7 @@
             <h2>Appointment details</h2>
             <p><strong>Clinic:</strong> {{ appointment.clinic.name }}</p>
             <p><strong>Staff:</strong> {{ appointment.staff }}</p>
-            <p><strong>Time:</strong> {{ appointment_local|date:"Y-m-d H:i" }}</p>
+            <p><strong>Time:</strong> {{ appointment_local|date:"M j, Y, g:i A" }}</p>
             {% if appointment.appointment_type %}
               <p><strong>Type:</strong> {{ appointment.appointment_type.name }}</p>
             {% endif %}

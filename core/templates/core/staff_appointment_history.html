@@ -41,7 +41,7 @@
       <tbody>
         {% for item in history %}
           <tr>
-            <td>{{ item.history_date|date:"Y-m-d H:i" }}</td>
+            <td>{{ item.history_date|date:"M j, Y, g:i A" }}</td>
             {% if limited_history %}
               <td>{{ item.get_status_display }}</td>
               <td>{{ item.cancel_reason|default:"-" }}</td>
@@ -53,8 +53,8 @@
               </td>
               <td>{{ item.staff }}</td>
               <td>{{ item.get_status_display }}</td>
-              <td>{{ item.start_at|date:"Y-m-d H:i" }}</td>
-              <td>{{ item.end_at|date:"Y-m-d H:i" }}</td>
+              <td>{{ item.start_at|date:"M j, Y, g:i A" }}</td>
+              <td>{{ item.end_at|date:"M j, Y, g:i A" }}</td>
               <td>{{ item.cancel_reason|default:"-" }}</td>
               <td>{{ item.history_user|default:"-" }}</td>
               <td>{{ item.history_change_reason|default:"-" }}</td>
