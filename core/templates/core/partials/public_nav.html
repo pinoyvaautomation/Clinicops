@@ -64,7 +64,7 @@
       {% if clinic and clinic.slug %}
         <a href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
       {% endif %}
-      <a class="cta" href="{% url 'login' %}?next={{ request.path }}">Sign in</a>
+      <a class="cta" href="{% url 'login' %}">Sign in</a>
     </div>
   </div>
 </nav>
