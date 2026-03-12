@@ -115,6 +115,33 @@ class AvatarUploadForm(forms.Form):
     avatar = forms.ImageField(required=False)
 
 
+class AppointmentTypeForm(forms.Form):
+    name = forms.CharField(max_length=100)
+    duration_minutes = forms.IntegerField(min_value=5)
+    price_cents = forms.IntegerField(required=False, min_value=0)
+    is_active = forms.BooleanField(required=False, initial=True)
+
+    def __init__(self, *args, clinic=None, instance=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.clinic = clinic
+        self.instance = instance
+        if instance is not None and not self.is_bound:
+            self.fields['name'].initial = instance.name
+            self.fields['duration_minutes'].initial = instance.duration_minutes
+            self.fields['price_cents'].initial = instance.price_cents
+            self.fields['is_active'].initial = instance.is_active
+
+    def clean_name(self):
+        name = self.cleaned_data['name'].strip()
+        if self.clinic:
+            qs = AppointmentType.objects.filter(clinic=self.clinic, name__iexact=name)
+            if self.instance is not None:
+                qs = qs.exclude(pk=self.instance.pk)
+            if qs.exists():
+                raise ValidationError('An appointment type with this name already exists.')
+        return name
+
+
 STAFF_ROLE_CHOICES = [
     ('Admin', 'Admin'),
     ('Doctor', 'Doctor'),

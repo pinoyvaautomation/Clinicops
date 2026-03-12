@@ -38,6 +38,7 @@ from .forms import (
     WalkInAppointmentForm,
     StaffMemberCreateForm,
     StaffMemberUpdateForm,
+    AppointmentTypeForm,
     ClinicAuthenticationForm,
 )
 from .models import (
@@ -1211,6 +1212,103 @@ def staff_members(request):
         {
             'clinic': clinic,
             'staff_rows': staff_rows,
+        },
+    )
+
+
+@login_required
+def appointment_types(request):
+    staff, error = _require_admin_staff(request)
+    if error:
+        return error
+
+    clinic = staff.clinic
+    types = AppointmentType.objects.filter(clinic=clinic).order_by('name')
+    rows = []
+    for appt_type in types:
+        if appt_type.price_cents is None:
+            price_display = '—'
+        else:
+            price_display = f"${appt_type.price_cents / 100:.2f}"
+        rows.append({'type': appt_type, 'price': price_display})
+
+    return render(
+        request,
+        'core/appointment_types.html',
+        {
+            'clinic': clinic,
+            'rows': rows,
+        },
+    )
+
+
+@login_required
+def appointment_type_create(request):
+    staff, error = _require_admin_staff(request)
+    if error:
+        return error
+
+    clinic = staff.clinic
+    if request.method == 'POST':
+        form = AppointmentTypeForm(request.POST, clinic=clinic)
+        if form.is_valid():
+            price_cents = form.cleaned_data.get('price_cents')
+            AppointmentType.objects.create(
+                clinic=clinic,
+                name=form.cleaned_data['name'],
+                duration_minutes=form.cleaned_data['duration_minutes'],
+                price_cents=price_cents if price_cents is not None else None,
+                is_active=bool(form.cleaned_data.get('is_active')),
+            )
+            messages.success(request, 'Service created.')
+            return redirect('appointment-types')
+    else:
+        form = AppointmentTypeForm(clinic=clinic)
+
+    return render(
+        request,
+        'core/appointment_type_form.html',
+        {
+            'clinic': clinic,
+            'form': form,
+            'title': 'Add service',
+            'submit_label': 'Create service',
+        },
+    )
+
+
+@login_required
+def appointment_type_edit(request, type_id: int):
+    staff, error = _require_admin_staff(request)
+    if error:
+        return error
+
+    clinic = staff.clinic
+    appt_type = get_object_or_404(AppointmentType, pk=type_id, clinic=clinic)
+
+    if request.method == 'POST':
+        form = AppointmentTypeForm(request.POST, clinic=clinic, instance=appt_type)
+        if form.is_valid():
+            appt_type.name = form.cleaned_data['name']
+            appt_type.duration_minutes = form.cleaned_data['duration_minutes']
+            price_cents = form.cleaned_data.get('price_cents')
+            appt_type.price_cents = price_cents if price_cents is not None else None
+            appt_type.is_active = bool(form.cleaned_data.get('is_active'))
+            appt_type.save(update_fields=['name', 'duration_minutes', 'price_cents', 'is_active'])
+            messages.success(request, 'Service updated.')
+            return redirect('appointment-types')
+    else:
+        form = AppointmentTypeForm(clinic=clinic, instance=appt_type)
+
+    return render(
+        request,
+        'core/appointment_type_form.html',
+        {
+            'clinic': clinic,
+            'form': form,
+            'title': 'Edit service',
+            'submit_label': 'Save changes',
+            'appointment_type': appt_type,
         },
     )
 

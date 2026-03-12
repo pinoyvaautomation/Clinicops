@@ -1,0 +1,145 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ title }}</title>
+    <style>
+      :root { --brand: #0f5132; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+      .page {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 520px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+      }
+      .card-header {
+        background: var(--brand);
+        color: #fff;
+        padding: 18px 20px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .card-body { padding: 22px 20px 24px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        margin-top: 6px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+      }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 12px 18px;
+        border-radius: 8px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+        text-decoration: none;
+        cursor: pointer;
+        border: 2px solid transparent;
+        transition: transform 0.08s ease, box-shadow 0.12s ease, background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+      }
+      .btn.primary {
+        background: var(--brand);
+        color: #fff;
+        border-color: var(--brand);
+      }
+      .btn.primary:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 6px 14px rgba(15, 23, 42, 0.12);
+      }
+      .btn.secondary {
+        background: transparent;
+        color: #111827;
+        border-color: #111827;
+      }
+      .btn.secondary:hover {
+        transform: translateY(-1px);
+        background: #f9fafb;
+      }
+      .btn.primary:active,
+      .btn.secondary:active {
+        transform: translateY(0);
+      }
+      .muted { color: #6b7280; font-size: 14px; margin-top: 6px; }
+      .help { font-size: 12px; color: #6b7280; margin-top: 4px; }
+      .actions { margin-top: 18px; display: flex; gap: 12px; width: 100%; }
+      .actions .btn { flex: 1; }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .checkbox-row label {
+        margin: 0;
+        font-weight: 600;
+      }
+      .checkbox-row input {
+        width: auto;
+        margin: 0;
+      }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <main class="page">
+      <div class="card">
+        <div class="card-header">{{ title }}</div>
+        <div class="card-body">
+          <p class="muted">Clinic: {{ clinic.name }}</p>
+          <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <label for="id_name">Service name</label>
+            {{ form.name }}
+            {{ form.name.errors }}
+
+            <label for="id_duration_minutes">Duration (minutes)</label>
+            {{ form.duration_minutes }}
+            {{ form.duration_minutes.errors }}
+
+            <label for="id_price_cents">Price (optional)</label>
+            {{ form.price_cents }}
+            {{ form.price_cents.errors }}
+            <div class="help">Enter the amount in cents. Example: 500 = $5.00.</div>
+
+            <div class="checkbox-row">
+              <label for="id_is_active">Active</label>
+              {{ form.is_active }}
+            </div>
+            {{ form.is_active.errors }}
+
+            <div class="actions">
+              <a class="btn secondary" href="{% url 'appointment-types' %}">Cancel</a>
+              <button class="btn primary" type="submit">{{ submit_label }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </main>
+    {% include "core/partials/site_footer.html" %}
+  </body>
+</html>
