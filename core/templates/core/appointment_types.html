@@ -19,6 +19,68 @@
         border-radius: 8px;
         font-weight: 600;
       }
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(15, 23, 42, 0.35);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        z-index: 2000;
+      }
+      .modal.open { display: flex; }
+      .modal-card {
+        width: 100%;
+        max-width: 520px;
+        background: #fff;
+        border-radius: 12px;
+        border: 1px solid #e5e7eb;
+        overflow: hidden;
+        box-shadow: 0 18px 36px rgba(15, 23, 42, 0.18);
+      }
+      .modal-header {
+        background: #0f5132;
+        color: #fff;
+        padding: 16px 18px;
+        font-weight: 700;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .modal-body { padding: 20px 18px 22px; }
+      .close-btn {
+        border: none;
+        background: transparent;
+        color: #fff;
+        font-size: 20px;
+        cursor: pointer;
+      }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        margin-top: 6px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+      }
+      .help { font-size: 12px; color: #6b7280; margin-top: 4px; }
+      .actions-row { margin-top: 18px; display: flex; gap: 12px; width: 100%; }
+      .actions-row .btn { flex: 1; text-align: center; }
+      .btn.secondary {
+        background: transparent;
+        color: #111827;
+        border: 2px solid #111827;
+      }
+      .btn.secondary:hover { background: #f9fafb; }
+      .checkbox-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      .checkbox-row label { margin: 0; }
+      .checkbox-row input { width: auto; margin: 0; }
     </style>
   </head>
   <body>
@@ -26,7 +88,7 @@
     <h1>Services</h1>
     <p class="muted">Clinic: {{ clinic.name }}</p>
     <div class="actions">
-      <a class="btn" href="{% url 'appointment-type-create' %}">Add service</a>
+      <a class="btn" href="#" id="open-service-modal">Add service</a>
     </div>
 
     <table>
@@ -56,5 +118,75 @@
       </tbody>
     </table>
     {% include "core/partials/site_footer.html" %}
+
+    <div class="modal{% if open_modal %} open{% endif %}" id="service-modal" aria-hidden="{% if open_modal %}false{% else %}true{% endif %}">
+      <div class="modal-card">
+        <div class="modal-header">
+          <span>Add service</span>
+          <button class="close-btn" type="button" id="close-service-modal">×</button>
+        </div>
+        <div class="modal-body">
+          <form method="post" action="{% url 'appointment-types' %}">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <label for="id_name">Service name</label>
+            {{ form.name }}
+            {{ form.name.errors }}
+
+            <label for="id_duration_minutes">Duration (minutes)</label>
+            {{ form.duration_minutes }}
+            {{ form.duration_minutes.errors }}
+
+            <label for="id_price_cents">Price (optional)</label>
+            {{ form.price_cents }}
+            {{ form.price_cents.errors }}
+            <div class="help">Enter the amount in cents. Example: 500 = $5.00.</div>
+
+            <div class="checkbox-row">
+              <label for="id_is_active">Active</label>
+              {{ form.is_active }}
+            </div>
+            {{ form.is_active.errors }}
+
+            <div class="actions-row">
+              <button class="btn secondary" type="button" id="cancel-service-modal">Cancel</button>
+              <button class="btn" type="submit">Create service</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      (function() {
+        const openBtn = document.getElementById('open-service-modal');
+        const modal = document.getElementById('service-modal');
+        const closeBtn = document.getElementById('close-service-modal');
+        const cancelBtn = document.getElementById('cancel-service-modal');
+        if (!openBtn || !modal) return;
+
+        function openModal() {
+          modal.classList.add('open');
+          modal.setAttribute('aria-hidden', 'false');
+        }
+        function closeModal() {
+          modal.classList.remove('open');
+          modal.setAttribute('aria-hidden', 'true');
+        }
+
+        openBtn.addEventListener('click', function(e) {
+          e.preventDefault();
+          openModal();
+        });
+        closeBtn?.addEventListener('click', closeModal);
+        cancelBtn?.addEventListener('click', closeModal);
+        modal.addEventListener('click', function(e) {
+          if (e.target === modal) {
+            closeModal();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

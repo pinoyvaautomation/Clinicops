@@ -1224,6 +1224,23 @@ def appointment_types(request):
 
     clinic = staff.clinic
     types = AppointmentType.objects.filter(clinic=clinic).order_by('name')
+    form = AppointmentTypeForm(clinic=clinic)
+    open_modal = False
+
+    if request.method == 'POST':
+        form = AppointmentTypeForm(request.POST, clinic=clinic)
+        if form.is_valid():
+            price_cents = form.cleaned_data.get('price_cents')
+            AppointmentType.objects.create(
+                clinic=clinic,
+                name=form.cleaned_data['name'],
+                duration_minutes=form.cleaned_data['duration_minutes'],
+                price_cents=price_cents if price_cents is not None else None,
+                is_active=bool(form.cleaned_data.get('is_active')),
+            )
+            messages.success(request, 'Service created.')
+            return redirect('appointment-types')
+        open_modal = True
     rows = []
     for appt_type in types:
         if appt_type.price_cents is None:
@@ -1238,6 +1255,8 @@ def appointment_types(request):
         {
             'clinic': clinic,
             'rows': rows,
+            'form': form,
+            'open_modal': open_modal,
         },
     )
 
