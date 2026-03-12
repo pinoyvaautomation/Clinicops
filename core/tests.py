@@ -1,5 +1,5 @@
 import json
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
@@ -173,11 +173,13 @@ class BookingViewTests(TestCase):
             duration_minutes=45,
         )
 
-        now = timezone.make_aware(datetime(2026, 2, 25, 12, 0))
-        slots = build_available_slots(clinic, [staff], duration_minutes=45, now=now)
-        self.assertTrue(slots)
-
-        slot_value = slots[0].value
+        get_response = self.client.get(reverse('clinic-booking', args=[clinic.id]))
+        self.assertEqual(get_response.status_code, 200)
+        form = get_response.context['form']
+        slot_choices = form.fields['slot'].choices
+        self.assertTrue(slot_choices)
+        slot_value = slot_choices[-1][0]
+        appointment_type_id = form.fields['appointment_type_id'].initial or appointment_type.id
         response = self.client.post(
             reverse('clinic-booking', args=[clinic.id]),
             data={
@@ -185,13 +187,15 @@ class BookingViewTests(TestCase):
                 'last_name': 'Patient',
                 'email': 'jamie@example.com',
                 'phone': '555-0999',
-                'appointment_type_id': appointment_type.id,
+                'appointment_type_id': appointment_type_id,
                 'slot': slot_value,
                 'notes': 'Test booking',
             },
         )
 
         self.assertEqual(response.status_code, 200)
+        template_names = [template.name for template in response.templates]
+        self.assertIn('core/booking_success.html', template_names, template_names)
         self.assertEqual(Appointment.objects.count(), 1)
         appointment = Appointment.objects.first()
         self.assertEqual(appointment.appointment_type_id, appointment_type.id)
