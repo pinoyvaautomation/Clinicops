@@ -139,10 +139,27 @@ def _get_user_clinic(user):
         return user.staff.clinic
     except Staff.DoesNotExist:
         pass
-    patient = getattr(user, 'patient_profile', None)
+    patient = Patient.objects.filter(user=user).select_related('clinic').first()
     if patient:
         return patient.clinic
     return None
+
+
+def _get_active_patient_profile(request):
+    profiles = Patient.objects.filter(user=request.user).select_related('clinic')
+    if not profiles.exists():
+        return None, profiles
+
+    selected_id = request.session.get('patient_clinic_id')
+    if selected_id:
+        patient = profiles.filter(clinic_id=selected_id).first()
+        if patient:
+            return patient, profiles
+
+    if profiles.count() == 1:
+        return profiles.first(), profiles
+
+    return None, profiles
 
 
 def _is_admin(user):
@@ -390,14 +407,38 @@ def _clinic_booking(request, clinic: Clinic):
                     end_at = start_at + duration
                     start_at_local = timezone.localtime(start_at, clinic_tz)
                     end_at_local = timezone.localtime(end_at, clinic_tz)
-                    patient = Patient.objects.create(
-                        clinic=clinic,
-                        first_name=form.cleaned_data['first_name'],
-                        last_name=form.cleaned_data['last_name'],
-                        email=form.cleaned_data['email'],
-                        phone=form.cleaned_data['phone'],
-                        dob=form.cleaned_data.get('dob'),
-                    )
+                    email = form.cleaned_data['email'].strip().lower()
+                    patient = None
+
+                    if request.user.is_authenticated:
+                        patient = Patient.objects.filter(
+                            user=request.user,
+                            clinic=clinic,
+                        ).first()
+                        if not patient:
+                            patient = Patient.objects.filter(
+                                clinic=clinic,
+                                email=email,
+                            ).first()
+                            if patient and patient.user is None:
+                                patient.user = request.user
+                                patient.save(update_fields=['user'])
+                    else:
+                        patient = Patient.objects.filter(
+                            clinic=clinic,
+                            email=email,
+                        ).first()
+
+                    if not patient:
+                        patient = Patient.objects.create(
+                            user=request.user if request.user.is_authenticated else None,
+                            clinic=clinic,
+                            first_name=form.cleaned_data['first_name'],
+                            last_name=form.cleaned_data['last_name'],
+                            email=email,
+                            phone=form.cleaned_data['phone'],
+                            dob=form.cleaned_data.get('dob'),
+                        )
 
                     appointment = Appointment(
                         clinic=clinic,
@@ -553,7 +594,7 @@ def resend_verification(request):
 def post_login_redirect(request):
     if request.user.is_superuser or request.user.groups.filter(name__in=ALLOWED_GROUPS).exists():
         return redirect('dashboard')
-    if hasattr(request.user, 'patient_profile') and request.user.patient_profile:
+    if Patient.objects.filter(user=request.user).exists():
         return redirect('patient-portal')
     return redirect('login')
 
@@ -568,7 +609,7 @@ def settings_view(request):
         clinic = profile.clinic
         profile_type = 'staff'
     except Staff.DoesNotExist:
-        patient = getattr(request.user, 'patient_profile', None)
+        patient, profiles = _get_active_patient_profile(request)
         if patient:
             profile = patient
             clinic = patient.clinic
@@ -693,8 +734,34 @@ def _patient_signup(request, clinic: Clinic):
         form = PatientSignupForm(request.POST)
         if form.is_valid():
             email = form.cleaned_data['email']
-            if User.objects.filter(username=email).exists():
-                form.add_error('email', 'An account with this email already exists.')
+            user = User.objects.filter(username=email).first()
+            verification_sent = False
+
+            if user:
+                if Patient.objects.filter(user=user, clinic=clinic).exists():
+                    form.add_error('email', 'You already have an account for this clinic. Please sign in.')
+                else:
+                    Patient.objects.create(
+                        user=user,
+                        clinic=clinic,
+                        first_name=form.cleaned_data['first_name'],
+                        last_name=form.cleaned_data['last_name'],
+                        email=email,
+                        phone=form.cleaned_data['phone'],
+                        dob=form.cleaned_data.get('dob'),
+                    )
+                    if not user.is_active:
+                        _send_verification_email(request, user, clinic=clinic)
+                        verification_sent = True
+                    return render(
+                        request,
+                        'core/patient_signup_success.html',
+                        {
+                            'clinic': clinic,
+                            'email': email,
+                            'verification_sent': verification_sent,
+                        },
+                    )
             else:
                 user = User.objects.create_user(
                     username=email,
@@ -723,6 +790,7 @@ def _patient_signup(request, clinic: Clinic):
                     {
                         'clinic': clinic,
                         'email': email,
+                        'verification_sent': True,
                     },
                 )
     else:
@@ -741,9 +809,28 @@ def _patient_signup(request, clinic: Clinic):
 
 @login_required
 def patient_portal(request):
-    patient = getattr(request.user, 'patient_profile', None)
-    if not patient:
+    profiles = Patient.objects.filter(user=request.user).select_related('clinic')
+    if not profiles.exists():
         return HttpResponseForbidden('Patient access required.')
+
+    clinic_id = request.GET.get('clinic')
+    if clinic_id:
+        try:
+            clinic_id = int(clinic_id)
+        except (TypeError, ValueError):
+            clinic_id = None
+        if clinic_id and profiles.filter(clinic_id=clinic_id).exists():
+            request.session['patient_clinic_id'] = clinic_id
+
+    patient, profiles = _get_active_patient_profile(request)
+    if patient is None:
+        return render(
+            request,
+            'core/patient_select_clinic.html',
+            {
+                'profiles': profiles,
+            },
+        )
 
     clinic = patient.clinic
     tz = ZoneInfo(clinic.timezone or 'UTC')

@@ -86,12 +86,12 @@ class AppointmentType(models.Model):
 
 
 class Patient(models.Model):
-    user = models.OneToOneField(
+    user = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,
         blank=True,
         null=True,
-        related_name='patient_profile',
+        related_name='patient_profiles',
     )
     clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='patients')
     avatar = models.ImageField(upload_to='avatars/patients/', blank=True, null=True)

@@ -27,10 +27,14 @@ def user_roles(request):
         if staff.avatar:
             avatar_url = staff.avatar.url
     except Staff.DoesNotExist:
-        try:
-            patient = user.patient_profile
-        except Patient.DoesNotExist:
-            patient = None
+        patient_profiles = Patient.objects.filter(user=user).select_related('clinic')
+        patient = None
+        if patient_profiles.exists():
+            selected_id = request.session.get('patient_clinic_id')
+            if selected_id:
+                patient = patient_profiles.filter(clinic_id=selected_id).first()
+            if not patient and patient_profiles.count() == 1:
+                patient = patient_profiles.first()
         if patient:
             clinic = patient.clinic
             if patient.avatar:

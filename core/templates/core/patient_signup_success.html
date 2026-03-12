@@ -78,13 +78,20 @@
         </div>
         <div class="card-body">
           <h2>Thank you for signing up!</h2>
-          <p class="muted">
-            We sent a verification email{% if email %} to <strong>{{ email }}</strong>{% endif %}.
-            Please check your inbox to activate your account.
-          </p>
+          {% if verification_sent %}
+            <p class="muted">
+              We sent a verification email{% if email %} to <strong>{{ email }}</strong>{% endif %}.
+              Please check your inbox to activate your account.
+            </p>
+          {% else %}
+            <p class="muted">
+              Your account is already active for this email{% if email %} (<strong>{{ email }}</strong>){% endif %}.
+              You can sign in to continue.
+            </p>
+          {% endif %}
           <div class="actions">
             <a class="btn btn-primary" href="{% url 'login' %}">Sign in</a>
-            {% if email %}
+            {% if email and verification_sent %}
               <a class="btn btn-ghost" href="{% url 'resend-verification' %}?email={{ email|urlencode }}">
                 Resend verification email
               </a>

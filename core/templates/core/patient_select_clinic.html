@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Select Clinic</title>
+    <style>
+      :root { --brand: #0f5132; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+      .page {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 520px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+      }
+      .card-header {
+        background: var(--brand);
+        color: #fff;
+        padding: 18px 20px;
+        font-size: 20px;
+        font-weight: 700;
+      }
+      .card-body { padding: 22px 20px 24px; }
+      .clinic-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
+      .clinic-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 12px 14px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #f8fafc;
+      }
+      .clinic-item strong { color: #0f172a; }
+      .btn {
+        background: var(--brand);
+        color: #fff;
+        text-decoration: none;
+        padding: 8px 12px;
+        border-radius: 6px;
+        font-weight: 700;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+    <main class="page">
+      <div class="card">
+        <div class="card-header">Choose your clinic</div>
+        <div class="card-body">
+          <ul class="clinic-list">
+            {% for profile in profiles %}
+              <li class="clinic-item">
+                <div>
+                  <strong>{{ profile.clinic.name }}</strong>
+                </div>
+                <a class="btn" href="{% url 'patient-portal' %}?clinic={{ profile.clinic_id }}">Open portal</a>
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </main>
+    {% include "core/partials/site_footer.html" %}
+  </body>
+</html>
