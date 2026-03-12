@@ -1,0 +1,70 @@
+<style>
+  .public-nav {
+    background: #fff;
+    border-bottom: 1px solid #e5e7eb;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+  }
+  .public-nav__inner {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 16px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  .public-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-weight: 700;
+    color: var(--brand, #1d4ed8);
+  }
+  .public-brand img {
+    height: 34px;
+    width: auto;
+  }
+  .public-nav__links {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    font-size: 14px;
+    flex-wrap: wrap;
+  }
+  .public-nav__links a {
+    color: var(--brand, #1d4ed8);
+    text-decoration: none;
+  }
+  .public-nav__links a:hover { text-decoration: underline; }
+  .public-nav__links .cta {
+    background: var(--brand, #1d4ed8);
+    color: #fff;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-decoration: none;
+  }
+  .public-nav__links .cta:hover { text-decoration: none; opacity: 0.92; }
+  @media (max-width: 700px) {
+    .public-nav__links { width: 100%; }
+    .public-nav__links .cta { width: 100%; text-align: center; }
+  }
+</style>
+<nav class="public-nav" style="--brand: {{ public_brand_color|default:'#1d4ed8' }};">
+  <div class="public-nav__inner">
+    <div class="public-brand">
+      {% if public_logo_url %}
+        <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.remove()">
+      {% endif %}
+      <span>{{ public_brand_name|default:"ClinicOps" }}</span>
+    </div>
+    <div class="public-nav__links">
+      {% if clinic and clinic.slug %}
+        <a href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
+      {% endif %}
+      <a class="cta" href="{% url 'login' %}?next={{ request.path }}">Sign in</a>
+    </div>
+  </div>
+</nav>

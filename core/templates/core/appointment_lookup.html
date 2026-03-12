@@ -14,6 +14,7 @@
     </style>
   </head>
   <body>
+    {% include "core/partials/public_nav.html" %}
     <div class="panel">
       <h1>Find your appointment</h1>
       <p class="muted">Enter your email and confirmation code.</p>
@@ -46,5 +47,6 @@
         {% endif %}
       {% endif %}
     </div>
+    {% include "core/partials/site_footer.html" %}
   </body>
 </html>

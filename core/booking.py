@@ -22,7 +22,7 @@ class Slot:
 
     @property
     def label(self) -> str:
-        return f'{self.start_at:%Y-%m-%d %H:%M} - {self.staff}'
+        return f'{self.start_at:%Y-%m-%d %H:%M}'
 
 
 def build_available_slots(

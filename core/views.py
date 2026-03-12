@@ -55,6 +55,10 @@ ALLOWED_GROUPS = {'Admin', 'Doctor', 'Nurse', 'FrontDesk'}
 logger = logging.getLogger(__name__)
 
 
+def page_not_found(request, exception=None):
+    return render(request, '404.html', status=404)
+
+
 def _parse_date(value: str | None, fallback: date) -> date:
     if not value:
         return fallback

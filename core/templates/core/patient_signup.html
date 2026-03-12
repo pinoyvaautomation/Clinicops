@@ -15,6 +15,7 @@
     </style>
   </head>
   <body>
+    {% include "core/partials/public_nav.html" %}
     <h1>{{ clinic.name }} Patient Signup</h1>
     <p class="muted">Create a patient account to manage your appointments.</p>
 
@@ -60,5 +61,6 @@
       <button type="submit">Create account</button>
     </form>
     <p class="muted">Already have an account? <a href="{% url 'login' %}">Sign in</a>.</p>
+    {% include "core/partials/site_footer.html" %}
   </body>
 </html>

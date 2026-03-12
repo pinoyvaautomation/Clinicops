@@ -10,6 +10,7 @@
     </style>
   </head>
   <body>
+    {% include "core/partials/public_nav.html" %}
     <div class="panel">
       <h1>Booking confirmed</h1>
       <p class="muted">Thank you. Your appointment has been booked.</p>
@@ -23,5 +24,6 @@
       <p class="muted">Use this code on the appointment lookup page.</p>
       <p><a href="/appointments/lookup/">View or confirm appointment</a></p>
     </div>
+    {% include "core/partials/site_footer.html" %}
   </body>
 </html>

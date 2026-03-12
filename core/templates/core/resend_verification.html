@@ -4,29 +4,96 @@
     <meta charset="utf-8">
     <title>Resend verification</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 48px; color: #1f2937; }
-      form { max-width: 360px; }
-      label { display: block; margin-top: 12px; }
-      input { width: 100%; padding: 8px; margin-top: 4px; }
-      button { margin-top: 16px; padding: 8px 12px; }
-      .muted { color: #6b7280; }
+      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+      .page {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 440px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+      }
+      .card-header {
+        background: var(--brand);
+        color: #fff;
+        padding: 18px 20px;
+        font-size: 20px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .card-header img {
+        height: 28px;
+        width: auto;
+      }
+      .card-header.logo-broken img { display: none; }
+      .card-header.logo-broken .logo-fallback { display: inline; }
+      .logo-fallback { display: none; font-weight: 700; }
+      .card-body { padding: 22px 20px 24px; }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 6px; }
+      button {
+        margin-top: 18px;
+        width: 100%;
+        padding: 12px;
+        background: var(--brand);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-weight: 700;
+        letter-spacing: 0.3px;
+      }
+      .muted { color: #6b7280; font-size: 14px; margin-top: 6px; }
       .success { color: #047857; }
     </style>
   </head>
   <body>
-    <h1>Resend verification</h1>
-    <p class="muted">Enter your email and we’ll send a new verification link.</p>
+    {% include "core/partials/public_nav.html" %}
+    <main class="page">
+      <div class="card">
+        <div class="card-header">
+          {% if public_logo_url %}
+            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.card-header').classList.add('logo-broken')">
+            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
+          {% endif %}
+          <span>Resend verification</span>
+        </div>
+        <div class="card-body">
+          <p class="muted">Enter your email and we'll send a new verification link.</p>
 
-    {% if sent %}
-      <p class="success">If an inactive account exists for that email, a verification link has been sent.</p>
-    {% endif %}
+          {% if sent %}
+            <p class="success">If an inactive account exists for that email, a verification link has been sent.</p>
+          {% endif %}
 
-    <form method="post">
-      {% csrf_token %}
-      {{ form.email.label_tag }}
-      {{ form.email }}
-      {{ form.email.errors }}
-      <button type="submit">Resend verification</button>
-    </form>
+          <form method="post">
+            {% csrf_token %}
+            {{ form.email.label_tag }}
+            {{ form.email }}
+            {{ form.email.errors }}
+            <button type="submit">Resend verification</button>
+          </form>
+        </div>
+      </div>
+    </main>
+    {% include "core/partials/site_footer.html" %}
   </body>
 </html>

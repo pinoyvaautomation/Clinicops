@@ -2,33 +2,114 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>ClinicOps Login</title>
+    <title>{{ public_brand_name|default:"ClinicOps" }} Login</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 48px; color: #1f2937; }
-      form { max-width: 320px; }
-      label { display: block; margin-top: 12px; }
-      input { width: 100%; padding: 8px; margin-top: 4px; }
-      button { margin-top: 16px; padding: 8px 12px; }
-      .error { color: #b91c1c; }
+      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+      .page {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .login-card {
+        width: 100%;
+        max-width: 420px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+      }
+      .login-header {
+        background: var(--brand);
+        color: #fff;
+        padding: 18px 20px;
+        font-size: 20px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .login-header img {
+        height: 28px;
+        width: auto;
+      }
+      .logo-fallback {
+        display: none;
+        font-weight: 700;
+      }
+      .login-header.logo-broken img {
+        display: none;
+      }
+      .login-header.logo-broken .logo-fallback {
+        display: inline;
+      }
+      .login-body {
+        padding: 22px 20px 24px;
+      }
+      label { display: block; margin-top: 12px; font-weight: 600; }
+      input { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 6px; }
+      button {
+        margin-top: 18px;
+        width: 100%;
+        padding: 12px;
+        background: var(--brand);
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-weight: 700;
+        letter-spacing: 0.4px;
+      }
+      .error { color: #b91c1c; margin: 6px 0 0; }
+      .links { margin-top: 14px; font-size: 14px; }
+      .links a { color: var(--brand); text-decoration: none; }
+      .links a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
-    <h1>Sign in</h1>
-    {% if form.errors %}
-      <p class="error">Invalid username or password.</p>
-    {% endif %}
-    <form method="post" action="{% url 'login' %}">
-      {% csrf_token %}
-      <label for="id_username">Username</label>
-      <input type="text" name="username" id="id_username" required>
+    {% include "core/partials/public_nav.html" %}
+    <main class="page">
+      <div class="login-card">
+        <div class="login-header">
+          {% if public_logo_url %}
+            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.login-header').classList.add('logo-broken')">
+            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
+          {% endif %}
+          <span>{{ public_brand_name|default:"ClinicOps" }} Login</span>
+        </div>
+        <div class="login-body">
+          {% if form.errors %}
+            <p class="error">Invalid username or password.</p>
+          {% endif %}
+          <form method="post" action="{% url 'login' %}">
+            {% csrf_token %}
+            <label for="id_username">Username</label>
+            <input type="text" name="username" id="id_username" required>
 
-      <label for="id_password">Password</label>
-      <input type="password" name="password" id="id_password" required>
+            <label for="id_password">Password</label>
+            <input type="password" name="password" id="id_password" required>
 
-      <input type="hidden" name="next" value="{{ next }}">
-      <button type="submit">Sign in</button>
-    </form>
-    <p><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
-    <p><a href="{% url 'resend-verification' %}">Resend verification email</a></p>
+            <input type="hidden" name="next" value="{{ next }}">
+            <button type="submit">LOG IN</button>
+          </form>
+          <div class="links">
+            <p><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
+            <p><a href="{% url 'resend-verification' %}">Resend verification email</a></p>
+          </div>
+        </div>
+      </div>
+    </main>
+    {% include "core/partials/site_footer.html" %}
   </body>
 </html>

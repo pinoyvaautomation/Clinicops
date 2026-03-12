@@ -2,7 +2,7 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>Reset Password</title>
+    <title>Page not found</title>
     <style>
       :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
       * { box-sizing: border-box; }
@@ -24,7 +24,7 @@
       }
       .card {
         width: 100%;
-        max-width: 440px;
+        max-width: 520px;
         background: #fff;
         border: 1px solid #e5e7eb;
         border-radius: 10px;
@@ -49,20 +49,17 @@
       .card-header.logo-broken .logo-fallback { display: inline; }
       .logo-fallback { display: none; font-weight: 700; }
       .card-body { padding: 22px 20px 24px; }
-      label { display: block; margin-top: 12px; font-weight: 600; }
-      input { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 6px; }
-      button {
-        margin-top: 18px;
-        width: 100%;
-        padding: 12px;
+      .muted { color: #6b7280; font-size: 14px; margin-top: 6px; }
+      .cta {
+        display: inline-block;
+        margin-top: 16px;
         background: var(--brand);
         color: #fff;
-        border: none;
+        padding: 10px 14px;
         border-radius: 6px;
+        text-decoration: none;
         font-weight: 700;
-        letter-spacing: 0.3px;
       }
-      .muted { color: #6b7280; font-size: 14px; margin-top: 6px; }
     </style>
   </head>
   <body>
@@ -74,16 +71,11 @@
             <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.card-header').classList.add('logo-broken')">
             <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
           {% endif %}
-          <span>Reset Password</span>
+          <span>Page not found</span>
         </div>
         <div class="card-body">
-          <p class="muted">Enter your email and we'll send a reset link.</p>
-          <form method="post">
-            {% csrf_token %}
-            {{ form.email.label_tag }}
-            {{ form.email }}
-            <button type="submit">Send reset link</button>
-          </form>
+          <p class="muted">The page you’re looking for doesn’t exist or has been moved.</p>
+          <a class="cta" href="{% url 'home' %}">Go to home</a>
         </div>
       </div>
     </main>

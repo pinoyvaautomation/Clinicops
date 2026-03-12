@@ -5,47 +5,49 @@
     <title>{{ clinic.name }} - Book Appointment</title>
     <style>
       :root { --brand: {{ clinic.brand_color|default:"#1d4ed8" }}; }
-      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
-      h1 { margin-bottom: 4px; color: var(--brand); }
-      .header { display: flex; align-items: center; gap: 16px; margin-bottom: 8px; }
-      .logo { height: 48px; width: auto; }
+      * { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; margin: 0; color: #1f2937; background: #f8fafc; }
+      a { color: var(--brand); text-decoration: none; }
+      a:hover { text-decoration: underline; }
       .muted { color: #6b7280; font-size: 14px; }
-      .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 24px; }
-      @media (max-width: 800px) { .grid { grid-template-columns: 1fr; } }
-      label { display: block; margin-top: 12px; font-weight: 600; }
-      input, select, textarea { width: 100%; padding: 8px; margin-top: 4px; }
-      button { margin-top: 16px; padding: 10px 14px; background: var(--brand); color: #fff; border: none; border-radius: 4px; }
-      .panel { border: 1px solid #e5e7eb; padding: 16px; border-radius: 6px; background: #fff; }
+      .page { max-width: 860px; margin: 0 auto; padding: 32px 24px 48px; }
+      .page-header { text-align: center; margin-bottom: 24px; }
+      h1 { margin: 0 0 6px; color: var(--brand); font-size: 32px; }
+      h2 { margin: 0 0 8px; }
+      .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 24px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
+      label { display: block; margin-top: 14px; font-weight: 600; }
+      input, select, textarea { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
+      button { margin-top: 18px; padding: 12px 16px; background: var(--brand); color: #fff; border: none; border-radius: 6px; font-weight: 600; }
       .errorlist { color: #b91c1c; margin: 8px 0; }
+      .section-divider { height: 1px; background: #e5e7eb; margin: 18px 0; }
+      @media (max-width: 900px) {
+        .page { padding: 24px 16px 40px; }
+        .card { padding: 20px; }
+      }
+      @media (max-width: 700px) {
+        .page-header { text-align: left; }
+      }
     </style>
   </head>
   <body>
-    <div class="header">
-      {% if clinic.logo_url %}
-        <img class="logo" src="{{ clinic.logo_url }}" alt="{{ clinic.name }} logo">
-      {% endif %}
-      <div>
-        <h1>{{ clinic.name }}</h1>
-        <div class="muted">Book an appointment using the form below.</div>
-      </div>
-    </div>
+    {% include "core/partials/public_nav.html" %}
 
-    <div class="grid">
-      <div class="panel">
-        <h2>Available Staff</h2>
-        <ul>
-          {% for staff in staff_list %}
-            <li>{{ staff }}</li>
-          {% empty %}
-            <li>No staff available.</li>
-          {% endfor %}
-        </ul>
-        <div class="muted">Slots available: {{ slot_count }}</div>
+    <main class="page">
+      <div class="page-header">
+        <h1>Book an appointment</h1>
+        <div class="muted">Choose a service and an available time that works for you.</div>
+      </div>
+
+      <section class="card">
+        <h2>Book Appointment</h2>
+        <p class="muted">
+          Want a patient account? <a href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
+          Already have one? <a href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
+        </p>
 
         {% if appointment_types %}
-          <h2>Appointment Type</h2>
           <form method="get">
-            <label for="type">Choose type</label>
+            <label for="type">Appointment type</label>
             <select id="type" name="type" onchange="this.form.submit()">
               {% for appt_type in appointment_types %}
                 <option value="{{ appt_type.id }}" {% if selected_type and appt_type.id == selected_type.id %}selected{% endif %}>
@@ -60,20 +62,11 @@
           {% if selected_type %}
             <div class="muted">Selected: {{ selected_type.name }} ({{ selected_type.duration_minutes }} min)</div>
           {% endif %}
+          <div class="section-divider"></div>
         {% else %}
           <div class="muted">No appointment types configured.</div>
         {% endif %}
-      </div>
 
-      <div class="panel">
-        <h2>Book Appointment</h2>
-        <p class="muted">
-          Want a patient account? <a href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
-          Already have one? <a href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
-        </p>
-        {% if selected_type %}
-          <div class="muted">Selected type: {{ selected_type.name }} ({{ selected_type.duration_minutes }} min)</div>
-        {% endif %}
         {% if slot_count == 0 %}
           <p>No appointment slots are available right now. Please check back later.</p>
         {% else %}
@@ -113,7 +106,9 @@
           <button type="submit">Book appointment</button>
         </form>
         {% endif %}
-      </div>
-    </div>
+      </section>
+    </main>
+
+    {% include "core/partials/site_footer.html" %}
   </body>
 </html>
