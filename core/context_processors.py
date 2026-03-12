@@ -21,6 +21,8 @@ def user_roles(request):
     clinic = None
     avatar_url = None
     patient_multi = False
+    patient_clinic_options = []
+    patient_selected_id = None
 
     try:
         staff = user.staff
@@ -28,15 +30,24 @@ def user_roles(request):
         if staff.avatar:
             avatar_url = staff.avatar.url
     except Staff.DoesNotExist:
-        patient_profiles = Patient.objects.filter(user=user).select_related('clinic')
+        patient_profiles = (
+            Patient.objects.filter(user=user)
+            .select_related('clinic')
+            .order_by('clinic__name')
+        )
         patient = None
         if patient_profiles.exists():
             patient_multi = patient_profiles.count() > 1
             selected_id = request.session.get('patient_clinic_id')
+            patient_selected_id = selected_id
             if selected_id:
                 patient = patient_profiles.filter(clinic_id=selected_id).first()
             if not patient and patient_profiles.count() == 1:
                 patient = patient_profiles.first()
+            patient_clinic_options = [
+                {'id': profile.clinic_id, 'name': profile.clinic.name}
+                for profile in patient_profiles
+            ]
         if patient:
             clinic = patient.clinic
             if patient.avatar:
@@ -49,4 +60,6 @@ def user_roles(request):
         'nav_clinic': clinic,
         'nav_avatar_url': avatar_url,
         'nav_patient_multi': patient_multi,
+        'nav_patient_clinics': patient_clinic_options,
+        'nav_patient_selected_id': patient_selected_id,
     }

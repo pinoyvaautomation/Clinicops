@@ -813,6 +813,17 @@ def patient_portal(request):
     if not profiles.exists():
         return HttpResponseForbidden('Patient access required.')
 
+    if request.method == 'POST':
+        clinic_id = request.POST.get('clinic_id')
+        if clinic_id:
+            try:
+                clinic_id = int(clinic_id)
+            except (TypeError, ValueError):
+                clinic_id = None
+            if clinic_id and profiles.filter(clinic_id=clinic_id).exists():
+                request.session['patient_clinic_id'] = clinic_id
+        return redirect('patient-portal')
+
     if request.GET.get('switch'):
         request.session.pop('patient_clinic_id', None)
 
