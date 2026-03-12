@@ -715,11 +715,10 @@ def _patient_signup(request, clinic: Clinic):
                 _send_verification_email(request, user, clinic=clinic)
                 return render(
                     request,
-                    'core/patient_signup.html',
+                    'core/patient_signup_success.html',
                     {
                         'clinic': clinic,
-                        'form': PatientSignupForm(),
-                        'verification_sent': True,
+                        'email': email,
                     },
                 )
     else:

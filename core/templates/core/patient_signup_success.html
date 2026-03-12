@@ -1,0 +1,98 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>{{ clinic.name }} - Signup Complete</title>
+    <style>
+      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
+      * { box-sizing: border-box; }
+      body {
+        font-family: Arial, sans-serif;
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        background: #f3f4f6;
+        color: #1f2937;
+      }
+      .page {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+      }
+      .card {
+        width: 100%;
+        max-width: 520px;
+        background: #fff;
+        border: 1px solid #e5e7eb;
+        border-radius: 10px;
+        overflow: hidden;
+        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
+        text-align: center;
+      }
+      .card-header {
+        background: var(--brand);
+        color: #fff;
+        padding: 18px 20px;
+        font-size: 20px;
+        font-weight: 700;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+      }
+      .card-header img {
+        height: 28px;
+        width: auto;
+      }
+      .card-header.logo-broken img { display: none; }
+      .card-header.logo-broken .logo-fallback { display: inline; }
+      .logo-fallback { display: none; font-weight: 700; }
+      .card-body { padding: 26px 22px 28px; }
+      .card-body h2 { margin: 0 0 8px; }
+      .muted { color: #6b7280; font-size: 14px; }
+      .actions { margin-top: 18px; display: grid; gap: 10px; }
+      .btn {
+        display: inline-block;
+        padding: 12px;
+        border-radius: 6px;
+        font-weight: 700;
+        text-decoration: none;
+      }
+      .btn-primary { background: var(--brand); color: #fff; }
+      .btn-ghost { border: 1px solid var(--brand); color: var(--brand); background: #fff; }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/public_nav.html" %}
+    <main class="page">
+      <div class="card">
+        <div class="card-header">
+          {% if public_logo_url %}
+            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.card-header').classList.add('logo-broken')">
+            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
+          {% endif %}
+          <span>Signup Complete</span>
+        </div>
+        <div class="card-body">
+          <h2>Thank you for signing up!</h2>
+          <p class="muted">
+            We sent a verification email{% if email %} to <strong>{{ email }}</strong>{% endif %}.
+            Please check your inbox to activate your account.
+          </p>
+          <div class="actions">
+            <a class="btn btn-primary" href="{% url 'login' %}">Sign in</a>
+            {% if email %}
+              <a class="btn btn-ghost" href="{% url 'resend-verification' %}?email={{ email|urlencode }}">
+                Resend verification email
+              </a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </main>
+    {% include "core/partials/site_footer.html" %}
+  </body>
+</html>
