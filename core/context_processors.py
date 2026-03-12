@@ -20,6 +20,7 @@ def user_roles(request):
 
     clinic = None
     avatar_url = None
+    patient_multi = False
 
     try:
         staff = user.staff
@@ -30,6 +31,7 @@ def user_roles(request):
         patient_profiles = Patient.objects.filter(user=user).select_related('clinic')
         patient = None
         if patient_profiles.exists():
+            patient_multi = patient_profiles.count() > 1
             selected_id = request.session.get('patient_clinic_id')
             if selected_id:
                 patient = patient_profiles.filter(clinic_id=selected_id).first()
@@ -46,4 +48,5 @@ def user_roles(request):
         'nav_is_staff': is_staff_user,
         'nav_clinic': clinic,
         'nav_avatar_url': avatar_url,
+        'nav_patient_multi': patient_multi,
     }

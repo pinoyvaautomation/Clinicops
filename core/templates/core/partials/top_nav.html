@@ -149,6 +149,9 @@
       {% endif %}
     {% else %}
       <a href="{% url 'patient-portal' %}">Portal</a>
+      {% if nav_patient_multi %}
+        <a href="{% url 'patient-portal' %}?switch=1">Switch clinic</a>
+      {% endif %}
     {% endif %}
   </div>
   <div style="position: relative;">
