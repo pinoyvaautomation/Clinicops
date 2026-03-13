@@ -1,4 +1,4 @@
-<style>
+﻿<style>
   .top-nav {
     display: flex;
     justify-content: space-between;
@@ -42,12 +42,56 @@
     align-items: center;
     flex-wrap: wrap;
   }
+  .nav-actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .top-nav .links a {
     text-decoration: none;
     color: #0f172a;
     font-weight: 600;
     font-size: 14px;
   }
+  .nav-toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .nav-toggle span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: #0f172a;
+    border-radius: 2px;
+    position: relative;
+  }
+  .nav-toggle span::before,
+  .nav-toggle span::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 18px;
+    height: 2px;
+    background: #0f172a;
+    border-radius: 2px;
+  }
+  .nav-toggle span::before { top: -6px; }
+  .nav-toggle span::after { top: 6px; }
+  .nav-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: none;
+    z-index: 1400;
+  }
+  .nav-overlay.open { display: block; }
   .avatar-btn {
     width: 36px;
     height: 36px;
@@ -77,14 +121,33 @@
     display: none;
     z-index: 2000;
   }
-  @media (max-width: 700px) {
+  @media (max-width: 900px) {
     .top-nav {
-      flex-direction: column;
-      align-items: flex-start;
+      flex-direction: row;
+      align-items: center;
       gap: 12px;
     }
     .top-nav .links {
-      width: 100%;
+      position: fixed;
+      top: 0;
+      left: -280px;
+      right: auto;
+      height: 100%;
+      width: 260px;
+      background: #ffffff;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 88px 16px 20px;
+      box-shadow: 12px 0 24px rgba(15, 23, 42, 0.15);
+      transition: left 0.2s ease;
+      z-index: 1500;
+    }
+    .top-nav .links.open {
+      left: 0;
+    }
+    .nav-toggle {
+      display: inline-flex;
     }
   }
   .avatar-menu.open { display: block; }
@@ -192,7 +255,7 @@
       {% endif %}
     </div>
   </div>
-  <div class="links">
+  <div class="links" id="nav-links">
     {% if nav_is_staff %}
       <a href="{% url 'dashboard' %}">Dashboard</a>
       <a href="{% url 'calendar' %}">Calendar</a>
@@ -210,43 +273,50 @@
       {% endif %}
     {% endif %}
   </div>
-  <div style="position: relative;">
-    <button type="button" class="avatar-btn" id="avatar-btn">
-      {% if nav_avatar_url %}
-        <img src="{{ nav_avatar_url }}" alt="Avatar">
-      {% else %}
-        {% with first=request.user.first_name|default:'' last=request.user.last_name|default:'' %}
-          {% if first or last %}
-            {{ first|slice:":1"|upper }}{{ last|slice:":1"|upper }}
-          {% else %}
-            {{ request.user.username|slice:":2"|upper }}
-          {% endif %}
-        {% endwith %}
-      {% endif %}
+  <div class="nav-actions">
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
+      <span></span>
     </button>
-    <div class="avatar-menu" id="avatar-menu">
-      <div class="avatar-header">
-        <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-        <div class="muted">{{ request.user.email|default:"" }}</div>
-      </div>
-      <div class="avatar-actions">
-        <a class="primary" href="{% url 'settings' %}">Account settings</a>
-        <a href="{% url 'password_change' %}">Change password</a>
-        <form method="post" action="{% url 'logout' %}">
-          {% csrf_token %}
-          <button type="submit">Log out</button>
-        </form>
+    <div style="position: relative;">
+      <button type="button" class="avatar-btn" id="avatar-btn">
+        {% if nav_avatar_url %}
+          <img src="{{ nav_avatar_url }}" alt="Avatar">
+        {% else %}
+          {% with first=request.user.first_name|default:'' last=request.user.last_name|default:'' %}
+            {% if first or last %}
+              {{ first|slice:":1"|upper }}{{ last|slice:":1"|upper }}
+            {% else %}
+              {{ request.user.username|slice:":2"|upper }}
+            {% endif %}
+          {% endwith %}
+        {% endif %}
+      </button>
+      <div class="avatar-menu" id="avatar-menu">
+        <div class="avatar-header">
+          <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+          <div class="muted">{{ request.user.email|default:"" }}</div>
+        </div>
+        <div class="avatar-actions">
+          <a class="primary" href="{% url 'settings' %}">Account settings</a>
+          <a href="{% url 'password_change' %}">Change password</a>
+          <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit">Log out</button>
+          </form>
+        </div>
       </div>
     </div>
   </div>
 </div>
+
+<div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
 
 {% if nav_patient_multi %}
   <div class="clinic-modal" id="clinic-switch-modal" aria-hidden="true">
     <div class="clinic-modal__card">
       <div class="clinic-modal__header">
         <span>Select clinic</span>
-        <button class="clinic-modal__close" type="button" id="clinic-switch-close">×</button>
+        <button class="clinic-modal__close" type="button" id="clinic-switch-close">&times;</button>
       </div>
       <div class="clinic-modal__body">
         <form id="clinic-switch-form" method="post" action="{% url 'patient-portal' %}">
@@ -325,6 +395,45 @@
         input.value = clinicId;
         form.submit();
       });
+    });
+  })();
+</script>
+
+<script>
+  (function() {
+    const toggle = document.getElementById('nav-toggle');
+    const links = document.getElementById('nav-links');
+    const overlay = document.getElementById('nav-overlay');
+    if (!toggle || !links || !overlay) return;
+
+    function openMenu() {
+      links.classList.add('open');
+      overlay.classList.add('open');
+      overlay.setAttribute('aria-hidden', 'false');
+      toggle.setAttribute('aria-expanded', 'true');
+    }
+    function closeMenu() {
+      links.classList.remove('open');
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden', 'true');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    toggle.addEventListener('click', function() {
+      if (links.classList.contains('open')) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+    overlay.addEventListener('click', closeMenu);
+    links.querySelectorAll('a').forEach(function(link) {
+      link.addEventListener('click', closeMenu);
+    });
+    window.addEventListener('resize', function() {
+      if (window.innerWidth > 900) {
+        closeMenu();
+      }
     });
   })();
 </script>
