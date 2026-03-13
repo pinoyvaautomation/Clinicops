@@ -58,7 +58,7 @@
     border-radius: 10px;
     border: 1px solid #e5e7eb;
     background: #ffffff;
-    display: none;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
@@ -110,7 +110,6 @@
     }
     .public-nav__links.open { left: 0; }
     .public-nav__links .cta { width: 100%; text-align: center; }
-    .public-nav__toggle { display: inline-flex; }
   }
 </style>
 <nav class="public-nav" style="--brand: {{ public_brand_color|default:'#1d4ed8' }};">
