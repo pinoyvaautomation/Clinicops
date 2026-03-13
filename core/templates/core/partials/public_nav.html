@@ -1,4 +1,4 @@
-<style>
+﻿<style>
   .public-nav {
     background: #fff;
     border-bottom: 1px solid #e5e7eb;
@@ -27,6 +27,11 @@
     height: 34px;
     width: auto;
   }
+  .public-nav__actions {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
   .public-nav__links {
     display: flex;
     align-items: center;
@@ -47,9 +52,65 @@
     text-decoration: none;
   }
   .public-nav__links .cta:hover { text-decoration: none; opacity: 0.92; }
-  @media (max-width: 700px) {
-    .public-nav__links { width: 100%; }
+  .public-nav__toggle {
+    width: 40px;
+    height: 40px;
+    border-radius: 10px;
+    border: 1px solid #e5e7eb;
+    background: #ffffff;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+  }
+  .public-nav__toggle span {
+    display: block;
+    width: 18px;
+    height: 2px;
+    background: var(--brand, #1d4ed8);
+    border-radius: 2px;
+    position: relative;
+  }
+  .public-nav__toggle span::before,
+  .public-nav__toggle span::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    width: 18px;
+    height: 2px;
+    background: var(--brand, #1d4ed8);
+    border-radius: 2px;
+  }
+  .public-nav__toggle span::before { top: -6px; }
+  .public-nav__toggle span::after { top: 6px; }
+  .public-nav__overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.35);
+    display: none;
+    z-index: 1400;
+  }
+  .public-nav__overlay.open { display: block; }
+  @media (max-width: 900px) {
+    .public-nav__links {
+      position: fixed;
+      top: 0;
+      left: -280px;
+      right: auto;
+      height: 100%;
+      width: 260px;
+      background: #ffffff;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 88px 16px 20px;
+      box-shadow: 12px 0 24px rgba(15, 23, 42, 0.15);
+      transition: left 0.2s ease;
+      z-index: 1500;
+    }
+    .public-nav__links.open { left: 0; }
     .public-nav__links .cta { width: 100%; text-align: center; }
+    .public-nav__toggle { display: inline-flex; }
   }
 </style>
 <nav class="public-nav" style="--brand: {{ public_brand_color|default:'#1d4ed8' }};">
@@ -60,11 +121,56 @@
       {% endif %}
       <span>{{ public_brand_name|default:"ClinicOps" }}</span>
     </div>
-    <div class="public-nav__links">
-      {% if clinic and clinic.slug %}
-        <a href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
-      {% endif %}
-      <a class="cta" href="{% url 'login' %}">Sign in</a>
+    <div class="public-nav__actions">
+      <button type="button" class="public-nav__toggle" id="public-nav-toggle" aria-label="Open menu" aria-expanded="false">
+        <span></span>
+      </button>
+      <div class="public-nav__links" id="public-nav-links">
+        {% if clinic and clinic.slug %}
+          <a href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
+        {% endif %}
+        <a class="cta" href="{% url 'login' %}">Sign in</a>
+      </div>
     </div>
   </div>
 </nav>
+<div class="public-nav__overlay" id="public-nav-overlay" aria-hidden="true"></div>
+
+<script>
+  (function() {
+    const toggle = document.getElementById('public-nav-toggle');
+    const links = document.getElementById('public-nav-links');
+    const overlay = document.getElementById('public-nav-overlay');
+    if (!toggle || !links || !overlay) return;
+
+    function openMenu() {
+      links.classList.add('open');
+      overlay.classList.add('open');
+      overlay.setAttribute('aria-hidden', 'false');
+      toggle.setAttribute('aria-expanded', 'true');
+    }
+    function closeMenu() {
+      links.classList.remove('open');
+      overlay.classList.remove('open');
+      overlay.setAttribute('aria-hidden', 'true');
+      toggle.setAttribute('aria-expanded', 'false');
+    }
+
+    toggle.addEventListener('click', function() {
+      if (links.classList.contains('open')) {
+        closeMenu();
+      } else {
+        openMenu();
+      }
+    });
+    overlay.addEventListener('click', closeMenu);
+    links.querySelectorAll('a').forEach(function(link) {
+      link.addEventListener('click', closeMenu);
+    });
+    window.addEventListener('resize', function() {
+      if (window.innerWidth > 900) {
+        closeMenu();
+      }
+    });
+  })();
+</script>
