@@ -125,6 +125,24 @@ class AppointmentTypeForm(forms.Form):
         super().__init__(*args, **kwargs)
         self.clinic = clinic
         self.instance = instance
+        self.fields['name'].widget.attrs.update(
+            {
+                'placeholder': 'General checkup',
+                'autocomplete': 'off',
+            }
+        )
+        self.fields['duration_minutes'].widget.attrs.update(
+            {
+                'placeholder': '30',
+                'inputmode': 'numeric',
+            }
+        )
+        self.fields['price_cents'].widget.attrs.update(
+            {
+                'placeholder': '500',
+                'inputmode': 'numeric',
+            }
+        )
         if instance is not None and not self.is_bound:
             self.fields['name'].initial = instance.name
             self.fields['duration_minutes'].initial = instance.duration_minutes

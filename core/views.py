@@ -1585,6 +1585,142 @@ def staff_members(request):
     )
 
 
+def _build_service_catalog_context(clinic: Clinic) -> dict:
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    now = timezone.now()
+    appointment_types = list(AppointmentType.objects.filter(clinic=clinic).order_by('name'))
+    appointments = list(
+        Appointment.objects.filter(clinic=clinic, appointment_type__isnull=False)
+        .select_related('appointment_type')
+        .order_by('start_at')
+    )
+
+    stats_by_type: dict[int, dict] = {}
+    total_upcoming_bookings = 0
+    for appointment in appointments:
+        appointment_type_id = appointment.appointment_type_id
+        if not appointment_type_id:
+            continue
+
+        stats = stats_by_type.setdefault(
+            appointment_type_id,
+            {
+                'appointment_count': 0,
+                'completed_count': 0,
+                'cancelled_count': 0,
+                'upcoming_count': 0,
+                'next_booking': None,
+                'last_booking': None,
+            },
+        )
+        stats['appointment_count'] += 1
+
+        if appointment.status == Appointment.Status.COMPLETED:
+            stats['completed_count'] += 1
+        elif appointment.status == Appointment.Status.CANCELLED:
+            stats['cancelled_count'] += 1
+
+        if appointment.status == Appointment.Status.SCHEDULED and appointment.start_at >= now:
+            stats['upcoming_count'] += 1
+            total_upcoming_bookings += 1
+            next_booking = stats['next_booking']
+            if next_booking is None or appointment.start_at < next_booking.start_at:
+                stats['next_booking'] = appointment
+
+        last_booking = stats['last_booking']
+        if last_booking is None or appointment.start_at > last_booking.start_at:
+            stats['last_booking'] = appointment
+
+    service_rows = []
+    active_service_count = 0
+    priced_service_count = 0
+    total_duration = 0
+    total_price_cents = 0
+    services_with_upcoming = 0
+    busiest_service_name = 'No bookings yet'
+    busiest_service_count = 0
+    next_service_name = ''
+    next_service_booking = None
+
+    for appointment_type in appointment_types:
+        stats = stats_by_type.get(
+            appointment_type.id,
+            {
+                'appointment_count': 0,
+                'completed_count': 0,
+                'cancelled_count': 0,
+                'upcoming_count': 0,
+                'next_booking': None,
+                'last_booking': None,
+            },
+        )
+        if appointment_type.is_active:
+            active_service_count += 1
+        if appointment_type.price_cents is not None:
+            priced_service_count += 1
+            total_price_cents += appointment_type.price_cents
+            price_display = f"${appointment_type.price_cents / 100:.2f}"
+            price_caption = 'Fixed service price'
+        else:
+            price_display = 'Flexible'
+            price_caption = 'Price set manually when needed'
+
+        total_duration += appointment_type.duration_minutes
+        if stats['upcoming_count']:
+            services_with_upcoming += 1
+        if stats['appointment_count'] > busiest_service_count:
+            busiest_service_count = stats['appointment_count']
+            busiest_service_name = appointment_type.name
+
+        next_booking = stats['next_booking']
+        if next_booking and (next_service_booking is None or next_booking.start_at < next_service_booking.start_at):
+            next_service_booking = next_booking
+            next_service_name = appointment_type.name
+
+        service_rows.append(
+            {
+                'type': appointment_type,
+                'price_display': price_display,
+                'price_caption': price_caption,
+                'status_label': 'Active' if appointment_type.is_active else 'Inactive',
+                'status_class': 'active' if appointment_type.is_active else 'inactive',
+                'duration_label': f'{appointment_type.duration_minutes} min',
+                'appointment_count': stats['appointment_count'],
+                'completed_count': stats['completed_count'],
+                'cancelled_count': stats['cancelled_count'],
+                'upcoming_count': stats['upcoming_count'],
+                'next_booking_local': timezone.localtime(next_booking.start_at, tz) if next_booking else None,
+                'last_booking_local': timezone.localtime(stats['last_booking'].start_at, tz) if stats['last_booking'] else None,
+            }
+        )
+
+    total_service_count = len(service_rows)
+    average_duration = round(total_duration / total_service_count) if total_service_count else 0
+    inactive_service_count = total_service_count - active_service_count
+    average_price_display = (
+        f"${(total_price_cents / priced_service_count) / 100:.2f}"
+        if priced_service_count
+        else 'Flexible'
+    )
+
+    return {
+        'service_rows': service_rows,
+        'total_service_count': total_service_count,
+        'active_service_count': active_service_count,
+        'inactive_service_count': inactive_service_count,
+        'priced_service_count': priced_service_count,
+        'average_duration': average_duration,
+        'average_price_display': average_price_display,
+        'services_with_upcoming': services_with_upcoming,
+        'total_upcoming_bookings': total_upcoming_bookings,
+        'busiest_service_name': busiest_service_name,
+        'busiest_service_count': busiest_service_count,
+        'next_service_name': next_service_name,
+        'next_service_booking_local': timezone.localtime(next_service_booking.start_at, tz) if next_service_booking else None,
+        'current_local_time': timezone.localtime(now, tz),
+    }
+
+
 @login_required
 def appointment_types(request):
     staff, error = _require_admin_staff(request)
@@ -1592,7 +1728,6 @@ def appointment_types(request):
         return error
 
     clinic = staff.clinic
-    types = AppointmentType.objects.filter(clinic=clinic).order_by('name')
     add_form = AppointmentTypeForm(prefix='add', clinic=clinic)
     edit_form = AppointmentTypeForm(prefix='edit', clinic=clinic)
     open_modal = False
@@ -1613,25 +1748,19 @@ def appointment_types(request):
             messages.success(request, 'Service created.')
             return redirect('appointment-types')
         open_modal = True
-    rows = []
-    for appt_type in types:
-        if appt_type.price_cents is None:
-            price_display = '-'
-        else:
-            price_display = f"${appt_type.price_cents / 100:.2f}"
-        rows.append({'type': appt_type, 'price': price_display})
+    catalog_context = _build_service_catalog_context(clinic)
 
     return render(
         request,
         'core/appointment_types.html',
         {
             'clinic': clinic,
-            'rows': rows,
             'add_form': add_form,
             'edit_form': edit_form,
             'open_modal': open_modal,
             'open_edit_modal': open_edit_modal,
             'edit_action_url': edit_action_url,
+            **catalog_context,
         },
     )
 
@@ -1643,6 +1772,7 @@ def appointment_type_create(request):
         return error
 
     clinic = staff.clinic
+    catalog_context = _build_service_catalog_context(clinic)
     if request.method == 'POST':
         form = AppointmentTypeForm(request.POST, clinic=clinic)
         if form.is_valid():
@@ -1667,6 +1797,7 @@ def appointment_type_create(request):
             'form': form,
             'title': 'Add service',
             'submit_label': 'Create service',
+            **catalog_context,
         },
     )
 
@@ -1679,6 +1810,7 @@ def appointment_type_edit(request, type_id: int):
 
     clinic = staff.clinic
     appt_type = get_object_or_404(AppointmentType, pk=type_id, clinic=clinic)
+    catalog_context = _build_service_catalog_context(clinic)
 
     if request.method == 'POST':
         form = AppointmentTypeForm(request.POST, prefix='edit', clinic=clinic, instance=appt_type)
@@ -1691,25 +1823,17 @@ def appointment_type_edit(request, type_id: int):
             appt_type.save(update_fields=['name', 'duration_minutes', 'price_cents', 'is_active'])
             messages.success(request, 'Service updated.')
             return redirect('appointment-types')
-        types = AppointmentType.objects.filter(clinic=clinic).order_by('name')
-        rows = []
-        for appt in types:
-            if appt.price_cents is None:
-                price_display = '-'
-            else:
-                price_display = f"${appt.price_cents / 100:.2f}"
-            rows.append({'type': appt, 'price': price_display})
         return render(
             request,
             'core/appointment_types.html',
             {
                 'clinic': clinic,
-                'rows': rows,
                 'add_form': AppointmentTypeForm(prefix='add', clinic=clinic),
                 'edit_form': form,
                 'open_modal': False,
                 'open_edit_modal': True,
                 'edit_action_url': reverse('appointment-type-edit', args=[appt_type.id]),
+                **catalog_context,
             },
         )
     else:
@@ -1724,6 +1848,7 @@ def appointment_type_edit(request, type_id: int):
             'title': 'Edit service',
             'submit_label': 'Save changes',
             'appointment_type': appt_type,
+            **catalog_context,
         },
     )
 
