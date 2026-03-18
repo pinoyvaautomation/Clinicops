@@ -4,8 +4,9 @@
     justify-content: space-between;
     align-items: center;
     padding: 12px 16px;
-    background: #ffffff;
-    border-bottom: 1px solid #e5e7eb;
+    background: rgba(255, 255, 255, 0.9);
+    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    backdrop-filter: blur(14px);
     margin-bottom: 16px;
     position: sticky;
     top: 0;
@@ -52,6 +53,16 @@
     color: #0f172a;
     font-weight: 600;
     font-size: 14px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+  .top-nav .links a:hover {
+    background: rgba(15, 23, 42, 0.06);
+  }
+  .top-nav .links a.active {
+    background: rgba(14, 165, 166, 0.12);
+    color: #0f766e;
   }
   .nav-toggle {
     width: 40px;
@@ -256,22 +267,24 @@
     </div>
   </div>
   <div class="links" id="nav-links">
+    {% with current=request.resolver_match.url_name %}
     {% if nav_is_staff %}
-      <a href="{% url 'dashboard' %}">Dashboard</a>
-      <a href="{% url 'calendar' %}">Calendar</a>
-      <a href="{% url 'staff-appointments' %}">Appointments</a>
-      <a href="{% url 'staff-patients' %}">Patients</a>
+      <a class="{% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+      <a class="{% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">Calendar</a>
+      <a class="{% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}">Appointments</a>
+      <a class="{% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}">Patients</a>
       {% if nav_is_admin %}
-        <a href="{% url 'staff-members' %}">Staff</a>
-        <a href="{% url 'appointment-types' %}">Services</a>
-        <a href="{% url 'billing' %}">Billing</a>
+        <a class="{% if current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}active{% endif %}" href="{% url 'staff-members' %}">Staff</a>
+        <a class="{% if current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}active{% endif %}" href="{% url 'appointment-types' %}">Services</a>
+        <a class="{% if current == 'billing' %}active{% endif %}" href="{% url 'billing' %}">Billing</a>
       {% endif %}
     {% else %}
-      <a href="{% url 'patient-portal' %}">Portal</a>
+      <a class="{% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}">Portal</a>
       {% if nav_patient_multi %}
         <a href="#" id="clinic-switch-btn">Switch clinic</a>
       {% endif %}
     {% endif %}
+    {% endwith %}
   </div>
   <div class="nav-actions">
     <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">

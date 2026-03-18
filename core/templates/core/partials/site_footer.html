@@ -1,8 +1,9 @@
 <style>
   .site-footer {
     margin-top: 48px;
-    border-top: 1px solid #e5e7eb;
-    background: #fff;
+    border-top: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(14px);
   }
   .site-footer__inner {
     max-width: 1100px;
@@ -23,10 +24,9 @@
   }
 </style>
 <footer class="site-footer">
-  <!-- UI refresh marker -->
   <div class="site-footer__inner">
     <div>
-      © {{ nav_clinic.name|default:public_brand_name|default:"ClinicOps" }}. All rights reserved.
+      &copy; {{ nav_clinic.name|default:public_brand_name|default:"ClinicOps" }}. All rights reserved.
     </div>
     <div>Need help? Contact the clinic directly.</div>
   </div>

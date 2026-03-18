@@ -2,106 +2,458 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
-    <title>ClinicOps Calendar - {{ clinic.name }}</title>
+    <title>{{ clinic.name }} Calendar</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
-      h1 { margin-bottom: 8px; }
-      table { border-collapse: collapse; width: 100%; margin-top: 16px; }
-      th, td { border: 1px solid #e5e7eb; padding: 8px; text-align: left; }
-      th { background: #f3f4f6; }
-      .muted { color: #6b7280; font-size: 14px; }
-      label { display: block; margin-bottom: 4px; }
-      input, select { width: 100%; padding: 6px; }
-      button { padding: 8px 12px; }
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: {{ clinic.brand_color|default:"#0ea5a6" }};
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.22);
+        --panel: rgba(255, 255, 255, 0.94);
+        --success: #177b57;
+        --success-bg: #eaf9f0;
+        --warning: #9a5b00;
+        --warning-bg: #fff3db;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 166, 0.12), transparent 30%),
+          radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 26%),
+          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 22px 24px 56px;
+      }
+      .hero, .panel, .stat-card, .day-card {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 30px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 26%),
+          linear-gradient(135deg, #0f172a 0%, #111827 60%, var(--brand) 160%);
+      }
+      .hero-grid, .stats-grid {
+        display: grid;
+        gap: 16px;
+      }
+      .hero-grid {
+        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+      }
+      .eyebrow, .pill, .chip, .status-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .eyebrow, .pill {
+        background: rgba(255, 255, 255, 0.12);
+        color: #f8fafc;
+      }
+      .hero h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(2rem, 4vw, 3.1rem);
+        line-height: 1;
+      }
+      .hero p {
+        margin: 0;
+        max-width: 720px;
+        color: rgba(248, 250, 252, 0.78);
+        line-height: 1.6;
+      }
+      .hero-meta, .hero-actions, .toolbar, .badges, .day-list, .stats-grid {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .hero-meta { margin-top: 20px; }
+      .hero-actions { margin-top: 24px; }
+      .btn, .btn-secondary, .btn-ghost {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 11px 16px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn { background: #fff; color: var(--ink); }
+      .btn-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.14); }
+      .btn-ghost { background: rgba(255, 255, 255, 0.9); color: var(--ink-soft); border-color: var(--line); }
+      .hero-side {
+        display: grid;
+        gap: 14px;
+      }
+      .hero-box {
+        padding: 20px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .kicker {
+        margin-bottom: 10px;
+        color: rgba(248, 250, 252, 0.64);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .hero-box strong {
+        display: block;
+        font-size: 28px;
+      }
+      .hero-box p {
+        margin-top: 8px;
+        font-size: 14px;
+      }
+      .panel {
+        margin-top: 18px;
+        padding: 24px;
+        background: var(--panel);
+      }
+      .panel-head, .day-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+        margin-bottom: 18px;
+      }
+      .panel-head p, .day-head p, .note, .meta {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.5;
+      }
+      .filter-grid {
+        display: grid;
+        gap: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      }
+      label {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--ink-soft);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      input, select {
+        width: 100%;
+        min-height: 46px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 14px;
+        padding: 11px 13px;
+        font: inherit;
+        background: #fff;
+        color: var(--ink);
+      }
+      .stats-grid {
+        margin-top: 18px;
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      }
+      .stat-card {
+        padding: 18px;
+        background: #fff;
+      }
+      .stat-card::before {
+        content: '';
+        display: block;
+        width: 100%;
+        height: 4px;
+        margin: -18px 0 14px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--brand), rgba(15, 23, 42, 0.3));
+      }
+      .label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .value {
+        margin: 14px 0 10px;
+        font-size: clamp(1.8rem, 4vw, 2.4rem);
+        font-weight: 700;
+        line-height: 1;
+      }
+      .mini {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        margin-top: 14px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.05);
+        color: var(--ink-soft);
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .calendar-grid {
+        margin-top: 18px;
+        display: grid;
+        gap: 16px;
+      }
+      .day-card {
+        padding: 22px;
+        background: #fff;
+      }
+      .day-title {
+        font-size: 1.3rem;
+      }
+      .day-list {
+        display: grid;
+        gap: 12px;
+      }
+      .appointment-card {
+        display: grid;
+        grid-template-columns: 140px minmax(0, 1.3fr) minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        padding: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 18px;
+        background: #fff;
+      }
+      .time-box {
+        padding: 12px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, #0f172a, #1e293b);
+        color: #fff;
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .time-box span {
+        display: block;
+        margin-top: 4px;
+        color: rgba(255, 255, 255, 0.68);
+        font-size: 12px;
+      }
+      .status-pill.scheduled { background: rgba(14, 165, 166, 0.1); color: #0f766e; }
+      .status-pill.completed { background: var(--success-bg); color: var(--success); }
+      .status-pill.cancelled { background: var(--warning-bg); color: var(--warning); }
+      .empty {
+        padding: 18px;
+        border: 1px dashed rgba(148, 163, 184, 0.36);
+        border-radius: 18px;
+        background: linear-gradient(180deg, #fff, #f8fafc);
+      }
+      @media (max-width: 1080px) {
+        .hero-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 860px) {
+        .wrap { padding: 18px 16px 44px; }
+        .hero, .panel, .stat-card, .day-card { border-radius: 22px; }
+        .appointment-card { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 560px) {
+        .filter-grid, .stats-grid { grid-template-columns: 1fr; }
+        .panel-head, .day-head, .toolbar { flex-direction: column; align-items: flex-start; }
+      }
     </style>
   </head>
   <body>
     {% include "core/partials/top_nav.html" %}
-    <h1>Appointments</h1>
-    <p class="muted"><a href="{% url 'dashboard' %}">Back to dashboard</a></p>
-    <div class="muted">
-      Clinic: {{ clinic.name }} |
-      Range: {{ start_date }} -> {{ end_date }}
-    </div>
-    <div class="muted" style="margin-top: 8px;">
-      {% if current_subscription %}
-        Subscription: {{ current_subscription.status }} ({{ current_subscription.plan.name }})
-        {% if current_subscription.current_period_end %}
-          | Next billing: {{ current_subscription.current_period_end|date:"Y-m-d" }}
-        {% endif %}
-      {% else %}
-        Subscription: none
-      {% endif %}
-      {% if is_admin %}
-        | <a href="/billing/">Manage billing</a>
-      {% endif %}
-    </div>
+    <main class="wrap">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Calendar View</div>
+            <h1>{{ clinic.name }} schedule</h1>
+            <p>Grouped by day so the clinic team can scan upcoming workload, spot empty gaps, and review the week without bouncing between screens.</p>
+            <div class="hero-meta">
+              <span class="pill">Local time {{ current_local_time|date:"g:i A" }}</span>
+              <span class="pill">{{ clinic.timezone }}</span>
+              <span class="pill">{{ start_date|date:"M j" }} to {{ end_date|date:"M j, Y" }}</span>
+            </div>
+            <div class="hero-actions">
+              <a class="btn" href="{% url 'dashboard' %}">Back to dashboard</a>
+              <a class="btn-secondary" href="{% url 'staff-appointments' %}?start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Appointment list</a>
+              {% if is_admin %}
+                <a class="btn-secondary" href="{% url 'billing' %}">Billing</a>
+              {% endif %}
+            </div>
+          </div>
+          <div class="hero-side">
+            <div class="hero-box">
+              <div class="kicker">Next appointment</div>
+              {% if next_appointment %}
+                <strong>{{ next_appointment.start_at|date:"g:i A" }}</strong>
+                <p>{{ next_appointment.patient }} with {{ next_appointment.staff }} on {{ next_appointment.start_at|date:"M j" }}.</p>
+              {% else %}
+                <strong>No upcoming bookings</strong>
+                <p>This filtered range does not currently include any future appointments.</p>
+              {% endif %}
+            </div>
+            <div class="hero-box">
+              <div class="kicker">Billing status</div>
+              {% if current_subscription %}
+                <strong>{{ current_subscription.plan.name }}</strong>
+                <div class="pill" style="margin-top:12px;">{{ current_subscription.status|title }}</div>
+                <p>{% if current_subscription.current_period_end %}Next billing date {{ current_subscription.current_period_end|date:"M j, Y" }}.{% else %}Billing cycle details will appear after sync.{% endif %}</p>
+              {% else %}
+                <strong>No active plan</strong>
+                <p>Review subscription status before relying on patient self-booking.</p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </section>
 
-    <form method="get" style="margin-top: 16px;">
-      <div style="display:grid; gap:12px; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));">
-        <div>
-          <label class="muted">Start date</label>
-          <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+      <section class="panel">
+        <div class="panel-head">
+          <div>
+            <h2>Filter the calendar</h2>
+            <p>Focus the day view by date range, staff member, or appointment status.</p>
+          </div>
+          <div class="badges">
+            {% if has_active_filters %}
+              {% for badge in filter_badges %}
+                <span class="chip">{{ badge }}</span>
+              {% endfor %}
+            {% else %}
+              <span class="chip">Default date window</span>
+            {% endif %}
+          </div>
         </div>
-        <div>
-          <label class="muted">End date</label>
-          <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
-        </div>
-        <div>
-          <label class="muted">Staff</label>
-          <select name="staff">
-            <option value="">All staff</option>
-            {% for staff in staff_list %}
-              <option value="{{ staff.id }}" {% if staff.id|stringformat:"s" == selected_staff_id %}selected{% endif %}>
-                {{ staff }}
-              </option>
-            {% endfor %}
-          </select>
-        </div>
-        <div>
-          <label class="muted">Status</label>
-          <select name="status">
-            <option value="">All statuses</option>
-            <option value="scheduled" {% if selected_status == "scheduled" %}selected{% endif %}>Scheduled</option>
-            <option value="completed" {% if selected_status == "completed" %}selected{% endif %}>Completed</option>
-            <option value="cancelled" {% if selected_status == "cancelled" %}selected{% endif %}>Cancelled</option>
-          </select>
-        </div>
-      </div>
-      <div style="margin-top: 12px;">
-        <button type="submit">Apply filters</button>
-        <a href="{% url 'calendar' %}" style="margin-left: 8px;">Reset</a>
-      </div>
-    </form>
+        <form method="get">
+          <div class="filter-grid">
+            <div>
+              <label for="id_start">Start date</label>
+              <input id="id_start" type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+            </div>
+            <div>
+              <label for="id_end">End date</label>
+              <input id="id_end" type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+            </div>
+            <div>
+              <label for="id_staff">Staff</label>
+              <select id="id_staff" name="staff">
+                <option value="">All staff</option>
+                {% for staff in staff_list %}
+                  <option value="{{ staff.id }}" {% if staff.id|stringformat:"s" == selected_staff_id %}selected{% endif %}>{{ staff }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div>
+              <label for="id_status">Status</label>
+              <select id="id_status" name="status">
+                <option value="">All statuses</option>
+                <option value="scheduled" {% if selected_status == "scheduled" %}selected{% endif %}>Scheduled</option>
+                <option value="completed" {% if selected_status == "completed" %}selected{% endif %}>Completed</option>
+                <option value="cancelled" {% if selected_status == "cancelled" %}selected{% endif %}>Cancelled</option>
+              </select>
+            </div>
+          </div>
+          <div class="toolbar" style="margin-top:16px;">
+            <button class="btn" type="submit">Apply filters</button>
+            <a class="btn-ghost" href="{% url 'calendar' %}">Reset</a>
+          </div>
+        </form>
+      </section>
 
-    <table>
-      <thead>
-        <tr>
-          <th>Start</th>
-          <th>End</th>
-          <th>Type</th>
-          <th>Staff</th>
-          <th>Patient</th>
-          <th>Status</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for appt in appointments %}
-          <tr>
-            <td>{{ appt.start_at|date:"M j, Y, g:i A" }}</td>
-            <td>{{ appt.end_at|date:"M j, Y, g:i A" }}</td>
-            <td>{% if appt.appointment_type %}{{ appt.appointment_type.name }}{% else %}-{% endif %}</td>
-            <td>{{ appt.staff }}</td>
-            <td>{{ appt.patient }}</td>
-            <td>{{ appt.get_status_display }}</td>
-          </tr>
-        {% empty %}
-          <tr>
-            <td colspan="6">No appointments found for this range.</td>
-          </tr>
+      <section class="stats-grid">
+        <article class="stat-card">
+          <div class="label">Appointments in range</div>
+          <div class="value">{{ total_count }}</div>
+          <div class="note">All appointments shown by the current filters.</div>
+          <div class="mini">Peak {{ busiest_day_label }}{% if busiest_day_count %} · {{ busiest_day_count }}{% endif %}</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Today</div>
+          <div class="value">{{ today_count }}</div>
+          <div class="note">Appointments landing on today in clinic local time.</div>
+          <div class="mini">{{ upcoming_count }} still ahead</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Patients</div>
+          <div class="value">{{ unique_patient_count }}</div>
+          <div class="note">Unique patients represented in this calendar window.</div>
+          <div class="mini">{{ active_staff_count }} staff active</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Scheduled</div>
+          <div class="value">{{ scheduled_count }}</div>
+          <div class="note">Appointments still active and not yet completed or cancelled.</div>
+          <div class="mini">{{ average_daily_load }} avg/day</div>
+        </article>
+      </section>
+
+      <section class="calendar-grid">
+        {% for day in date_rows %}
+          <article class="day-card">
+            <div class="day-head">
+              <div>
+                <h2 class="day-title">{{ day.label }}</h2>
+                <p>{{ day.date|date:"M j, Y" }}</p>
+              </div>
+              <span class="chip">{{ day.count }} appointment{{ day.count|pluralize }}</span>
+            </div>
+
+            {% if day.appointments %}
+              <div class="day-list">
+                {% for row in day.appointments %}
+                  <div class="appointment-card">
+                    <div class="time-box">
+                      {{ row.local_start|date:"g:i A" }}
+                      <span>{{ row.local_end|date:"g:i A" }}</span>
+                    </div>
+                    <div>
+                      <strong>{{ row.appointment.patient }}</strong>
+                      <div class="meta" style="margin-top:6px;">
+                        {{ row.appointment.staff }}
+                        {% if row.appointment.appointment_type %}
+                          · {{ row.appointment.appointment_type.name }}
+                        {% endif %}
+                      </div>
+                    </div>
+                    <div class="meta">
+                      Confirmation {{ row.appointment.confirmation_code|default:"pending" }}<br>
+                      {% if row.appointment.appointment_type %}
+                        {{ row.appointment.appointment_type.duration_minutes }} minute service
+                      {% else %}
+                        General appointment
+                      {% endif %}
+                    </div>
+                    <div>
+                      <span class="status-pill {{ row.appointment.status }}">{{ row.appointment.get_status_display }}</span>
+                    </div>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="empty">
+                <strong>No appointments booked for this day</strong>
+                <p class="note">This section stays visible so the team can spot open capacity quickly.</p>
+              </div>
+            {% endif %}
+          </article>
         {% endfor %}
-      </tbody>
-    </table>
+      </section>
+    </main>
     {% include "core/partials/site_footer.html" %}
   </body>
 </html>

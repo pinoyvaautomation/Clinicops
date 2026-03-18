@@ -197,6 +197,94 @@ def _require_staff_portal(request):
     return staff, None
 
 
+def _build_schedule_summary(appointments, tz, start_date=None, end_date=None):
+    now = timezone.now()
+    today = timezone.localdate(now, tz)
+    total_count = len(appointments)
+    completed_count = 0
+    cancelled_count = 0
+    upcoming_count = 0
+    today_count = 0
+    unique_patient_ids = set()
+    active_staff_ids = set()
+    next_appointment = None
+    appointment_rows = []
+    grouped_map = {}
+
+    for appt in appointments:
+        unique_patient_ids.add(appt.patient_id)
+        active_staff_ids.add(appt.staff_id)
+
+        if appt.status == Appointment.Status.COMPLETED:
+            completed_count += 1
+        elif appt.status == Appointment.Status.CANCELLED:
+            cancelled_count += 1
+
+        if appt.start_at >= now:
+            upcoming_count += 1
+            if next_appointment is None:
+                next_appointment = appt
+
+        local_start = timezone.localtime(appt.start_at, tz)
+        local_end = timezone.localtime(appt.end_at, tz)
+        row = {
+            'appointment': appt,
+            'local_start': local_start,
+            'local_end': local_end,
+        }
+        appointment_rows.append(row)
+
+        local_day = local_start.date()
+        grouped_map.setdefault(local_day, []).append(row)
+        if local_day == today:
+            today_count += 1
+
+    scheduled_count = total_count - completed_count - cancelled_count
+    date_rows = []
+    average_daily_load = 0
+    busiest_day_label = ''
+    busiest_day_count = 0
+
+    if start_date and end_date:
+        cursor = start_date
+        while cursor <= end_date:
+            items = grouped_map.get(cursor, [])
+            date_rows.append(
+                {
+                    'date': cursor,
+                    'label': cursor.strftime('%A'),
+                    'short_label': cursor.strftime('%b %d'),
+                    'count': len(items),
+                    'appointments': items,
+                }
+            )
+            cursor += timedelta(days=1)
+
+        if date_rows:
+            busiest_day = max(date_rows, key=lambda row: row['count'])
+            busiest_day_label = busiest_day['short_label']
+            busiest_day_count = busiest_day['count']
+            average_daily_load = round(total_count / len(date_rows), 1)
+
+    return {
+        'appointment_rows': appointment_rows,
+        'date_rows': date_rows,
+        'total_count': total_count,
+        'scheduled_count': scheduled_count,
+        'completed_count': completed_count,
+        'cancelled_count': cancelled_count,
+        'upcoming_count': upcoming_count,
+        'today_count': today_count,
+        'unique_patient_count': len(unique_patient_ids),
+        'active_staff_count': len(active_staff_ids),
+        'current_local_time': timezone.localtime(now, tz),
+        'next_appointment': next_appointment,
+        'average_daily_load': average_daily_load,
+        'busiest_day_label': busiest_day_label,
+        'busiest_day_count': busiest_day_count,
+    }
+
+
 @login_required
 def calendar_view(request):
     if not (request.user.is_superuser or request.user.groups.filter(name__in=ALLOWED_GROUPS).exists()):
@@ -210,6 +298,7 @@ def calendar_view(request):
     tz = ZoneInfo(clinic.timezone or 'UTC')
 
     today = timezone.localdate(timezone.now(), tz)
+    start_default_end = today + timedelta(days=7)
     start_date = _parse_date(request.GET.get('start'), today)
     end_date = _parse_date(request.GET.get('end'), start_date + timedelta(days=7))
     start_date, end_date = _normalize_date_range(start_date, end_date)
@@ -220,28 +309,59 @@ def calendar_view(request):
         start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
         end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
 
-        appointments = (
+        appointments = list(
             _filter_appointments(clinic, start_dt, end_dt, staff_id, status)
             .select_related('staff', 'patient', 'appointment_type')
             .order_by('start_at')
         )
+        summary = _build_schedule_summary(appointments, tz, start_date, end_date)
         current_subscription = (
             ClinicSubscription.objects.filter(clinic=clinic)
             .select_related('plan')
             .order_by('-created_at')
             .first()
         )
-        staff_list = Staff.objects.filter(clinic=clinic, is_active=True).select_related('user')
+        staff_list = list(Staff.objects.filter(clinic=clinic, is_active=True).select_related('user'))
         is_admin = request.user.is_superuser or request.user.groups.filter(name='Admin').exists()
+        try:
+            selected_staff_id = int(staff_id) if staff_id else None
+        except (TypeError, ValueError):
+            selected_staff_id = None
+        selected_staff = next((member for member in staff_list if member.id == selected_staff_id), None)
+
+        filter_badges = []
+        if selected_staff:
+            filter_badges.append(f'Staff: {selected_staff}')
+        if status and status in dict(Appointment.Status.choices):
+            filter_badges.append(f'Status: {status.title()}')
+        if start_date != today or end_date != start_default_end:
+            filter_badges.append(f'Range: {start_date:%b %d} to {end_date:%b %d}')
 
         context = {
             'clinic': clinic,
             'start_date': start_date,
             'end_date': end_date,
             'appointments': appointments,
+            'appointment_rows': summary['appointment_rows'],
+            'date_rows': summary['date_rows'],
+            'total_count': summary['total_count'],
+            'scheduled_count': summary['scheduled_count'],
+            'completed_count': summary['completed_count'],
+            'cancelled_count': summary['cancelled_count'],
+            'upcoming_count': summary['upcoming_count'],
+            'today_count': summary['today_count'],
+            'unique_patient_count': summary['unique_patient_count'],
+            'active_staff_count': summary['active_staff_count'],
+            'current_local_time': summary['current_local_time'],
+            'next_appointment': summary['next_appointment'],
+            'average_daily_load': summary['average_daily_load'],
+            'busiest_day_label': summary['busiest_day_label'],
+            'busiest_day_count': summary['busiest_day_count'],
             'staff_list': staff_list,
             'selected_staff_id': staff_id or '',
             'selected_status': status or '',
+            'filter_badges': filter_badges,
+            'has_active_filters': bool(filter_badges),
             'current_subscription': current_subscription,
             'is_admin': is_admin,
         }
@@ -261,8 +381,9 @@ def dashboard_view(request):
     tz = ZoneInfo(clinic.timezone or 'UTC')
 
     today = timezone.localdate(timezone.now(), tz)
+    default_end_date = today + timedelta(days=6)
     start_date = _parse_date(request.GET.get('start'), today)
-    end_date = _parse_date(request.GET.get('end'), today + timedelta(days=6))
+    end_date = _parse_date(request.GET.get('end'), default_end_date)
     start_date, end_date = _normalize_date_range(start_date, end_date)
     staff_id = request.GET.get('staff')
     status = request.GET.get('status')
@@ -271,33 +392,22 @@ def dashboard_view(request):
         start_dt = timezone.make_aware(datetime.combine(start_date, datetime.min.time()))
         end_dt = timezone.make_aware(datetime.combine(end_date, datetime.max.time()))
 
-        appointments = (
+        appointments = list(
             _filter_appointments(clinic, start_dt, end_dt, staff_id, status)
             .select_related('staff', 'patient', 'appointment_type')
             .order_by('start_at')
         )
 
         now = timezone.now()
-        total_count = appointments.count()
-        completed_count = appointments.filter(status=Appointment.Status.COMPLETED).count()
-        cancelled_count = appointments.filter(status=Appointment.Status.CANCELLED).count()
-        upcoming_count = appointments.filter(start_at__gte=now).count()
-
-        today_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
-        today_end = timezone.make_aware(datetime.combine(today, datetime.max.time()))
-        today_count = appointments.filter(
-            start_at__gte=today_start,
-            start_at__lte=today_end,
-        ).count()
-
-        current_subscription = (
-            ClinicSubscription.objects.filter(clinic=clinic)
-            .select_related('plan')
-            .order_by('-created_at')
-            .first()
-        )
-        staff_list = Staff.objects.filter(clinic=clinic, is_active=True).select_related('user')
-        is_admin = request.user.is_superuser or request.user.groups.filter(name='Admin').exists()
+        total_count = len(appointments)
+        completed_count = 0
+        cancelled_count = 0
+        upcoming_count = 0
+        today_count = 0
+        unique_patient_ids = set()
+        active_staff_ids = set()
+        today_appointments = []
+        staff_load_map = {}
 
         chart_days = []
         cursor = start_date
@@ -306,10 +416,56 @@ def dashboard_view(request):
             cursor += timedelta(days=1)
 
         counts = {day: 0 for day in chart_days}
+        next_appointment = None
+
         for appt in appointments:
+            unique_patient_ids.add(appt.patient_id)
+            active_staff_ids.add(appt.staff_id)
+
+            if appt.status == Appointment.Status.COMPLETED:
+                completed_count += 1
+            elif appt.status == Appointment.Status.CANCELLED:
+                cancelled_count += 1
+
+            if appt.start_at >= now:
+                upcoming_count += 1
+                if next_appointment is None:
+                    next_appointment = appt
+
             local_day = timezone.localtime(appt.start_at, tz).date()
             if local_day in counts:
                 counts[local_day] += 1
+            if local_day == today:
+                today_count += 1
+                today_appointments.append(appt)
+
+            staff_row = staff_load_map.setdefault(
+                appt.staff_id,
+                {
+                    'staff': appt.staff,
+                    'count': 0,
+                    'completed': 0,
+                    'cancelled': 0,
+                },
+            )
+            staff_row['count'] += 1
+            if appt.status == Appointment.Status.COMPLETED:
+                staff_row['completed'] += 1
+            elif appt.status == Appointment.Status.CANCELLED:
+                staff_row['cancelled'] += 1
+
+        scheduled_count = total_count - completed_count - cancelled_count
+
+        current_subscription = (
+            ClinicSubscription.objects.filter(clinic=clinic)
+            .select_related('plan')
+            .order_by('-created_at')
+            .first()
+        )
+        staff_list = list(
+            Staff.objects.filter(clinic=clinic, is_active=True).select_related('user')
+        )
+        is_admin = request.user.is_superuser or request.user.groups.filter(name='Admin').exists()
 
         max_count = max(counts.values()) if counts else 0
         chart_points = []
@@ -322,16 +478,70 @@ def dashboard_view(request):
                 'percent': percent,
             })
 
+        unique_patients_count = len(unique_patient_ids)
+        active_staff_count = len(active_staff_ids)
+        completion_rate = int(round((completed_count / total_count) * 100)) if total_count else 0
+        cancellation_rate = int(round((cancelled_count / total_count) * 100)) if total_count else 0
+        average_daily_load = round(total_count / len(chart_days), 1) if chart_days else 0
+
+        busiest_day = max(counts.items(), key=lambda item: item[1]) if counts else (start_date, 0)
+        busiest_day_label = busiest_day[0].strftime('%b %d') if busiest_day[0] else ''
+        busiest_day_count = busiest_day[1]
+
+        staff_load_rows = sorted(
+            staff_load_map.values(),
+            key=lambda row: (-row['count'], str(row['staff']).lower()),
+        )
+        max_staff_load = staff_load_rows[0]['count'] if staff_load_rows else 0
+        for row in staff_load_rows:
+            row['scheduled'] = row['count'] - row['completed'] - row['cancelled']
+            row['percent'] = int((row['count'] / max_staff_load) * 100) if max_staff_load else 0
+
+        selected_staff = None
+        try:
+            selected_staff_id = int(staff_id) if staff_id else None
+        except (TypeError, ValueError):
+            selected_staff_id = None
+        if selected_staff_id:
+            selected_staff = next((member for member in staff_list if member.id == selected_staff_id), None)
+
+        filter_badges = []
+        if selected_staff:
+            filter_badges.append(f'Staff: {selected_staff}')
+        if status and status in dict(Appointment.Status.choices):
+            filter_badges.append(f'Status: {status.title()}')
+        if start_date != today or end_date != default_end_date:
+            filter_badges.append(f'Range: {start_date:%b %d} to {end_date:%b %d}')
+
+        appointment_preview = appointments[:8]
+        remaining_appointment_count = max(total_count - len(appointment_preview), 0)
+
         context = {
             'clinic': clinic,
             'start_date': start_date,
             'end_date': end_date,
             'appointments': appointments,
+            'appointment_preview': appointment_preview,
+            'remaining_appointment_count': remaining_appointment_count,
+            'today_appointments': today_appointments,
+            'next_appointment': next_appointment,
             'total_count': total_count,
+            'scheduled_count': scheduled_count,
             'completed_count': completed_count,
             'cancelled_count': cancelled_count,
             'upcoming_count': upcoming_count,
             'today_count': today_count,
+            'unique_patients_count': unique_patients_count,
+            'active_staff_count': active_staff_count,
+            'completion_rate': completion_rate,
+            'cancellation_rate': cancellation_rate,
+            'average_daily_load': average_daily_load,
+            'busiest_day_label': busiest_day_label,
+            'busiest_day_count': busiest_day_count,
+            'staff_load_rows': staff_load_rows,
+            'filter_badges': filter_badges,
+            'has_active_filters': bool(filter_badges),
+            'current_local_time': timezone.localtime(now, tz),
             'staff_list': staff_list,
             'selected_staff_id': staff_id or '',
             'selected_status': status or '',
@@ -886,6 +1096,7 @@ def staff_appointments(request):
     clinic = staff.clinic
     tz = ZoneInfo(clinic.timezone or 'UTC')
     today = timezone.localdate(timezone.now(), tz)
+    start_default_end = today + timedelta(days=7)
     start_date = _parse_date(request.GET.get('start'), today)
     end_date = _parse_date(request.GET.get('end'), start_date + timedelta(days=7))
     start_date, end_date = _normalize_date_range(start_date, end_date)
@@ -906,7 +1117,14 @@ def staff_appointments(request):
         if status and status in dict(Appointment.Status.choices):
             qs = qs.filter(status=status)
 
-        appointments = qs.order_by('start_at')
+        appointments = list(qs.order_by('start_at'))
+
+    summary = _build_schedule_summary(appointments, tz, start_date, end_date)
+    filter_badges = []
+    if status and status in dict(Appointment.Status.choices):
+        filter_badges.append(f'Status: {status.title()}')
+    if start_date != today or end_date != start_default_end:
+        filter_badges.append(f'Range: {start_date:%b %d} to {end_date:%b %d}')
 
     return render(
         request,
@@ -914,9 +1132,25 @@ def staff_appointments(request):
         {
             'clinic': clinic,
             'appointments': appointments,
+            'appointment_rows': summary['appointment_rows'],
             'start_date': start_date,
             'end_date': end_date,
             'selected_status': status,
+            'total_count': summary['total_count'],
+            'scheduled_count': summary['scheduled_count'],
+            'completed_count': summary['completed_count'],
+            'cancelled_count': summary['cancelled_count'],
+            'upcoming_count': summary['upcoming_count'],
+            'today_count': summary['today_count'],
+            'unique_patient_count': summary['unique_patient_count'],
+            'active_staff_count': summary['active_staff_count'],
+            'current_local_time': summary['current_local_time'],
+            'next_appointment': summary['next_appointment'],
+            'average_daily_load': summary['average_daily_load'],
+            'busiest_day_label': summary['busiest_day_label'],
+            'busiest_day_count': summary['busiest_day_count'],
+            'filter_badges': filter_badges,
+            'has_active_filters': bool(filter_badges),
             'is_doctor': _is_doctor(request.user),
             'is_admin': _is_admin(request.user),
             'can_create': _is_admin(request.user) or _is_frontdesk(request.user),
@@ -1132,6 +1366,7 @@ def staff_appointment_history(request, appointment_id: int):
         return HttpResponseForbidden('Role cannot view appointment history.')
 
     clinic = staff.clinic
+    tz = ZoneInfo(clinic.timezone or 'UTC')
     appointment = get_object_or_404(Appointment, pk=appointment_id, clinic=clinic)
 
     if _is_doctor(request.user) and not _is_admin(request.user):
@@ -1141,12 +1376,37 @@ def staff_appointment_history(request, appointment_id: int):
     is_admin = _is_admin(request.user)
     is_frontdesk = _is_frontdesk(request.user) and not is_admin
 
-    history = (
+    history = list(
         appointment.history.select_related('history_user', 'staff', 'patient')
         .order_by('-history_date')
     )
     if is_frontdesk:
-        history = history.filter(status=Appointment.Status.CANCELLED)
+        history = [item for item in history if item.status == Appointment.Status.CANCELLED]
+
+    history_rows = []
+    created_count = 0
+    changed_count = 0
+    deleted_count = 0
+    for item in history:
+        if item.history_type == '+':
+            created_count += 1
+            history_label = 'Created'
+        elif item.history_type == '-':
+            deleted_count += 1
+            history_label = 'Deleted'
+        else:
+            changed_count += 1
+            history_label = 'Changed'
+
+        history_rows.append(
+            {
+                'item': item,
+                'history_label': history_label,
+                'history_date_local': timezone.localtime(item.history_date, tz),
+                'start_at_local': timezone.localtime(item.start_at, tz) if item.start_at else None,
+                'end_at_local': timezone.localtime(item.end_at, tz) if item.end_at else None,
+            }
+        )
 
     return render(
         request,
@@ -1155,6 +1415,12 @@ def staff_appointment_history(request, appointment_id: int):
             'clinic': clinic,
             'appointment': appointment,
             'history': history,
+            'history_rows': history_rows,
+            'history_total': len(history_rows),
+            'created_count': created_count,
+            'changed_count': changed_count,
+            'deleted_count': deleted_count,
+            'current_local_time': timezone.localtime(timezone.now(), tz),
             'limited_history': is_frontdesk,
         },
     )
@@ -1176,7 +1442,56 @@ def staff_patients(request):
         ).values_list('patient_id', flat=True)
         qs = qs.filter(id__in=patient_ids)
 
-    patients = qs.order_by('last_name', 'first_name')
+    patients = list(qs.order_by('last_name', 'first_name'))
+    patient_ids = [patient.id for patient in patients]
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    appointments_qs = Appointment.objects.none()
+    if patient_ids:
+        appointments_qs = (
+            Appointment.objects.filter(clinic=clinic, patient_id__in=patient_ids)
+            .select_related('staff', 'appointment_type')
+            .order_by('start_at')
+        )
+        if _is_doctor(request.user) and not _is_admin(request.user):
+            appointments_qs = appointments_qs.filter(staff=staff)
+
+    now = timezone.now()
+    patient_map = {
+        patient.id: {
+            'patient': patient,
+            'appointment_count': 0,
+            'upcoming_count': 0,
+            'next_appointment': None,
+            'last_appointment': None,
+        }
+        for patient in patients
+    }
+
+    for appt in appointments_qs:
+        row = patient_map.get(appt.patient_id)
+        if not row:
+            continue
+        row['appointment_count'] += 1
+        row['last_appointment'] = appt
+        if appt.start_at >= now:
+            row['upcoming_count'] += 1
+            if row['next_appointment'] is None:
+                row['next_appointment'] = appt
+
+    patient_rows = list(patient_map.values())
+    total_upcoming = sum(row['upcoming_count'] for row in patient_rows)
+    patients_with_upcoming = sum(1 for row in patient_rows if row['upcoming_count'] > 0)
+    for row in patient_rows:
+        row['next_appointment_local'] = (
+            timezone.localtime(row['next_appointment'].start_at, tz)
+            if row['next_appointment']
+            else None
+        )
+        row['last_appointment_local'] = (
+            timezone.localtime(row['last_appointment'].start_at, tz)
+            if row['last_appointment']
+            else None
+        )
 
     return render(
         request,
@@ -1184,6 +1499,11 @@ def staff_patients(request):
         {
             'clinic': clinic,
             'patients': patients,
+            'patient_rows': patient_rows,
+            'total_patient_count': len(patient_rows),
+            'patients_with_upcoming': patients_with_upcoming,
+            'total_upcoming_appointments': total_upcoming,
+            'current_local_time': timezone.localtime(now, tz),
             'can_edit': _is_admin(request.user) or _is_frontdesk(request.user),
         },
     )
@@ -1196,15 +1516,59 @@ def staff_members(request):
         return error
 
     clinic = staff.clinic
-    members = (
+    members = list(
         Staff.objects.filter(clinic=clinic)
         .select_related('user')
         .order_by('user__last_name', 'user__first_name')
     )
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    now = timezone.now()
+    staff_ids = [member.id for member in members]
+    appointments_qs = Appointment.objects.none()
+    if staff_ids:
+        appointments_qs = (
+            Appointment.objects.filter(clinic=clinic, staff_id__in=staff_ids)
+            .only('staff_id', 'start_at')
+            .order_by('start_at')
+        )
+    counts_by_staff = {
+        member.id: {'appointment_count': 0, 'upcoming_count': 0, 'next_appointment': None}
+        for member in members
+    }
+    for appt in appointments_qs:
+        row = counts_by_staff.get(appt.staff_id)
+        if not row:
+            continue
+        row['appointment_count'] += 1
+        if appt.start_at >= now:
+            row['upcoming_count'] += 1
+            if row['next_appointment'] is None:
+                row['next_appointment'] = appt
+
     staff_rows = []
+    active_count = 0
+    inactive_count = 0
+    role_counts = {}
     for member in members:
         role = _staff_role_for_user(member.user) or '-'
-        staff_rows.append({'staff': member, 'role': role})
+        role_counts[role] = role_counts.get(role, 0) + 1
+        is_active = member.is_active and member.user.is_active
+        if is_active:
+            active_count += 1
+        else:
+            inactive_count += 1
+        summary = counts_by_staff.get(member.id, {})
+        next_appointment = summary.get('next_appointment')
+        staff_rows.append(
+            {
+                'staff': member,
+                'role': role,
+                'is_active': is_active,
+                'appointment_count': summary.get('appointment_count', 0),
+                'upcoming_count': summary.get('upcoming_count', 0),
+                'next_appointment_local': timezone.localtime(next_appointment.start_at, tz) if next_appointment else None,
+            }
+        )
 
     return render(
         request,
@@ -1212,6 +1576,11 @@ def staff_members(request):
         {
             'clinic': clinic,
             'staff_rows': staff_rows,
+            'total_staff_count': len(staff_rows),
+            'active_staff_count': active_count,
+            'inactive_staff_count': inactive_count,
+            'role_counts': sorted(role_counts.items()),
+            'current_local_time': timezone.localtime(now, tz),
         },
     )
 
@@ -1489,6 +1858,7 @@ def staff_patient_edit(request, patient_id: int):
         return error
 
     clinic = staff.clinic
+    tz = ZoneInfo(clinic.timezone or 'UTC')
     patient = get_object_or_404(Patient, pk=patient_id, clinic=clinic)
 
     if _is_doctor(request.user) and not _is_admin(request.user):
@@ -1522,6 +1892,27 @@ def staff_patient_edit(request, patient_id: int):
     if _is_doctor(request.user) and not _is_admin(request.user):
         appointments_qs = appointments_qs.filter(staff=staff)
 
+    appointments = list(appointments_qs)
+    appointment_rows = []
+    now = timezone.now()
+    upcoming_count = 0
+    completed_count = 0
+    cancelled_count = 0
+    for appt in appointments:
+        if appt.start_at >= now:
+            upcoming_count += 1
+        if appt.status == Appointment.Status.COMPLETED:
+            completed_count += 1
+        elif appt.status == Appointment.Status.CANCELLED:
+            cancelled_count += 1
+        appointment_rows.append(
+            {
+                'appointment': appt,
+                'local_start': timezone.localtime(appt.start_at, tz),
+                'local_end': timezone.localtime(appt.end_at, tz),
+            }
+        )
+
     return render(
         request,
         'core/staff_patient_edit.html',
@@ -1529,7 +1920,13 @@ def staff_patient_edit(request, patient_id: int):
             'clinic': clinic,
             'patient': patient,
             'form': form,
-            'appointments': appointments_qs,
+            'appointments': appointments,
+            'appointment_rows': appointment_rows,
+            'appointment_count': len(appointment_rows),
+            'upcoming_count': upcoming_count,
+            'completed_count': completed_count,
+            'cancelled_count': cancelled_count,
+            'current_local_time': timezone.localtime(now, tz),
             'can_edit': can_edit,
             'can_update_appointments': _is_admin(request.user) or _is_doctor(request.user) or _is_frontdesk(request.user),
             'can_view_history': _is_admin(request.user) or _is_frontdesk(request.user) or _is_doctor(request.user),
