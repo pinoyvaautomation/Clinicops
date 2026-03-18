@@ -2,83 +2,151 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Select Clinic</title>
     <style>
-      :root { --brand: #0f5132; }
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: #0ea5a6;
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.22);
+        --panel: rgba(255, 255, 255, 0.94);
+      }
+
       * { box-sizing: border-box; }
       body {
-        font-family: Arial, sans-serif;
         margin: 0;
         min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: #f3f4f6;
-        color: #1f2937;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 166, 0.12), transparent 30%),
+          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
       }
-      .page {
-        flex: 1;
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
+      }
+      .wrap {
+        max-width: 980px;
+        margin: 0 auto;
+        padding: 22px 24px 56px;
+      }
+      .hero, .panel {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 28px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 26%),
+          linear-gradient(135deg, #0f172a 0%, #111827 60%, var(--brand) 160%);
+      }
+      .eyebrow, .pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1;
+      }
+      .hero p, .note {
+        margin: 0;
+        line-height: 1.6;
+      }
+      .hero p { color: rgba(248, 250, 252, 0.78); }
+      .hero-meta {
         display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+      .panel {
+        margin-top: 18px;
+        padding: 24px;
+        background: var(--panel);
+      }
+      .panel h2 {
+        margin: 0 0 10px;
+      }
+      .clinic-list {
+        margin-top: 18px;
+        display: grid;
+        gap: 12px;
+      }
+      .clinic-card {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: center;
+        padding: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        border-radius: 20px;
+        background: #fff;
+      }
+      .btn {
+        display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 24px;
-      }
-      .card {
-        width: 100%;
-        max-width: 520px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
-      }
-      .card-header {
-        background: var(--brand);
-        color: #fff;
-        padding: 18px 20px;
-        font-size: 20px;
-        font-weight: 700;
-      }
-      .card-body { padding: 22px 20px 24px; }
-      .clinic-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 12px; }
-      .clinic-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        padding: 12px 14px;
-        border: 1px solid #e5e7eb;
-        border-radius: 8px;
-        background: #f8fafc;
-      }
-      .clinic-item strong { color: #0f172a; }
-      .btn {
-        background: var(--brand);
+        min-height: 44px;
+        padding: 11px 16px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
         color: #fff;
         text-decoration: none;
-        padding: 8px 12px;
-        border-radius: 6px;
-        font-weight: 700;
-        font-size: 13px;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      @media (max-width: 640px) {
+        .wrap { padding: 18px 16px 44px; }
+        .hero, .panel { border-radius: 22px; }
+        .clinic-card { grid-template-columns: 1fr; }
+        .btn { width: 100%; }
       }
     </style>
   </head>
   <body>
     {% include "core/partials/top_nav.html" %}
-    <main class="page">
-      <div class="card">
-        <div class="card-header">Choose your clinic</div>
-        <div class="card-body">
-          <ul class="clinic-list">
-            {% for profile in profiles %}
-              <li class="clinic-item">
-                <div>
-                  <strong>{{ profile.clinic.name }}</strong>
-                </div>
-                <a class="btn" href="{% url 'patient-portal' %}?clinic={{ profile.clinic_id }}">Open portal</a>
-              </li>
-            {% endfor %}
-          </ul>
+    <main class="wrap">
+      <section class="hero">
+        <div class="eyebrow">Patient Access</div>
+        <h1>Choose your clinic</h1>
+        <p>Select the clinic profile you want to open. This keeps multi-clinic patients on a simple, mobile-safe entry screen.</p>
+        <div class="hero-meta">
+          <span class="pill">{{ profile_count }} clinic option{{ profile_count|pluralize }}</span>
         </div>
-      </div>
+      </section>
+
+      <section class="panel">
+        <h2>Available clinic profiles</h2>
+        <p class="note">Each option opens the matching patient portal for that clinic.</p>
+
+        <div class="clinic-list">
+          {% for profile in profiles %}
+            <article class="clinic-card">
+              <div>
+                <strong>{{ profile.clinic.name }}</strong>
+                <p class="note" style="margin-top: 8px;">Open the patient portal for this clinic profile.</p>
+              </div>
+              <a class="btn" href="{% url 'patient-portal' %}?clinic={{ profile.clinic_id }}">Open portal</a>
+            </article>
+          {% endfor %}
+        </div>
+      </section>
     </main>
     {% include "core/partials/site_footer.html" %}
   </body>

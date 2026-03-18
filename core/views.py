@@ -847,6 +847,7 @@ def settings_view(request):
         form = AvatarUploadForm()
 
     groups = list(request.user.groups.values_list('name', flat=True))
+    tz = ZoneInfo(clinic.timezone or 'UTC') if clinic else timezone.get_current_timezone()
     return render(
         request,
         'core/settings.html',
@@ -857,6 +858,7 @@ def settings_view(request):
             'avatar_saved': success,
             'avatar_url': avatar_url,
             'profile_type': profile_type,
+            'current_local_time': timezone.localtime(timezone.now(), tz),
         },
     )
 
@@ -1054,6 +1056,7 @@ def patient_portal(request):
             'core/patient_select_clinic.html',
             {
                 'profiles': profiles,
+                'profile_count': profiles.count(),
             },
         )
 
@@ -1083,6 +1086,9 @@ def patient_portal(request):
             'clinic': clinic,
             'patient': patient,
             'appointments': appointments,
+            'appointment_count': len(appointments),
+            'next_appointment': appointments[0] if appointments else None,
+            'current_local_time': timezone.localtime(timezone.now(), tz),
         },
     )
 
@@ -2162,6 +2168,10 @@ def billing_view(request):
             'current_subscription': current_subscription,
             'paypal_client_id': settings.PAYPAL_CLIENT_ID,
             'paypal_sdk_url': settings.PAYPAL_SDK_URL,
+            'current_local_time': timezone.localtime(
+                timezone.now(),
+                ZoneInfo(clinic.timezone or 'UTC'),
+            ),
         },
     )
 

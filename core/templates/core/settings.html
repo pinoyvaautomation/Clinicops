@@ -2,62 +2,340 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Account Settings</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
-      .card { max-width: 520px; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; }
-      .muted { color: #6b7280; }
-      .actions { margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap; }
-      a.button, button { padding: 8px 12px; border-radius: 6px; border: none; background: #0ea5a6; color: #fff; text-decoration: none; }
-      a.secondary { background: #e5e7eb; color: #0f172a; }
-      ul { padding-left: 16px; }
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: {{ clinic.brand_color|default:"#0ea5a6" }};
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.22);
+        --panel: rgba(255, 255, 255, 0.94);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 166, 0.12), transparent 30%),
+          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
+      }
+      .wrap {
+        max-width: 1080px;
+        margin: 0 auto;
+        padding: 22px 24px 56px;
+      }
+      .hero, .panel, .card {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 28px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 26%),
+          linear-gradient(135deg, #0f172a 0%, #111827 60%, var(--brand) 160%);
+      }
+      .hero-grid, .content-grid {
+        display: grid;
+        gap: 16px;
+      }
+      .hero-grid {
+        grid-template-columns: minmax(0, 1.65fr) minmax(280px, 1fr);
+      }
+      .content-grid {
+        margin-top: 18px;
+        grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.9fr);
+      }
+      .eyebrow, .pill, .chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .eyebrow, .pill {
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1;
+      }
+      .hero p, .note, .meta {
+        margin: 0;
+        line-height: 1.6;
+      }
+      .hero p { color: rgba(248, 250, 252, 0.78); }
+      .hero-meta, .hero-actions, .actions, .chip-list {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .hero-meta { margin-top: 18px; }
+      .hero-actions { margin-top: 22px; }
+      .btn, .btn-secondary, .btn-ghost, .btn-brand {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 11px 16px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn { background: #fff; color: var(--ink); }
+      .btn-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.14); }
+      .btn-ghost { background: rgba(255, 255, 255, 0.9); color: var(--ink-soft); border-color: var(--line); }
+      .btn-brand {
+        color: #fff;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+      }
+      .hero-side {
+        display: grid;
+        gap: 14px;
+      }
+      .hero-box {
+        padding: 20px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .kicker {
+        margin-bottom: 10px;
+        color: rgba(248, 250, 252, 0.64);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .hero-box strong {
+        display: block;
+        font-size: 28px;
+      }
+      .panel, .card {
+        padding: 24px;
+        background: var(--panel);
+      }
+      .panel h2, .card h2 {
+        margin: 0 0 10px;
+      }
+      .profile-line {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      .profile-line + .profile-line {
+        margin-top: 12px;
+      }
+      .label {
+        display: block;
+        margin-bottom: 6px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+      }
+      .avatar-wrap {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        flex-wrap: wrap;
+      }
+      .avatar-wrap img,
+      .avatar-fallback {
+        width: 88px;
+        height: 88px;
+        border-radius: 999px;
+        object-fit: cover;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.5rem;
+        font-weight: 700;
+      }
+      form {
+        margin: 0;
+      }
+      input[type="file"] {
+        width: 100%;
+        max-width: 100%;
+        padding: 11px 13px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 14px;
+        background: #fff;
+      }
+      .chip-list {
+        margin-top: 12px;
+      }
+      .chip {
+        color: var(--ink-soft);
+        background: rgba(15, 23, 42, 0.05);
+      }
+      .link-box {
+        word-break: break-all;
+      }
+      @media (max-width: 980px) {
+        .hero-grid, .content-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 560px) {
+        .wrap { padding: 18px 16px 44px; }
+        .hero, .panel, .card { border-radius: 22px; }
+        .actions, .hero-actions { flex-direction: column; align-items: stretch; }
+        .actions .btn-brand,
+        .actions .btn-ghost,
+        .hero-actions .btn,
+        .hero-actions .btn-secondary {
+          width: 100%;
+        }
+      }
     </style>
   </head>
   <body>
     {% include "core/partials/top_nav.html" %}
-    <h1>Account Settings</h1>
-    <div class="card">
-      <p><strong>Name:</strong> {{ request.user.get_full_name|default:request.user.username }}</p>
-      <p><strong>Email:</strong> {{ request.user.email|default:"-" }}</p>
-      <p><strong>Clinic:</strong> {{ clinic.name|default:"-" }}</p>
-      {% if clinic and clinic.slug and profile_type == 'staff' %}
-        <p>
-          <strong>Public booking link:</strong>
-          <a href="{% url 'clinic-booking-slug' clinic.slug %}">
-            {{ request.scheme }}://{{ request.get_host }}{% url 'clinic-booking-slug' clinic.slug %}
-          </a>
-        </p>
-        <p class="muted">Share this link with patients to book or create accounts.</p>
-      {% endif %}
-      <p><strong>Avatar:</strong></p>
-      {% if avatar_url %}
-        <img src="{{ avatar_url }}" alt="Avatar" style="height:72px; width:72px; border-radius:999px; object-fit:cover;">
-      {% else %}
-        <p class="muted">No avatar uploaded.</p>
-      {% endif %}
-      <form method="post" enctype="multipart/form-data" style="margin-top: 12px;">
-        {% csrf_token %}
-        {{ avatar_form.avatar.label_tag }}
-        {{ avatar_form.avatar }}
-        <button type="submit" style="margin-top: 8px;">Upload avatar</button>
-        {% if avatar_saved %}
-          <p class="muted">Avatar updated.</p>
-        {% endif %}
-      </form>
-      <p><strong>Roles:</strong></p>
-      <ul>
-        {% for role in groups %}
-          <li>{{ role }}</li>
-        {% empty %}
-          <li class="muted">No roles assigned.</li>
-        {% endfor %}
-      </ul>
-      <div class="actions">
-        <a class="button" href="{% url 'password_change' %}">Change password</a>
-        <a class="button secondary" href="{% url 'dashboard' %}">Back to dashboard</a>
-        <a class="button secondary" href="{% url 'logout' %}">Log out</a>
-      </div>
-    </div>
+    <main class="wrap">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Account Settings</div>
+            <h1>{{ request.user.get_full_name|default:request.user.username }}</h1>
+            <p>Review account details, update your avatar, and reach the core account actions without leaving the portal.</p>
+            <div class="hero-meta">
+              <span class="pill">{{ current_local_time|date:"g:i A" }} local time</span>
+              <span class="pill">{{ clinic.name|default:"No clinic selected" }}</span>
+              <span class="pill">{{ profile_type|default:"user"|title }}</span>
+            </div>
+            <div class="hero-actions">
+              <a class="btn" href="{% if profile_type == 'staff' %}{% url 'dashboard' %}{% else %}{% url 'patient-portal' %}{% endif %}">Back</a>
+              <a class="btn-secondary" href="{% url 'password_change' %}">Change password</a>
+            </div>
+          </div>
+          <div class="hero-side">
+            <div class="hero-box">
+              <div class="kicker">Account email</div>
+              <strong>{{ request.user.email|default:"-" }}</strong>
+              <p>The primary login email shown across clinic and patient account flows.</p>
+            </div>
+            <div class="hero-box">
+              <div class="kicker">Roles</div>
+              <strong>{{ groups|length }}</strong>
+              <p>Role assignments determine which areas of the portal you can access.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <article class="card">
+          <h2>Profile details</h2>
+          <p class="note">This page shows the current account identity and avatar used throughout the clinic portal.</p>
+
+          <div class="profile-line" style="margin-top: 18px;">
+            <span class="label">Display name</span>
+            <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+          </div>
+
+          <div class="profile-line">
+            <span class="label">Email</span>
+            <strong>{{ request.user.email|default:"-" }}</strong>
+          </div>
+
+          <div class="profile-line">
+            <span class="label">Clinic</span>
+            <strong>{{ clinic.name|default:"-" }}</strong>
+          </div>
+
+          <div class="profile-line">
+            <span class="label">Avatar</span>
+            <div class="avatar-wrap">
+              {% if avatar_url %}
+                <img src="{{ avatar_url }}" alt="Avatar">
+              {% else %}
+                <div class="avatar-fallback">
+                  {% with first=request.user.first_name|default:'' last=request.user.last_name|default:'' %}
+                    {% if first or last %}
+                      {{ first|slice:":1"|upper }}{{ last|slice:":1"|upper }}
+                    {% else %}
+                      {{ request.user.username|slice:":2"|upper }}
+                    {% endif %}
+                  {% endwith %}
+                </div>
+              {% endif %}
+              <div style="flex: 1; min-width: 220px;">
+                <form method="post" enctype="multipart/form-data">
+                  {% csrf_token %}
+                  {{ avatar_form.avatar.label_tag }}
+                  <div style="margin-top: 8px;">{{ avatar_form.avatar }}</div>
+                  <div class="actions" style="margin-top: 12px;">
+                    <button class="btn-brand" type="submit">Upload avatar</button>
+                  </div>
+                </form>
+                {% if avatar_saved %}
+                  <p class="note" style="margin-top: 10px;">Avatar updated successfully.</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <aside class="panel">
+          <h2>Access and actions</h2>
+          <p class="note">Keep these quick controls reachable on smaller screens without forcing horizontal scrolling.</p>
+
+          <div class="profile-line" style="margin-top: 18px;">
+            <span class="label">Assigned roles</span>
+            <div class="chip-list">
+              {% for role in groups %}
+                <span class="chip">{{ role }}</span>
+              {% empty %}
+                <span class="chip">No roles assigned</span>
+              {% endfor %}
+            </div>
+          </div>
+
+          {% if clinic and clinic.slug and profile_type == 'staff' %}
+            <div class="profile-line link-box">
+              <span class="label">Public booking link</span>
+              <a href="{% url 'clinic-booking-slug' clinic.slug %}">
+                {{ request.scheme }}://{{ request.get_host }}{% url 'clinic-booking-slug' clinic.slug %}
+              </a>
+              <p class="note" style="margin-top: 10px;">Share this link with patients when they need direct booking or account creation access.</p>
+            </div>
+          {% endif %}
+
+          <div class="actions" style="margin-top: 18px;">
+            <a class="btn-brand" href="{% url 'password_change' %}">Change password</a>
+            <a class="btn-ghost" href="{% if profile_type == 'staff' %}{% url 'dashboard' %}{% else %}{% url 'patient-portal' %}{% endif %}">Back</a>
+          </div>
+          <form method="post" action="{% url 'logout' %}" style="margin-top: 12px;">
+            {% csrf_token %}
+            <button class="btn-ghost" type="submit" style="width: 100%;">Log out</button>
+          </form>
+        </aside>
+      </section>
+    </main>
     {% include "core/partials/site_footer.html" %}
   </body>
 </html>

@@ -2,73 +2,436 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Clinic Billing</title>
     <style>
-      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
-      .panel { border: 1px solid #e5e7eb; padding: 16px; border-radius: 6px; max-width: 720px; }
-      label { display: block; margin-top: 12px; font-weight: 600; }
-      select { width: 100%; padding: 8px; margin-top: 4px; }
-      .muted { color: #6b7280; }
-      #paypal-button-container { margin-top: 16px; }
-      .error { color: #b91c1c; }
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: {{ clinic.brand_color|default:"#0ea5a6" }};
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.22);
+        --panel: rgba(255, 255, 255, 0.94);
+        --success: #177b57;
+        --success-bg: #eaf9f0;
+        --danger: #b42318;
+        --danger-bg: #fff2f1;
+        --warning: #9a5b00;
+        --warning-bg: #fff3db;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 166, 0.12), transparent 30%),
+          radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 26%),
+          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 22px 24px 56px;
+      }
+      .hero, .stat-card, .panel {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 28px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 26%),
+          linear-gradient(135deg, #0f172a 0%, #111827 60%, var(--brand) 160%);
+      }
+      .hero-grid, .stats-grid, .content-grid, .plan-list {
+        display: grid;
+        gap: 16px;
+      }
+      .hero-grid {
+        grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+      }
+      .content-grid {
+        margin-top: 18px;
+        grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+      }
+      .eyebrow, .pill, .status-pill, .mini {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .eyebrow, .pill {
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1;
+      }
+      .hero p, .note, .meta {
+        margin: 0;
+        line-height: 1.6;
+      }
+      .hero p { color: rgba(248, 250, 252, 0.78); }
+      .hero-meta, .hero-actions, .actions, .flash-stack {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .hero-meta { margin-top: 18px; }
+      .hero-actions { margin-top: 22px; }
+      .btn, .btn-secondary, .btn-ghost, .btn-brand {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 44px;
+        padding: 11px 16px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn { background: #fff; color: var(--ink); }
+      .btn-secondary { background: rgba(255, 255, 255, 0.08); color: #fff; border-color: rgba(255, 255, 255, 0.14); }
+      .btn-ghost { background: rgba(255, 255, 255, 0.9); color: var(--ink-soft); border-color: var(--line); }
+      .btn-brand {
+        color: #fff;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+      }
+      .hero-side {
+        display: grid;
+        gap: 14px;
+      }
+      .hero-box {
+        padding: 20px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .kicker {
+        margin-bottom: 10px;
+        color: rgba(248, 250, 252, 0.64);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .hero-box strong {
+        display: block;
+        font-size: 28px;
+      }
+      .stats-grid {
+        margin-top: 18px;
+        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+      }
+      .stat-card {
+        padding: 18px;
+        background: #fff;
+      }
+      .stat-card::before {
+        content: '';
+        display: block;
+        width: 100%;
+        height: 4px;
+        margin: -18px 0 14px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--brand), rgba(15, 23, 42, 0.3));
+      }
+      .label {
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .value {
+        margin: 14px 0 10px;
+        font-size: clamp(1.8rem, 4vw, 2.4rem);
+        font-weight: 700;
+        line-height: 1;
+      }
+      .mini {
+        background: rgba(15, 23, 42, 0.05);
+        color: var(--ink-soft);
+      }
+      .panel {
+        padding: 24px;
+        background: var(--panel);
+      }
+      .panel h2 {
+        margin: 0 0 10px;
+      }
+      .flash-stack {
+        margin-top: 18px;
+        display: grid;
+      }
+      .flash {
+        padding: 14px 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.2);
+        background: #fff;
+      }
+      .flash.success {
+        border-color: rgba(23, 123, 87, 0.22);
+        background: var(--success-bg);
+        color: var(--success);
+      }
+      .flash.error {
+        border-color: rgba(180, 35, 24, 0.18);
+        background: var(--danger-bg);
+        color: var(--danger);
+      }
+      .status-pill.active, .status-pill.approved {
+        background: var(--success-bg);
+        color: var(--success);
+      }
+      .status-pill.pending {
+        background: var(--warning-bg);
+        color: var(--warning);
+      }
+      .status-pill.cancelled, .status-pill.expired, .status-pill.suspended {
+        background: var(--danger-bg);
+        color: var(--danger);
+      }
+      .field-block, .snapshot, .plan-card {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      label {
+        display: block;
+        margin-bottom: 7px;
+        color: var(--ink-soft);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      select {
+        width: 100%;
+        min-height: 48px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 14px;
+        padding: 11px 13px;
+        font: inherit;
+        background: #fff;
+        color: var(--ink);
+      }
+      .plan-list {
+        margin-top: 16px;
+      }
+      .plan-card strong {
+        display: block;
+        font-size: 1.05rem;
+      }
+      .plan-card p {
+        margin: 6px 0 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      #paypal-button-container {
+        margin-top: 16px;
+        min-height: 44px;
+      }
+      .helper {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.6;
+      }
+      #billing-csrf {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+      }
+      @media (max-width: 980px) {
+        .hero-grid, .content-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 560px) {
+        .wrap { padding: 18px 16px 44px; }
+        .hero, .stat-card, .panel { border-radius: 22px; }
+        .stats-grid { grid-template-columns: 1fr; }
+        .actions, .hero-actions { flex-direction: column; align-items: stretch; }
+        .actions .btn-brand,
+        .actions .btn-ghost,
+        .hero-actions .btn,
+        .hero-actions .btn-secondary {
+          width: 100%;
+        }
+      }
     </style>
   </head>
   <body>
     {% include "core/partials/top_nav.html" %}
-    <div class="panel">
-      <h1>Billing - {{ clinic.name }}</h1>
-      {% if current_subscription %}
-        <p class="muted">
-          Current status: {{ current_subscription.status }} ({{ current_subscription.plan.name }})
-        </p>
-      {% else %}
-        <p class="muted">No active subscription yet.</p>
-      {% endif %}
+    <main class="wrap">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Billing Control</div>
+            <h1>{{ clinic.name }} subscription</h1>
+            <p>Manage the clinic plan, launch PayPal checkout, and sync the subscription state without leaving the operations portal.</p>
+            <div class="hero-meta">
+              <span class="pill">{{ current_local_time|date:"g:i A" }} local time</span>
+              <span class="pill">{{ plans|length }} active plan{{ plans|length|pluralize }}</span>
+              {% if current_subscription %}
+                <span class="pill">{{ current_subscription.plan.name }}</span>
+              {% endif %}
+            </div>
+            <div class="hero-actions">
+              <a class="btn" href="{% url 'dashboard' %}">Back to dashboard</a>
+              {% if current_subscription %}
+                <button id="sync-button" type="button" class="btn-secondary">Sync with PayPal</button>
+              {% endif %}
+            </div>
+          </div>
+          <div class="hero-side">
+            <div class="hero-box">
+              <div class="kicker">Current status</div>
+              {% if current_subscription %}
+                <strong>{{ current_subscription.status|title }}</strong>
+                <p>{{ current_subscription.plan.name }} plan{% if current_subscription.current_period_end %} renews {{ current_subscription.current_period_end|date:"M j, Y" }}{% endif %}.</p>
+              {% else %}
+                <strong>Not active</strong>
+                <p>No subscription is currently attached to this clinic.</p>
+              {% endif %}
+            </div>
+            <div class="hero-box">
+              <div class="kicker">Checkout route</div>
+              <strong>Direct PayPal</strong>
+              <p>The current MVP billing flow stays inside PayPal for subscription approval and payment method handling.</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
-      {% if current_subscription %}
-        <button id="sync-button" type="button">Sync with PayPal</button>
-      {% endif %}
+      <section class="stats-grid">
+        <article class="stat-card">
+          <div class="label">Available plans</div>
+          <div class="value">{{ plans|length }}</div>
+          <div class="mini">Only active plans are shown to the clinic admin</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Subscription state</div>
+          <div class="value">{% if current_subscription %}{{ current_subscription.status|title }}{% else %}None{% endif %}</div>
+          <div class="mini">{% if current_subscription %}Plan: {{ current_subscription.plan.name }}{% else %}Choose a plan to begin billing{% endif %}</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Current plan</div>
+          <div class="value">{% if current_subscription %}{{ current_subscription.plan.price_dollars|floatformat:2 }}{% else %}0.00{% endif %}</div>
+          <div class="mini">{% if current_subscription %}{{ current_subscription.plan.currency }} per {{ current_subscription.plan.interval }}{% else %}No active charge yet{% endif %}</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Next renewal</div>
+          <div class="value">{% if current_subscription and current_subscription.current_period_end %}{{ current_subscription.current_period_end|date:"M j" }}{% else %}Pending{% endif %}</div>
+          <div class="mini">{% if current_subscription and current_subscription.last_event_type %}Last event: {{ current_subscription.last_event_type }}{% else %}Awaiting first billing event{% endif %}</div>
+        </article>
+      </section>
 
-      {% if not paypal_client_id %}
-        <p class="error">PayPal client ID is not configured.</p>
-      {% endif %}
+      <section class="content-grid">
+        <article class="panel">
+          <h2>Choose a plan</h2>
+          <p class="note">Pick the clinic plan first, then the PayPal subscription button will render for that selection.</p>
 
-      {% if plans %}
-        <label for="plan">Choose a plan</label>
-        <select id="plan">
-          {% for plan in plans %}
-            <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
-              {{ plan.name }} - {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
-            </option>
-          {% endfor %}
-        </select>
-      {% else %}
-        <p class="error">No plans are configured. Add plans in the admin.</p>
-      {% endif %}
+          {% if not paypal_client_id %}
+            <div class="flash error" style="margin-top: 18px;">PayPal client ID is not configured, so checkout cannot load yet.</div>
+          {% endif %}
 
-      {% csrf_token %}
-      <div id="paypal-button-container"></div>
-      <p id="billing-error" class="error" style="display:none;"></p>
-      <p id="billing-success" class="muted" style="display:none;"></p>
-    </div>
+          {% if plans %}
+            <div class="field-block" style="margin-top: 18px;">
+              <label for="plan">Plan selection</label>
+              <select id="plan">
+                {% for plan in plans %}
+                  <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
+                    {{ plan.name }} | {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
+                  </option>
+                {% endfor %}
+              </select>
+              <p class="helper" style="margin: 10px 0 0;">The selected plan controls which PayPal subscription plan ID is used during checkout.</p>
+            </div>
+
+            <div class="plan-list">
+              {% for plan in plans %}
+                <div class="plan-card">
+                  <strong>{{ plan.name }}</strong>
+                  <p>{{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} billed every {{ plan.interval }}.</p>
+                </div>
+              {% endfor %}
+            </div>
+
+            <form id="billing-csrf" method="post">
+              {% csrf_token %}
+            </form>
+            <div id="paypal-button-container"></div>
+            <div id="billing-error" class="flash error" style="display:none;"></div>
+            <div id="billing-success" class="flash success" style="display:none;"></div>
+          {% else %}
+            <div class="flash error" style="margin-top: 18px;">No active plans are configured yet. Add plans in Django admin before opening checkout.</div>
+          {% endif %}
+        </article>
+
+        <aside class="panel">
+          <h2>Subscription snapshot</h2>
+          <p class="note">Use this as the clinic-side mirror of the current PayPal status.</p>
+
+          <div class="snapshot" style="margin-top: 18px;">
+            <strong>Current state</strong>
+            {% if current_subscription %}
+              <p class="meta" style="margin-top: 8px;">
+                <span class="status-pill {{ current_subscription.status }}">{{ current_subscription.status|title }}</span>
+              </p>
+              <p class="meta" style="margin-top: 10px;">Plan: {{ current_subscription.plan.name }}</p>
+              <p class="meta">Started: {% if current_subscription.started_at %}{{ current_subscription.started_at|date:"M j, Y" }}{% else %}Pending sync{% endif %}</p>
+              <p class="meta">Period end: {% if current_subscription.current_period_end %}{{ current_subscription.current_period_end|date:"M j, Y" }}{% else %}Unknown{% endif %}</p>
+            {% else %}
+              <p class="meta" style="margin-top: 10px;">No active local subscription record exists yet for this clinic.</p>
+            {% endif %}
+          </div>
+
+          <div class="snapshot" style="margin-top: 14px;">
+            <strong>Manual sync</strong>
+            <p class="meta" style="margin-top: 8px;">Use sync after checkout approval or if the local status looks stale compared to PayPal.</p>
+          </div>
+
+          <div class="snapshot" style="margin-top: 14px;">
+            <strong>Implementation note</strong>
+            <p class="meta" style="margin-top: 8px;">The portal still treats Django as the local source of access control, while PayPal remains the payment processor.</p>
+          </div>
+        </aside>
+      </section>
+    </main>
+    {% include "core/partials/site_footer.html" %}
 
     {% if paypal_client_id %}
       <script src="{{ paypal_sdk_url }}?client-id={{ paypal_client_id }}&vault=true&intent=subscription"></script>
       <script>
         const planSelect = document.getElementById('plan');
         const container = document.getElementById('paypal-button-container');
-        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+        const csrfTokenInput = document.querySelector('#billing-csrf [name=csrfmiddlewaretoken]');
+        const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
         const syncButton = document.getElementById('sync-button');
         const successBox = document.getElementById('billing-success');
-
         const errorBox = document.getElementById('billing-error');
 
         function showError(message) {
           if (errorBox) {
             errorBox.textContent = message;
             errorBox.style.display = 'block';
-          } else {
-            alert(message);
           }
         }
 
@@ -79,12 +442,7 @@
           }
         }
 
-        function renderButtons() {
-          const selectedOption = planSelect.options[planSelect.selectedIndex];
-          const paypalPlanId = selectedOption.getAttribute('data-paypal-plan-id');
-          const planId = selectedOption.value;
-
-          container.innerHTML = '';
+        function clearMessages() {
           if (errorBox) {
             errorBox.style.display = 'none';
             errorBox.textContent = '';
@@ -93,8 +451,28 @@
             successBox.style.display = 'none';
             successBox.textContent = '';
           }
+        }
+
+        function renderButtons() {
+          if (!planSelect || !container) return;
+          clearMessages();
+          container.innerHTML = '';
+
+          if (!window.paypal || !paypal.Buttons) {
+            showError('PayPal checkout failed to load. Refresh the page and try again.');
+            return;
+          }
+
+          const selectedOption = planSelect.options[planSelect.selectedIndex];
+          if (!selectedOption) {
+            showError('Select a plan before starting checkout.');
+            return;
+          }
+
+          const paypalPlanId = selectedOption.getAttribute('data-paypal-plan-id');
+          const planId = selectedOption.value;
           if (!paypalPlanId) {
-            container.innerHTML = '<p class="error">Selected plan is missing PayPal plan ID.</p>';
+            showError('Selected plan is missing a PayPal plan ID.');
             return;
           }
 
@@ -125,7 +503,6 @@
                 window.location.reload();
               }).catch(function(err) {
                 showError('Payment recorded but subscription save failed: ' + err.message);
-                console.error(err);
               });
             }
           }).render('#paypal-button-container');
@@ -138,14 +515,7 @@
 
         if (syncButton) {
           syncButton.addEventListener('click', function() {
-            if (errorBox) {
-              errorBox.style.display = 'none';
-              errorBox.textContent = '';
-            }
-            if (successBox) {
-              successBox.style.display = 'none';
-              successBox.textContent = '';
-            }
+            clearMessages();
             fetch('{% url "billing-sync" %}', {
               method: 'POST',
               headers: {
@@ -163,12 +533,10 @@
               window.location.reload();
             }).catch(function(err) {
               showError('Sync failed: ' + err.message);
-              console.error(err);
             });
           });
         }
       </script>
     {% endif %}
-    {% include "core/partials/site_footer.html" %}
   </body>
 </html>
