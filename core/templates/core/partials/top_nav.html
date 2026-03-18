@@ -7,13 +7,16 @@
     justify-content: space-between;
     align-items: center;
     gap: 16px;
-    padding: 12px 16px;
+    width: min(calc(100% - 24px), 1240px);
+    margin: 12px auto 16px;
+    padding: 12px 18px;
     background: rgba(255, 255, 255, 0.9);
-    border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 22px;
     backdrop-filter: blur(14px);
-    margin-bottom: 16px;
+    box-shadow: 0 18px 38px rgba(148, 163, 184, 0.18);
     position: sticky;
-    top: 0;
+    top: 12px;
     z-index: 1000;
   }
   .top-nav .brand {
@@ -151,7 +154,11 @@
       flex-direction: row;
       align-items: center;
       gap: 12px;
+      width: calc(100% - 16px);
+      margin: 8px auto 12px;
       padding: 10px 12px;
+      border-radius: 18px;
+      top: 8px;
     }
     .top-nav .links {
       position: fixed;
