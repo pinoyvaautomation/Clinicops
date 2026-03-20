@@ -87,9 +87,11 @@
     font-size: 14px;
     font-weight: 600;
     border: 1px solid transparent;
+    transition: background 0.16s ease, color 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
   }
   .public-nav__links a:hover {
     background: rgba(15, 23, 42, 0.06);
+    border-color: rgba(148, 163, 184, 0.18);
   }
   .public-nav__links .ghost {
     background: rgba(255, 255, 255, 0.92);
@@ -100,6 +102,18 @@
     background: linear-gradient(135deg, var(--brand, #1d4ed8), #0f172a);
     color: #fff;
     box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+  }
+  .public-nav__links .ghost:hover {
+    background: #fff;
+    border-color: rgba(148, 163, 184, 0.28);
+    color: #0f172a;
+  }
+  .public-nav__links .cta:hover {
+    background: linear-gradient(135deg, var(--brand, #1d4ed8), #0f172a);
+    color: #fff;
+    border-color: rgba(15, 23, 42, 0.16);
+    box-shadow: 0 16px 28px rgba(15, 23, 42, 0.18);
+    transform: translateY(-1px);
   }
   .public-nav__links .cta:hover,
   .public-nav__links .ghost:hover {
