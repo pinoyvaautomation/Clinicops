@@ -70,6 +70,51 @@ class ClinicSignupForm(forms.Form):
     password = forms.CharField(widget=forms.PasswordInput())
     confirm_password = forms.CharField(widget=forms.PasswordInput())
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['clinic_name'].widget.attrs.update(
+            {
+                'placeholder': 'Clinica JMC',
+                'autocomplete': 'organization',
+            }
+        )
+        self.fields['timezone'].widget.attrs.update(
+            {
+                'placeholder': 'UTC',
+                'autocomplete': 'off',
+            }
+        )
+        self.fields['admin_first_name'].widget.attrs.update(
+            {
+                'placeholder': 'Maria',
+                'autocomplete': 'given-name',
+            }
+        )
+        self.fields['admin_last_name'].widget.attrs.update(
+            {
+                'placeholder': 'Santos',
+                'autocomplete': 'family-name',
+            }
+        )
+        self.fields['admin_email'].widget.attrs.update(
+            {
+                'placeholder': 'owner@clinic.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['password'].widget.attrs.update(
+            {
+                'placeholder': 'Create a secure password',
+                'autocomplete': 'new-password',
+            }
+        )
+        self.fields['confirm_password'].widget.attrs.update(
+            {
+                'placeholder': 'Repeat your password',
+                'autocomplete': 'new-password',
+            }
+        )
+
     def clean_admin_email(self):
         email = self.cleaned_data['admin_email'].strip().lower()
         return email
