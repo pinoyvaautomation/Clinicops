@@ -230,10 +230,16 @@
       <span></span>
     </button>
     <div class="public-nav__links" id="public-nav-links">
-      {% if clinic and clinic.slug %}
-        <a class="ghost" href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
-      {% endif %}
-      <a class="cta" href="{% url 'login' %}">Sign in</a>
+      {% with current=request.resolver_match.url_name %}
+        {% if clinic and clinic.slug %}
+          <a class="ghost" href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
+        {% endif %}
+        {% if current == 'login' %}
+          <a class="cta" href="{% url 'clinic-signup' %}">Sign up</a>
+        {% else %}
+          <a class="cta" href="{% url 'login' %}">Sign in</a>
+        {% endif %}
+      {% endwith %}
     </div>
   </div>
 </nav>
