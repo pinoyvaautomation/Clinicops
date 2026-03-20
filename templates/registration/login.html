@@ -2,117 +2,366 @@
 <html lang="en">
   <head>
     <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ public_brand_name|default:"ClinicOps" }} Login</title>
     <style>
-      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: {{ public_brand_color|default:"#0f5132" }};
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.22);
+        --panel: rgba(255, 255, 255, 0.94);
+        --danger: #b42318;
+        --danger-bg: #fff2f1;
+      }
+
       * { box-sizing: border-box; }
       body {
-        font-family: Arial, sans-serif;
         margin: 0;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
-        background: #f3f4f6;
-        color: #1f2937;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(15, 81, 50, 0.12), transparent 30%),
+          radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 28%),
+          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
       }
       .page {
         flex: 1;
-        display: flex;
+        width: min(1180px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 34px 0 56px;
+      }
+      .shell {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(0, 1.05fr) minmax(360px, 430px);
+        align-items: stretch;
+      }
+      .hero, .login-card {
+        border: 1px solid var(--line);
+        border-radius: 30px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 34px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 24%),
+          linear-gradient(135deg, #0f172a 0%, #111827 56%, var(--brand) 160%);
+        position: relative;
+        overflow: hidden;
+      }
+      .hero::after {
+        content: '';
+        position: absolute;
+        inset: auto -12% -18% auto;
+        width: 280px;
+        height: 280px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 66%);
+        pointer-events: none;
+      }
+      .eyebrow, .pill, .chip {
+        display: inline-flex;
         align-items: center;
-        justify-content: center;
-        padding: 24px;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .eyebrow, .pill {
+        background: rgba(255, 255, 255, 0.12);
+        color: #f8fafc;
+      }
+      .hero h1 {
+        margin: 18px 0 12px;
+        font-size: clamp(2.4rem, 5vw, 4.1rem);
+        line-height: 0.96;
+      }
+      .hero p {
+        margin: 0;
+        max-width: 560px;
+        color: rgba(248, 250, 252, 0.78);
+        line-height: 1.7;
+        font-size: 1.04rem;
+      }
+      .hero-meta, .hero-points, .card-footer {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .hero-meta {
+        margin-top: 20px;
+      }
+      .hero-points {
+        margin-top: 28px;
+        display: grid;
+        gap: 12px;
+      }
+      .point {
+        padding: 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .point strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 1.08rem;
+      }
+      .point p {
+        margin: 0;
+        font-size: 0.95rem;
       }
       .login-card {
-        width: 100%;
-        max-width: 420px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
+        background: var(--panel);
         overflow: hidden;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
       }
-      .login-header {
-        background: var(--brand);
-        color: #fff;
-        padding: 18px 20px;
-        font-size: 20px;
-        font-weight: 700;
+      .login-head {
+        padding: 26px 26px 14px;
+      }
+      .brand-row {
         display: flex;
         align-items: center;
         gap: 12px;
+        color: var(--ink);
       }
-      .login-header img {
-        height: 28px;
+      .brand-row img {
+        height: 34px;
         width: auto;
+      }
+      .brand-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 700;
+        font-size: 1rem;
+      }
+      .login-head h2 {
+        margin: 18px 0 8px;
+        font-size: 2rem;
+      }
+      .login-head p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.6;
+      }
+      .login-body {
+        padding: 0 26px 26px;
+      }
+      .flash {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(180, 35, 24, 0.18);
+        background: var(--danger-bg);
+        color: var(--danger);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      form {
+        margin-top: 18px;
+        display: grid;
+        gap: 14px;
+      }
+      .field {
+        padding: 14px;
+        border-radius: 20px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      label {
+        display: block;
+        margin-bottom: 8px;
+        color: var(--ink-soft);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      input {
+        width: 100%;
+        min-height: 48px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font: inherit;
+        background: #fff;
+        color: var(--ink);
+      }
+      input:focus {
+        outline: none;
+        border-color: var(--brand);
+        box-shadow: 0 0 0 4px rgba(15, 81, 50, 0.08);
+      }
+      .submit {
+        margin-top: 4px;
+        width: 100%;
+        min-height: 52px;
+        border: none;
+        border-radius: 16px;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+        color: #fff;
+        font-size: 0.98rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
+      }
+      .card-footer {
+        margin-top: 18px;
+        display: grid;
+        gap: 10px;
+      }
+      .support-link {
+        color: var(--brand);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .support-link:hover {
+        text-decoration: underline;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 14px;
       }
       .logo-fallback {
         display: none;
-        font-weight: 700;
       }
-      .login-header.logo-broken img {
+      .brand-row.logo-broken img {
         display: none;
       }
-      .login-header.logo-broken .logo-fallback {
-        display: inline;
+      .brand-row.logo-broken .logo-fallback {
+        display: inline-flex;
       }
-      .login-body {
-        padding: 22px 20px 24px;
+      @media (max-width: 980px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
       }
-      label { display: block; margin-top: 12px; font-weight: 600; }
-      input { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 6px; }
-      button {
-        margin-top: 18px;
-        width: 100%;
-        padding: 12px;
-        background: var(--brand);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        font-weight: 700;
-        letter-spacing: 0.4px;
+      @media (max-width: 560px) {
+        .page {
+          width: calc(100% - 24px);
+          padding-top: 22px;
+          padding-bottom: 40px;
+        }
+        .hero, .login-card {
+          border-radius: 24px;
+        }
+        .hero,
+        .login-head,
+        .login-body {
+          padding-left: 20px;
+          padding-right: 20px;
+        }
       }
-      .error { color: #b91c1c; margin: 6px 0 0; }
-      .links { margin-top: 14px; font-size: 14px; }
-      .links a { color: var(--brand); text-decoration: none; }
-      .links a:hover { text-decoration: underline; }
     </style>
   </head>
   <body>
     {% include "core/partials/public_nav.html" %}
     <main class="page">
-      <div class="login-card">
-        <div class="login-header">
-          {% if public_logo_url %}
-            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.login-header').classList.add('logo-broken')">
-            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
-          {% endif %}
-          <span>{{ public_brand_name|default:"ClinicOps" }} Login</span>
-        </div>
-        <div class="login-body">
-          {% if form.non_field_errors %}
-            {% for error in form.non_field_errors %}
-              <p class="error">{{ error }}</p>
-            {% endfor %}
-          {% elif form.errors %}
-            <p class="error">Invalid username or password.</p>
-          {% endif %}
-          <form method="post" action="{% url 'login' %}">
-            {% csrf_token %}
-            <label for="id_username">Username</label>
-            <input type="text" name="username" id="id_username" required>
-
-            <label for="id_password">Password</label>
-            <input type="password" name="password" id="id_password" required>
-
-            <input type="hidden" name="next" value="{{ next }}">
-            <button type="submit">LOG IN</button>
-          </form>
-          <div class="links">
-            <p><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
-            <p><a href="{% url 'resend-verification' %}">Resend verification email</a></p>
+      <section class="shell">
+        <article class="hero">
+          <div class="eyebrow">Clinic Portal Access</div>
+          <h1>{{ public_brand_name|default:"ClinicOps" }}</h1>
+          <p>Appointments, patients, staff, reminders, and subscription control all live in one operating system for the clinic. Sign in to continue where the team left off.</p>
+          <div class="hero-meta">
+            <span class="pill">Built for clinics</span>
+            <span class="pill">Patient and staff access</span>
           </div>
-        </div>
-      </div>
+
+          <div class="hero-points">
+            <div class="point">
+              <strong>One login, full operations view</strong>
+              <p>Move from schedule management to patient follow-up and billing without switching tools.</p>
+            </div>
+            <div class="point">
+              <strong>Same design language as the portal</strong>
+              <p>The login experience now matches the rest of the product instead of feeling like a separate basic auth screen.</p>
+            </div>
+            <div class="point">
+              <strong>Responsive from the start</strong>
+              <p>The layout collapses into a single-column flow on smaller screens so the form stays readable on tablet and mobile.</p>
+            </div>
+          </div>
+        </article>
+
+        <article class="login-card">
+          <div class="login-head">
+            <div class="brand-row{% if public_logo_url %}{% else %} logo-broken{% endif %}">
+              {% if public_logo_url %}
+                <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.brand-row').classList.add('logo-broken')">
+                <span class="brand-mark logo-fallback">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
+              {% else %}
+                <span class="brand-mark">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
+              {% endif %}
+              <strong>{{ public_brand_name|default:"ClinicOps" }}</strong>
+            </div>
+            <h2>Sign in</h2>
+            <p>Use your clinic or patient portal account credentials to continue. Email login still works for accounts set up that way.</p>
+          </div>
+
+          <div class="login-body">
+            {% if form.non_field_errors %}
+              {% for error in form.non_field_errors %}
+                <div class="flash">{{ error }}</div>
+              {% endfor %}
+            {% elif form.errors %}
+              <div class="flash">Invalid username, email, or password.</div>
+            {% endif %}
+
+            <form method="post" action="{% url 'login' %}">
+              {% csrf_token %}
+
+              <div class="field">
+                <label for="id_username">Email or username</label>
+                <input
+                  type="text"
+                  name="username"
+                  id="id_username"
+                  value="{{ form.username.value|default_if_none:'' }}"
+                  autocomplete="username"
+                  required
+                >
+              </div>
+
+              <div class="field">
+                <label for="id_password">Password</label>
+                <input
+                  type="password"
+                  name="password"
+                  id="id_password"
+                  autocomplete="current-password"
+                  required
+                >
+              </div>
+
+              <input type="hidden" name="next" value="{{ next }}">
+              <button class="submit" type="submit">Log In</button>
+            </form>
+
+            <div class="card-footer">
+              <a class="support-link" href="{% url 'password_reset' %}">Forgot your password?</a>
+              <a class="support-link" href="{% url 'resend-verification' %}">Resend verification email</a>
+              <div class="muted">Need a patient account? Ask your clinic for its booking or signup link.</div>
+            </div>
+          </div>
+        </article>
+      </section>
     </main>
     {% include "core/partials/site_footer.html" %}
   </body>
