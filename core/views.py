@@ -88,6 +88,202 @@ def _user_label(user) -> str:
     return full_name or user.email or user.username
 
 
+def _patient_label(patient: Patient) -> str:
+    full_name = f'{patient.first_name} {patient.last_name}'.strip()
+    return full_name or patient.email or f'Patient {patient.pk}'
+
+
+def _build_walk_in_form(*, clinic: Clinic, data=None, prefix: str | None = None):
+    staff_qs = Staff.objects.filter(clinic=clinic, is_active=True).select_related('user')
+    appointment_type_qs = AppointmentType.objects.filter(clinic=clinic, is_active=True)
+    form_kwargs = {
+        'staff_qs': staff_qs,
+        'appointment_type_qs': appointment_type_qs,
+    }
+    if prefix:
+        form_kwargs['prefix'] = prefix
+    if data is not None:
+        return WalkInAppointmentForm(data, **form_kwargs)
+    return WalkInAppointmentForm(**form_kwargs)
+
+
+def _save_walk_in_appointment(form, clinic: Clinic, tz: ZoneInfo):
+    start_at = form.cleaned_data['start_at']
+    if timezone.is_naive(start_at):
+        start_at = timezone.make_aware(start_at, tz)
+    staff_selected = form.cleaned_data['staff']
+    appointment_type = form.cleaned_data.get('appointment_type')
+    duration_minutes = (
+        appointment_type.duration_minutes
+        if appointment_type
+        else getattr(settings, 'APPOINTMENT_SLOT_MINUTES', 30)
+    )
+    end_at = start_at + timedelta(minutes=duration_minutes)
+
+    email = form.cleaned_data['email'].strip().lower()
+    patient = Patient.objects.filter(clinic=clinic, email=email).first()
+    if not patient:
+        patient = Patient.objects.create(
+            clinic=clinic,
+            first_name=form.cleaned_data['first_name'],
+            last_name=form.cleaned_data['last_name'],
+            email=email,
+            phone=form.cleaned_data['phone'],
+            dob=form.cleaned_data.get('dob'),
+        )
+
+    appointment = Appointment(
+        clinic=clinic,
+        appointment_type=appointment_type,
+        staff=staff_selected,
+        patient=patient,
+        start_at=start_at,
+        end_at=end_at,
+        notes=form.cleaned_data.get('notes'),
+    )
+    try:
+        appointment.save()
+    except ValidationError:
+        form.add_error('start_at', 'That time overlaps another appointment for this staff.')
+        return None
+    return appointment
+
+
+def _staff_member_initial(user) -> dict:
+    return {
+        'email': user.email or user.username,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'role': _staff_role_for_user(user) or 'Doctor',
+        'is_active': user.is_active,
+    }
+
+
+def _save_staff_member_form(request, clinic: Clinic, form, *, member: Staff | None = None):
+    email = form.cleaned_data['email']
+    is_create = member is None
+    user = member.user if member is not None else None
+
+    if is_create:
+        if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
+            form.add_error('email', 'An account with this email already exists.')
+            return None
+        is_active = bool(form.cleaned_data.get('is_active'))
+        user = User.objects.create_user(
+            username=email,
+            email=email,
+            first_name=form.cleaned_data.get('first_name') or '',
+            last_name=form.cleaned_data.get('last_name') or '',
+            password=form.cleaned_data['password'],
+            is_staff=True,
+            is_active=is_active,
+        )
+        member = Staff.objects.create(
+            user=user,
+            clinic=clinic,
+            is_active=is_active,
+        )
+    else:
+        if email.lower() != (user.email or user.username).lower():
+            if (
+                User.objects.filter(username__iexact=email).exclude(pk=user.pk).exists()
+                or User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists()
+            ):
+                form.add_error('email', 'An account with this email already exists.')
+                return None
+
+        user.username = email
+        user.email = email
+        user.first_name = form.cleaned_data.get('first_name') or ''
+        user.last_name = form.cleaned_data.get('last_name') or ''
+        user.is_active = bool(form.cleaned_data.get('is_active'))
+        user.is_staff = True
+        new_password = form.cleaned_data.get('password')
+        if new_password:
+            user.set_password(new_password)
+        user.save()
+
+        member.is_active = user.is_active
+        member.save(update_fields=['is_active'])
+
+    staff_groups = Group.objects.filter(name__in=ALLOWED_GROUPS)
+    user.groups.remove(*staff_groups)
+    role = form.cleaned_data['role']
+    group = Group.objects.filter(name=role).first()
+    if group:
+        user.groups.add(group)
+
+    if not user.is_active:
+        _send_verification_email(request, user, clinic=clinic)
+
+    return member
+
+
+def _build_staff_members_context(clinic: Clinic) -> dict:
+    members = list(
+        Staff.objects.filter(clinic=clinic)
+        .select_related('user')
+        .order_by('user__last_name', 'user__first_name')
+    )
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    now = timezone.now()
+    staff_ids = [member.id for member in members]
+    appointments_qs = Appointment.objects.none()
+    if staff_ids:
+        appointments_qs = (
+            Appointment.objects.filter(clinic=clinic, staff_id__in=staff_ids)
+            .only('staff_id', 'start_at')
+            .order_by('start_at')
+        )
+    counts_by_staff = {
+        member.id: {'appointment_count': 0, 'upcoming_count': 0, 'next_appointment': None}
+        for member in members
+    }
+    for appt in appointments_qs:
+        row = counts_by_staff.get(appt.staff_id)
+        if not row:
+            continue
+        row['appointment_count'] += 1
+        if appt.start_at >= now:
+            row['upcoming_count'] += 1
+            if row['next_appointment'] is None:
+                row['next_appointment'] = appt
+
+    staff_rows = []
+    active_count = 0
+    inactive_count = 0
+    role_counts = {}
+    for member in members:
+        role = _staff_role_for_user(member.user) or '-'
+        role_counts[role] = role_counts.get(role, 0) + 1
+        is_active = member.is_active and member.user.is_active
+        if is_active:
+            active_count += 1
+        else:
+            inactive_count += 1
+        summary = counts_by_staff.get(member.id, {})
+        next_appointment = summary.get('next_appointment')
+        staff_rows.append(
+            {
+                'staff': member,
+                'role': role,
+                'is_active': is_active,
+                'appointment_count': summary.get('appointment_count', 0),
+                'upcoming_count': summary.get('upcoming_count', 0),
+                'next_appointment_local': timezone.localtime(next_appointment.start_at, tz) if next_appointment else None,
+            }
+        )
+
+    return {
+        'staff_rows': staff_rows,
+        'total_staff_count': len(staff_rows),
+        'active_staff_count': active_count,
+        'inactive_staff_count': inactive_count,
+        'role_counts': sorted(role_counts.items()),
+        'current_local_time': timezone.localtime(now, tz),
+    }
+
+
 def _filter_appointments(
     clinic: Clinic,
     start_dt: datetime,
@@ -1106,6 +1302,21 @@ def staff_appointments(request):
 
     clinic = staff.clinic
     tz = ZoneInfo(clinic.timezone or 'UTC')
+    can_create = _is_admin(request.user) or _is_frontdesk(request.user)
+    open_create_modal = False
+    walkin_form = _build_walk_in_form(clinic=clinic, prefix='walkin')
+
+    if request.method == 'POST':
+        if not can_create:
+            return HttpResponseForbidden('Only Admin or Front Desk can create walk-in appointments.')
+        walkin_form = _build_walk_in_form(clinic=clinic, data=request.POST, prefix='walkin')
+        if walkin_form.is_valid():
+            appointment = _save_walk_in_appointment(walkin_form, clinic, tz)
+            if appointment:
+                messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
+                return redirect(request.get_full_path())
+        open_create_modal = True
+
     today = timezone.localdate(timezone.now(), tz)
     start_default_end = today + timedelta(days=7)
     start_date = _parse_date(request.GET.get('start'), today)
@@ -1164,9 +1375,11 @@ def staff_appointments(request):
             'has_active_filters': bool(filter_badges),
             'is_doctor': _is_doctor(request.user),
             'is_admin': _is_admin(request.user),
-            'can_create': _is_admin(request.user) or _is_frontdesk(request.user),
+            'can_create': can_create,
             'can_update': _is_admin(request.user) or _is_doctor(request.user) or _is_frontdesk(request.user),
             'can_view_history': _is_admin(request.user) or _is_frontdesk(request.user) or _is_doctor(request.user),
+            'walkin_form': walkin_form,
+            'open_create_modal': open_create_modal,
         },
     )
 
@@ -1301,61 +1514,16 @@ def staff_appointment_create(request):
 
     clinic = staff.clinic
     tz = ZoneInfo(clinic.timezone or 'UTC')
-    staff_qs = Staff.objects.filter(clinic=clinic, is_active=True).select_related('user')
-    appointment_type_qs = AppointmentType.objects.filter(clinic=clinic, is_active=True)
 
     if request.method == 'POST':
-        form = WalkInAppointmentForm(
-            request.POST,
-            staff_qs=staff_qs,
-            appointment_type_qs=appointment_type_qs,
-        )
+        form = _build_walk_in_form(clinic=clinic, data=request.POST)
         if form.is_valid():
-            start_at = form.cleaned_data['start_at']
-            if timezone.is_naive(start_at):
-                start_at = timezone.make_aware(start_at, tz)
-            staff_selected = form.cleaned_data['staff']
-            appointment_type = form.cleaned_data.get('appointment_type')
-            duration_minutes = (
-                appointment_type.duration_minutes
-                if appointment_type
-                else getattr(settings, 'APPOINTMENT_SLOT_MINUTES', 30)
-            )
-            end_at = start_at + timedelta(minutes=duration_minutes)
-
-            email = form.cleaned_data['email'].strip().lower()
-            patient = Patient.objects.filter(clinic=clinic, email=email).first()
-            if not patient:
-                patient = Patient.objects.create(
-                    clinic=clinic,
-                    first_name=form.cleaned_data['first_name'],
-                    last_name=form.cleaned_data['last_name'],
-                    email=email,
-                    phone=form.cleaned_data['phone'],
-                    dob=form.cleaned_data.get('dob'),
-                )
-
-            appointment = Appointment(
-                clinic=clinic,
-                appointment_type=appointment_type,
-                staff=staff_selected,
-                patient=patient,
-                start_at=start_at,
-                end_at=end_at,
-                notes=form.cleaned_data.get('notes'),
-            )
-            try:
-                appointment.save()
-            except ValidationError:
-                form.add_error('start_at', 'That time overlaps another appointment for this staff.')
-            else:
-                messages.success(request, 'Walk-in appointment created.')
+            appointment = _save_walk_in_appointment(form, clinic, tz)
+            if appointment:
+                messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
                 return redirect('staff-appointments')
     else:
-        form = WalkInAppointmentForm(
-            staff_qs=staff_qs,
-            appointment_type_qs=appointment_type_qs,
-        )
+        form = _build_walk_in_form(clinic=clinic)
 
     return render(
         request,
@@ -1527,71 +1695,32 @@ def staff_members(request):
         return error
 
     clinic = staff.clinic
-    members = list(
-        Staff.objects.filter(clinic=clinic)
-        .select_related('user')
-        .order_by('user__last_name', 'user__first_name')
-    )
-    tz = ZoneInfo(clinic.timezone or 'UTC')
-    now = timezone.now()
-    staff_ids = [member.id for member in members]
-    appointments_qs = Appointment.objects.none()
-    if staff_ids:
-        appointments_qs = (
-            Appointment.objects.filter(clinic=clinic, staff_id__in=staff_ids)
-            .only('staff_id', 'start_at')
-            .order_by('start_at')
-        )
-    counts_by_staff = {
-        member.id: {'appointment_count': 0, 'upcoming_count': 0, 'next_appointment': None}
-        for member in members
-    }
-    for appt in appointments_qs:
-        row = counts_by_staff.get(appt.staff_id)
-        if not row:
-            continue
-        row['appointment_count'] += 1
-        if appt.start_at >= now:
-            row['upcoming_count'] += 1
-            if row['next_appointment'] is None:
-                row['next_appointment'] = appt
+    add_form = StaffMemberCreateForm(prefix='add')
+    edit_form = StaffMemberUpdateForm(prefix='edit')
+    open_modal = False
+    open_edit_modal = False
+    edit_action_url = ''
 
-    staff_rows = []
-    active_count = 0
-    inactive_count = 0
-    role_counts = {}
-    for member in members:
-        role = _staff_role_for_user(member.user) or '-'
-        role_counts[role] = role_counts.get(role, 0) + 1
-        is_active = member.is_active and member.user.is_active
-        if is_active:
-            active_count += 1
-        else:
-            inactive_count += 1
-        summary = counts_by_staff.get(member.id, {})
-        next_appointment = summary.get('next_appointment')
-        staff_rows.append(
-            {
-                'staff': member,
-                'role': role,
-                'is_active': is_active,
-                'appointment_count': summary.get('appointment_count', 0),
-                'upcoming_count': summary.get('upcoming_count', 0),
-                'next_appointment_local': timezone.localtime(next_appointment.start_at, tz) if next_appointment else None,
-            }
-        )
+    if request.method == 'POST':
+        add_form = StaffMemberCreateForm(request.POST, prefix='add')
+        if add_form.is_valid():
+            member = _save_staff_member_form(request, clinic, add_form)
+            if member:
+                messages.success(request, f'Staff added: {_user_label(member.user)}.')
+                return redirect('staff-members')
+        open_modal = True
 
     return render(
         request,
         'core/staff_members.html',
         {
             'clinic': clinic,
-            'staff_rows': staff_rows,
-            'total_staff_count': len(staff_rows),
-            'active_staff_count': active_count,
-            'inactive_staff_count': inactive_count,
-            'role_counts': sorted(role_counts.items()),
-            'current_local_time': timezone.localtime(now, tz),
+            'add_form': add_form,
+            'edit_form': edit_form,
+            'open_modal': open_modal,
+            'open_edit_modal': open_edit_modal,
+            'edit_action_url': edit_action_url,
+            **_build_staff_members_context(clinic),
         },
     )
 
@@ -1874,32 +2003,9 @@ def staff_member_create(request):
     if request.method == 'POST':
         form = StaffMemberCreateForm(request.POST)
         if form.is_valid():
-            email = form.cleaned_data['email']
-            if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
-                form.add_error('email', 'An account with this email already exists.')
-            else:
-                is_active = bool(form.cleaned_data.get('is_active'))
-                user = User.objects.create_user(
-                    username=email,
-                    email=email,
-                    first_name=form.cleaned_data.get('first_name') or '',
-                    last_name=form.cleaned_data.get('last_name') or '',
-                    password=form.cleaned_data['password'],
-                    is_staff=True,
-                    is_active=is_active,
-                )
-                Staff.objects.create(
-                    user=user,
-                    clinic=clinic,
-                    is_active=is_active,
-                )
-                role = form.cleaned_data['role']
-                group = Group.objects.filter(name=role).first()
-                if group:
-                    user.groups.add(group)
-                if not is_active:
-                    _send_verification_email(request, user, clinic=clinic)
-                messages.success(request, f'Staff added: {_user_label(user)}.')
+            member = _save_staff_member_form(request, clinic, form)
+            if member:
+                messages.success(request, f'Staff added: {_user_label(member.user)}.')
                 return redirect('staff-members')
     else:
         form = StaffMemberCreateForm()
@@ -1925,54 +2031,32 @@ def staff_member_edit(request, staff_id: int):
     clinic = staff.clinic
     member = get_object_or_404(Staff, pk=staff_id, clinic=clinic)
     user = member.user
-    current_role = _staff_role_for_user(user) or 'Doctor'
 
     if request.method == 'POST':
-        form = StaffMemberUpdateForm(request.POST)
+        from_modal = request.POST.get('origin') == 'modal'
+        form_kwargs = {'prefix': 'edit'} if from_modal else {}
+        form = StaffMemberUpdateForm(request.POST, **form_kwargs)
         if form.is_valid():
-            email = form.cleaned_data['email']
-            if email.lower() != (user.email or user.username).lower():
-                if (
-                    User.objects.filter(username__iexact=email).exclude(pk=user.pk).exists()
-                    or User.objects.filter(email__iexact=email).exclude(pk=user.pk).exists()
-                ):
-                    form.add_error('email', 'An account with this email already exists.')
-            if not form.errors:
-                user.username = email
-                user.email = email
-                user.first_name = form.cleaned_data.get('first_name') or ''
-                user.last_name = form.cleaned_data.get('last_name') or ''
-                user.is_active = bool(form.cleaned_data.get('is_active'))
-                user.is_staff = True
-                new_password = form.cleaned_data.get('password')
-                if new_password:
-                    user.set_password(new_password)
-                user.save()
-
-                member.is_active = user.is_active
-                member.save(update_fields=['is_active'])
-
-                staff_groups = Group.objects.filter(name__in=ALLOWED_GROUPS)
-                user.groups.remove(*staff_groups)
-                new_role = form.cleaned_data['role']
-                group = Group.objects.filter(name=new_role).first()
-                if group:
-                    user.groups.add(group)
-
-                if not user.is_active:
-                    _send_verification_email(request, user, clinic=clinic)
-                messages.success(request, f'Staff updated: {_user_label(user)}.')
+            saved_member = _save_staff_member_form(request, clinic, form, member=member)
+            if saved_member:
+                messages.success(request, f'Staff updated: {_user_label(saved_member.user)}.')
                 return redirect('staff-members')
+        if from_modal:
+            return render(
+                request,
+                'core/staff_members.html',
+                {
+                    'clinic': clinic,
+                    'add_form': StaffMemberCreateForm(prefix='add'),
+                    'edit_form': form,
+                    'open_modal': False,
+                    'open_edit_modal': True,
+                    'edit_action_url': reverse('staff-member-edit', args=[member.id]),
+                    **_build_staff_members_context(clinic),
+                },
+            )
     else:
-        form = StaffMemberUpdateForm(
-            initial={
-                'email': user.email or user.username,
-                'first_name': user.first_name,
-                'last_name': user.last_name,
-                'role': current_role,
-                'is_active': user.is_active,
-            }
-        )
+        form = StaffMemberUpdateForm(initial=_staff_member_initial(user))
 
     return render(
         request,

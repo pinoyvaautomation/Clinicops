@@ -176,6 +176,33 @@ class StaffMemberCreateForm(forms.Form):
     role = forms.ChoiceField(choices=STAFF_ROLE_CHOICES)
     is_active = forms.BooleanField(required=False, initial=True)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'staff@clinic.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['first_name'].widget.attrs.update(
+            {
+                'placeholder': 'Maria',
+                'autocomplete': 'given-name',
+            }
+        )
+        self.fields['last_name'].widget.attrs.update(
+            {
+                'placeholder': 'Santos',
+                'autocomplete': 'family-name',
+            }
+        )
+        self.fields['password'].widget.attrs.update(
+            {
+                'placeholder': 'Create a temporary password',
+                'autocomplete': 'new-password',
+            }
+        )
+
     def clean_email(self):
         return self.cleaned_data['email'].strip().lower()
 
@@ -187,6 +214,33 @@ class StaffMemberUpdateForm(forms.Form):
     password = forms.CharField(widget=forms.PasswordInput(render_value=True), required=False)
     role = forms.ChoiceField(choices=STAFF_ROLE_CHOICES)
     is_active = forms.BooleanField(required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'staff@clinic.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['first_name'].widget.attrs.update(
+            {
+                'placeholder': 'Maria',
+                'autocomplete': 'given-name',
+            }
+        )
+        self.fields['last_name'].widget.attrs.update(
+            {
+                'placeholder': 'Santos',
+                'autocomplete': 'family-name',
+            }
+        )
+        self.fields['password'].widget.attrs.update(
+            {
+                'placeholder': 'Leave blank to keep the current password',
+                'autocomplete': 'new-password',
+            }
+        )
 
     def clean_email(self):
         return self.cleaned_data['email'].strip().lower()
@@ -362,3 +416,37 @@ class WalkInAppointmentForm(forms.Form):
             self.fields['staff'].queryset = staff_qs
         if appointment_type_qs is not None:
             self.fields['appointment_type'].queryset = appointment_type_qs
+        self.fields['first_name'].widget.attrs.update(
+            {
+                'placeholder': 'Patient first name',
+                'autocomplete': 'given-name',
+            }
+        )
+        self.fields['last_name'].widget.attrs.update(
+            {
+                'placeholder': 'Patient last name',
+                'autocomplete': 'family-name',
+            }
+        )
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'patient@email.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['phone'].widget.attrs.update(
+            {
+                'placeholder': '+63 912 345 6789',
+                'autocomplete': 'tel',
+            }
+        )
+        self.fields['start_at'].widget.attrs.update(
+            {
+                'step': 300,
+            }
+        )
+        self.fields['notes'].widget.attrs.update(
+            {
+                'placeholder': 'Optional intake or scheduling notes',
+            }
+        )

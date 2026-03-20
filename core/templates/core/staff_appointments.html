@@ -31,6 +31,7 @@
           radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 26%),
           linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
       }
+      body.modal-open { overflow: hidden; }
       h1, h2, h3, strong {
         font-family: 'Space Grotesk', Arial, sans-serif;
         letter-spacing: -0.03em;
@@ -159,7 +160,7 @@
         font-size: 13px;
         font-weight: 600;
       }
-      input, select {
+      input, select, textarea {
         width: 100%;
         min-height: 46px;
         border: 1px solid rgba(148, 163, 184, 0.28);
@@ -168,6 +169,10 @@
         font: inherit;
         background: #fff;
         color: var(--ink);
+      }
+      textarea {
+        min-height: 120px;
+        resize: vertical;
       }
       .stats-grid {
         margin-top: 18px;
@@ -258,6 +263,138 @@
         border-radius: 18px;
         background: linear-gradient(180deg, #fff, #f8fafc);
       }
+      .modal {
+        position: fixed;
+        inset: 0;
+        z-index: 3000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        overflow-y: auto;
+        background: rgba(15, 23, 42, 0.46);
+        backdrop-filter: blur(8px);
+      }
+      .modal.open { display: flex; }
+      .modal-card {
+        width: min(100%, 780px);
+        max-height: calc(100dvh - 48px);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+        background: #fff;
+      }
+      .modal-hero {
+        flex-shrink: 0;
+        padding: 22px 24px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.14), transparent 28%),
+          linear-gradient(135deg, #0f172a 0%, #111827 58%, var(--brand) 160%);
+      }
+      .modal-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+      }
+      .modal-head h2 {
+        margin: 12px 0 8px;
+        font-size: clamp(1.8rem, 4vw, 2.2rem);
+      }
+      .modal-head p {
+        margin: 0;
+        max-width: 560px;
+        color: rgba(248, 250, 252, 0.76);
+        line-height: 1.6;
+      }
+      .modal-close {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        border-radius: 14px;
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        font-size: 1.5rem;
+        cursor: pointer;
+      }
+      .modal-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 24px;
+        background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+      }
+      .modal-form {
+        display: grid;
+        gap: 16px;
+      }
+      .field-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .field-block {
+        padding: 14px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      .field-block.full {
+        grid-column: 1 / -1;
+      }
+      .help {
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .errorlist {
+        margin: 8px 0 0;
+        padding: 10px 12px;
+        list-style: none;
+        border-radius: 14px;
+        background: #fff2f1;
+        color: #b42318;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        margin-top: 4px;
+      }
+      .modal-actions .btn-ghost,
+      .modal-actions .btn {
+        min-width: 180px;
+      }
+      .modal-actions .btn {
+        color: #fff;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
+      }
+      @media (max-width: 1280px), (max-height: 860px) {
+        .modal {
+          padding: 18px;
+        }
+        .modal-card {
+          width: min(100%, 700px);
+          max-height: calc(100dvh - 36px);
+        }
+        .modal-hero,
+        .modal-body {
+          padding: 20px;
+        }
+        .modal-head h2 {
+          font-size: clamp(1.55rem, 3vw, 1.95rem);
+        }
+        .field-block {
+          padding: 12px;
+        }
+      }
       @media (max-width: 1080px) {
         .hero-grid { grid-template-columns: 1fr; }
       }
@@ -266,10 +403,29 @@
         .hero, .panel, .stat-card, .list-card, .message { border-radius: 22px; }
         .appointment-row { grid-template-columns: 1fr; }
         .actions { justify-content: flex-start; }
+        .field-grid { grid-template-columns: 1fr; }
       }
       @media (max-width: 560px) {
         .filter-grid, .stats-grid { grid-template-columns: 1fr; }
         .panel-head, .list-head, .toolbar { flex-direction: column; align-items: flex-start; }
+        .modal {
+          padding: 16px;
+        }
+        .modal-card {
+          width: 100%;
+          max-height: calc(100dvh - 24px);
+        }
+        .modal-body,
+        .modal-hero {
+          padding: 18px;
+        }
+        .modal-actions {
+          flex-direction: column-reverse;
+        }
+        .modal-actions .btn-ghost,
+        .modal-actions .btn {
+          width: 100%;
+        }
       }
     </style>
   </head>
@@ -292,7 +448,7 @@
             <div class="hero-actions">
               <a class="btn" href="{% url 'calendar' %}?start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}{% if selected_status %}&status={{ selected_status }}{% endif %}">Open calendar</a>
               {% if can_create %}
-                <a class="btn-secondary" href="{% url 'staff-appointment-create' %}">Create walk-in</a>
+                <a class="btn-secondary" href="{% url 'staff-appointment-create' %}" id="open-walkin-modal">Create walk-in</a>
               {% endif %}
               <a class="btn-secondary" href="{% url 'dashboard' %}">Back to dashboard</a>
             </div>
@@ -357,7 +513,7 @@
             <button class="btn" type="submit">Apply filters</button>
             <a class="btn-ghost" href="{% url 'staff-appointments' %}">Reset</a>
             {% if can_create %}
-              <a class="btn-ghost" href="{% url 'staff-appointment-create' %}">New walk-in</a>
+              <a class="btn-ghost" href="{% url 'staff-appointment-create' %}" id="open-walkin-modal-inline">New walk-in</a>
             {% endif %}
           </div>
         </form>
@@ -451,5 +607,149 @@
       </section>
     </main>
     {% include "core/partials/site_footer.html" %}
+
+    {% if can_create %}
+      <div class="modal{% if open_create_modal %} open{% endif %}" id="walkin-modal" aria-hidden="{% if open_create_modal %}false{% else %}true{% endif %}">
+        <div class="modal-card">
+          <div class="modal-hero">
+            <div class="modal-head">
+              <div>
+                <div class="eyebrow">Walk-in Intake</div>
+                <h2>Create a new appointment</h2>
+                <p>Capture the patient, assign the right clinician, and get the booking into the schedule without leaving the queue.</p>
+              </div>
+              <button class="modal-close" type="button" id="close-walkin-modal" aria-label="Close walk-in modal">&times;</button>
+            </div>
+          </div>
+          <div class="modal-body">
+            <form method="post" action="{{ request.get_full_path }}" class="modal-form">
+              {% csrf_token %}
+              {{ walkin_form.non_field_errors }}
+
+              <div class="field-grid">
+                <div class="field-block">
+                  <label for="{{ walkin_form.first_name.id_for_label }}">First name</label>
+                  {{ walkin_form.first_name }}
+                  {{ walkin_form.first_name.errors }}
+                </div>
+                <div class="field-block">
+                  <label for="{{ walkin_form.last_name.id_for_label }}">Last name</label>
+                  {{ walkin_form.last_name }}
+                  {{ walkin_form.last_name.errors }}
+                </div>
+                <div class="field-block">
+                  <label for="{{ walkin_form.email.id_for_label }}">Email</label>
+                  {{ walkin_form.email }}
+                  {{ walkin_form.email.errors }}
+                  <div class="help">If this email already exists in the clinic, the appointment will reuse that patient record.</div>
+                </div>
+                <div class="field-block">
+                  <label for="{{ walkin_form.phone.id_for_label }}">Phone</label>
+                  {{ walkin_form.phone }}
+                  {{ walkin_form.phone.errors }}
+                </div>
+                <div class="field-block">
+                  <label for="{{ walkin_form.dob.id_for_label }}">Date of birth</label>
+                  {{ walkin_form.dob }}
+                  {{ walkin_form.dob.errors }}
+                </div>
+                <div class="field-block">
+                  <label for="{{ walkin_form.staff.id_for_label }}">Staff</label>
+                  {{ walkin_form.staff }}
+                  {{ walkin_form.staff.errors }}
+                </div>
+                <div class="field-block">
+                  <label for="{{ walkin_form.appointment_type.id_for_label }}">Appointment type</label>
+                  {{ walkin_form.appointment_type }}
+                  {{ walkin_form.appointment_type.errors }}
+                </div>
+                <div class="field-block">
+                  <label for="{{ walkin_form.start_at.id_for_label }}">Start time</label>
+                  {{ walkin_form.start_at }}
+                  {{ walkin_form.start_at.errors }}
+                  <div class="help">Times are entered in the clinic timezone: {{ clinic.timezone }}.</div>
+                </div>
+                <div class="field-block full">
+                  <label for="{{ walkin_form.notes.id_for_label }}">Notes</label>
+                  {{ walkin_form.notes }}
+                  {{ walkin_form.notes.errors }}
+                </div>
+              </div>
+
+              <div class="modal-actions">
+                <button class="btn-ghost" type="button" id="cancel-walkin-modal">Cancel</button>
+                <button class="btn" type="submit">Create appointment</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        (function() {
+          const body = document.body;
+          const modal = document.getElementById('walkin-modal');
+
+          function syncBodyState() {
+            body.classList.toggle('modal-open', Boolean(modal?.classList.contains('open')));
+          }
+
+          function focusFirstInput() {
+            const field = modal?.querySelector('input:not([type="checkbox"]), textarea, select');
+            if (field) {
+              window.requestAnimationFrame(function() {
+                field.focus();
+              });
+            }
+          }
+
+          function openModal() {
+            if (!modal) return;
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            syncBodyState();
+            focusFirstInput();
+          }
+
+          function closeModal() {
+            if (!modal) return;
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            syncBodyState();
+          }
+
+          function bindOpen(trigger) {
+            if (!trigger) return;
+            trigger.addEventListener('click', function(event) {
+              event.preventDefault();
+              openModal();
+            });
+          }
+
+          bindOpen(document.getElementById('open-walkin-modal'));
+          bindOpen(document.getElementById('open-walkin-modal-inline'));
+
+          document.getElementById('close-walkin-modal')?.addEventListener('click', closeModal);
+          document.getElementById('cancel-walkin-modal')?.addEventListener('click', closeModal);
+
+          modal?.addEventListener('click', function(event) {
+            if (event.target === modal) {
+              closeModal();
+            }
+          });
+
+          document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape' && modal?.classList.contains('open')) {
+              closeModal();
+            }
+          });
+
+          syncBodyState();
+          if (modal?.classList.contains('open')) {
+            focusFirstInput();
+          }
+        })();
+      </script>
+    {% endif %}
   </body>
 </html>
