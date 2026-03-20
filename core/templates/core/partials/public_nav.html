@@ -1,62 +1,115 @@
-﻿<style>
-  .public-nav {
-    background: #fff;
-    border-bottom: 1px solid #e5e7eb;
-    position: sticky;
-    top: 0;
-    z-index: 1000;
+<style>
+  body.public-nav-open {
+    overflow: hidden;
   }
-  .public-nav__inner {
-    max-width: 1040px;
-    margin: 0 auto;
-    padding: 16px 24px;
+  .public-nav {
+    width: min(calc(100% - 24px), 1240px);
+    margin: 12px auto 16px;
+    padding: 14px 18px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    flex-wrap: wrap;
+    position: sticky;
+    top: 12px;
+    z-index: 1000;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 24px;
+    box-shadow: 0 18px 38px rgba(148, 163, 184, 0.18);
+    backdrop-filter: blur(14px);
   }
   .public-brand {
     display: flex;
     align-items: center;
     gap: 12px;
-    font-weight: 700;
-    color: var(--brand, #1d4ed8);
+    min-width: 0;
+    color: #0f172a;
+    text-decoration: none;
   }
   .public-brand img {
     height: 34px;
     width: auto;
   }
+  .public-brand__mark {
+    width: 38px;
+    height: 38px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, var(--brand, #1d4ed8), #0f172a);
+    color: #fff;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 0.92rem;
+    flex-shrink: 0;
+  }
+  .public-brand__text {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    line-height: 1.08;
+  }
+  .public-brand__name {
+    font-weight: 700;
+    font-size: 1.08rem;
+    color: var(--brand, #1d4ed8);
+  }
+  .public-brand__tag {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
   .public-nav__actions {
     display: flex;
     align-items: center;
     gap: 12px;
+    flex-shrink: 0;
   }
   .public-nav__links {
     display: flex;
     align-items: center;
-    gap: 16px;
-    font-size: 14px;
+    gap: 10px;
     flex-wrap: wrap;
   }
   .public-nav__links a {
-    color: var(--brand, #1d4ed8);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 42px;
+    padding: 10px 14px;
+    border-radius: 999px;
+    color: #0f172a;
     text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    border: 1px solid transparent;
   }
-  .public-nav__links a:hover { text-decoration: underline; }
+  .public-nav__links a:hover {
+    background: rgba(15, 23, 42, 0.06);
+  }
+  .public-nav__links .ghost {
+    background: rgba(255, 255, 255, 0.92);
+    color: #334155;
+    border-color: rgba(148, 163, 184, 0.22);
+  }
   .public-nav__links .cta {
-    background: var(--brand, #1d4ed8);
+    background: linear-gradient(135deg, var(--brand, #1d4ed8), #0f172a);
     color: #fff;
-    padding: 8px 12px;
-    border-radius: 6px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.14);
+  }
+  .public-nav__links .cta:hover,
+  .public-nav__links .ghost:hover {
     text-decoration: none;
   }
-  .public-nav__links .cta:hover { text-decoration: none; opacity: 0.92; }
   .public-nav__toggle {
     width: 40px;
     height: 40px;
-    border-radius: 10px;
-    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.24);
     background: #ffffff;
     display: none;
     align-items: center;
@@ -67,7 +120,7 @@
     display: block;
     width: 18px;
     height: 2px;
-    background: var(--brand, #1d4ed8);
+    background: #0f172a;
     border-radius: 2px;
     position: relative;
   }
@@ -78,7 +131,7 @@
     left: 0;
     width: 18px;
     height: 2px;
-    background: var(--brand, #1d4ed8);
+    background: #0f172a;
     border-radius: 2px;
   }
   .public-nav__toggle span::before { top: -6px; }
@@ -88,49 +141,85 @@
     inset: 0;
     background: rgba(15, 23, 42, 0.35);
     display: none;
-    z-index: 1400;
+    z-index: 900;
   }
   .public-nav__overlay.open { display: block; }
   @media (max-width: 900px) {
-    .public-nav__links {
-      position: fixed;
-      top: 0;
-      left: -280px;
-      right: auto;
-      height: 100%;
-      width: 260px;
-      background: #ffffff;
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 88px 16px 20px;
-      box-shadow: 12px 0 24px rgba(15, 23, 42, 0.15);
-      transition: left 0.2s ease;
-      z-index: 1500;
+    .public-nav {
+      width: calc(100% - 16px);
+      margin: 8px auto 12px;
+      padding: 12px 14px;
+      border-radius: 20px;
+      top: 8px;
     }
-    .public-nav__links.open { left: 0; }
-    .public-nav__links .cta { width: 100%; text-align: center; }
+    .public-nav__links {
+      position: absolute;
+      top: calc(100% + 10px);
+      right: 0;
+      left: auto;
+      width: min(300px, calc(100vw - 16px));
+      max-width: calc(100vw - 16px);
+      padding: 12px;
+      background: rgba(255, 255, 255, 0.98);
+      border: 1px solid rgba(148, 163, 184, 0.22);
+      border-radius: 20px;
+      box-shadow: 0 22px 48px rgba(15, 23, 42, 0.18);
+      flex-direction: column;
+      align-items: stretch;
+      gap: 6px;
+      opacity: 0;
+      visibility: hidden;
+      transform: translateY(-8px);
+      transition: opacity 0.18s ease, transform 0.18s ease, visibility 0.18s ease;
+      z-index: 1100;
+    }
+    .public-nav__links a {
+      width: 100%;
+      justify-content: flex-start;
+    }
+    .public-nav__links .cta {
+      justify-content: center;
+    }
+    .public-nav__links.open {
+      opacity: 1;
+      visibility: visible;
+      transform: translateY(0);
+    }
     .public-nav__toggle { display: inline-flex; }
+  }
+  @media (max-width: 560px) {
+    .public-nav {
+      gap: 10px;
+    }
+    .public-brand__name {
+      font-size: 1rem;
+    }
+    .public-brand__tag {
+      font-size: 11px;
+    }
   }
 </style>
 <nav class="public-nav" style="--brand: {{ public_brand_color|default:'#1d4ed8' }};">
-  <div class="public-nav__inner">
-    <div class="public-brand">
-      {% if public_logo_url %}
-        <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.remove()">
+  <a class="public-brand" href="{% url 'login' %}">
+    {% if public_logo_url %}
+      <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.remove()">
+    {% else %}
+      <span class="public-brand__mark">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
+    {% endif %}
+    <span class="public-brand__text">
+      <span class="public-brand__name">{{ public_brand_name|default:"ClinicOps" }}</span>
+      <span class="public-brand__tag">{% if clinic %}{{ clinic.name }}{% else %}Clinic access platform{% endif %}</span>
+    </span>
+  </a>
+  <div class="public-nav__actions">
+    <button type="button" class="public-nav__toggle" id="public-nav-toggle" aria-label="Open menu" aria-expanded="false">
+      <span></span>
+    </button>
+    <div class="public-nav__links" id="public-nav-links">
+      {% if clinic and clinic.slug %}
+        <a class="ghost" href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
       {% endif %}
-      <span>{{ public_brand_name|default:"ClinicOps" }}</span>
-    </div>
-    <div class="public-nav__actions">
-      <button type="button" class="public-nav__toggle" id="public-nav-toggle" aria-label="Open menu" aria-expanded="false">
-        <span></span>
-      </button>
-      <div class="public-nav__links" id="public-nav-links">
-        {% if clinic and clinic.slug %}
-          <a href="{% url 'patient-signup-slug' clinic.slug %}">Create account</a>
-        {% endif %}
-        <a class="cta" href="{% url 'login' %}">Sign in</a>
-      </div>
+      <a class="cta" href="{% url 'login' %}">Sign in</a>
     </div>
   </div>
 </nav>
@@ -148,12 +237,14 @@
       overlay.classList.add('open');
       overlay.setAttribute('aria-hidden', 'false');
       toggle.setAttribute('aria-expanded', 'true');
+      document.body.classList.add('public-nav-open');
     }
     function closeMenu() {
       links.classList.remove('open');
       overlay.classList.remove('open');
       overlay.setAttribute('aria-hidden', 'true');
       toggle.setAttribute('aria-expanded', 'false');
+      document.body.classList.remove('public-nav-open');
     }
 
     toggle.addEventListener('click', function() {
@@ -166,6 +257,11 @@
     overlay.addEventListener('click', closeMenu);
     links.querySelectorAll('a').forEach(function(link) {
       link.addEventListener('click', closeMenu);
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closeMenu();
+      }
     });
     window.addEventListener('resize', function() {
       if (window.innerWidth > 900) {
