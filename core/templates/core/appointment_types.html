@@ -293,16 +293,21 @@
         align-items: center;
         justify-content: center;
         padding: 24px;
+        overflow-y: auto;
         background: rgba(15, 23, 42, 0.46);
         backdrop-filter: blur(8px);
       }
       .modal.open { display: flex; }
       .modal-card {
-        width: min(100%, 760px);
+        width: min(100%, 680px);
+        max-height: calc(100dvh - 48px);
+        display: flex;
+        flex-direction: column;
         overflow: hidden;
         background: #fff;
       }
       .modal-hero {
+        flex-shrink: 0;
         padding: 22px 24px;
         color: #f8fafc;
         background:
@@ -339,6 +344,8 @@
         cursor: pointer;
       }
       .modal-body {
+        flex: 1;
+        overflow-y: auto;
         padding: 24px;
         background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
       }
@@ -418,6 +425,25 @@
       .modal-actions .btn-brand {
         min-width: 180px;
       }
+      @media (max-width: 1280px), (max-height: 860px) {
+        .modal {
+          padding: 18px;
+        }
+        .modal-card {
+          width: min(100%, 620px);
+          max-height: calc(100dvh - 36px);
+        }
+        .modal-hero,
+        .modal-body {
+          padding: 20px;
+        }
+        .modal-head h2 {
+          font-size: clamp(1.55rem, 3vw, 1.95rem);
+        }
+        .field-block {
+          padding: 12px;
+        }
+      }
       @media (max-width: 980px) {
         .hero-grid { grid-template-columns: 1fr; }
       }
@@ -432,7 +458,11 @@
         .stats-grid { grid-template-columns: 1fr; }
         .catalog-head { flex-direction: column; align-items: flex-start; }
         .modal { padding: 16px; }
-        .modal-body, .modal-hero { padding: 20px; }
+        .modal-card {
+          width: 100%;
+          max-height: calc(100dvh - 24px);
+        }
+        .modal-body, .modal-hero { padding: 18px; }
         .modal-actions {
           flex-direction: column-reverse;
         }
