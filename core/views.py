@@ -83,6 +83,11 @@ def _normalize_date_range(start_date: date, end_date: date) -> tuple[date, date]
     return start_date, end_date
 
 
+def _user_label(user) -> str:
+    full_name = user.get_full_name().strip()
+    return full_name or user.email or user.username
+
+
 def _filter_appointments(
     clinic: Clinic,
     start_dt: datetime,
@@ -1744,14 +1749,14 @@ def appointment_types(request):
         add_form = AppointmentTypeForm(request.POST, prefix='add', clinic=clinic)
         if add_form.is_valid():
             price_cents = add_form.cleaned_data.get('price_cents')
-            AppointmentType.objects.create(
+            appointment_type = AppointmentType.objects.create(
                 clinic=clinic,
                 name=add_form.cleaned_data['name'],
                 duration_minutes=add_form.cleaned_data['duration_minutes'],
                 price_cents=price_cents if price_cents is not None else None,
                 is_active=bool(add_form.cleaned_data.get('is_active')),
             )
-            messages.success(request, 'Service created.')
+            messages.success(request, f'Service added: {appointment_type.name}.')
             return redirect('appointment-types')
         open_modal = True
     catalog_context = _build_service_catalog_context(clinic)
@@ -1783,14 +1788,14 @@ def appointment_type_create(request):
         form = AppointmentTypeForm(request.POST, clinic=clinic)
         if form.is_valid():
             price_cents = form.cleaned_data.get('price_cents')
-            AppointmentType.objects.create(
+            appointment_type = AppointmentType.objects.create(
                 clinic=clinic,
                 name=form.cleaned_data['name'],
                 duration_minutes=form.cleaned_data['duration_minutes'],
                 price_cents=price_cents if price_cents is not None else None,
                 is_active=bool(form.cleaned_data.get('is_active')),
             )
-            messages.success(request, 'Service created.')
+            messages.success(request, f'Service added: {appointment_type.name}.')
             return redirect('appointment-types')
     else:
         form = AppointmentTypeForm(clinic=clinic)
@@ -1827,7 +1832,7 @@ def appointment_type_edit(request, type_id: int):
             appt_type.price_cents = price_cents if price_cents is not None else None
             appt_type.is_active = bool(form.cleaned_data.get('is_active'))
             appt_type.save(update_fields=['name', 'duration_minutes', 'price_cents', 'is_active'])
-            messages.success(request, 'Service updated.')
+            messages.success(request, f'Service updated: {appt_type.name}.')
             return redirect('appointment-types')
         return render(
             request,
@@ -1894,7 +1899,7 @@ def staff_member_create(request):
                     user.groups.add(group)
                 if not is_active:
                     _send_verification_email(request, user, clinic=clinic)
-                messages.success(request, 'Staff member created.')
+                messages.success(request, f'Staff added: {_user_label(user)}.')
                 return redirect('staff-members')
     else:
         form = StaffMemberCreateForm()
@@ -1956,7 +1961,7 @@ def staff_member_edit(request, staff_id: int):
 
                 if not user.is_active:
                     _send_verification_email(request, user, clinic=clinic)
-                messages.success(request, 'Staff member updated.')
+                messages.success(request, f'Staff updated: {_user_label(user)}.')
                 return redirect('staff-members')
     else:
         form = StaffMemberUpdateForm(

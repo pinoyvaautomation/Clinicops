@@ -86,7 +86,7 @@
         line-height: 1.6;
       }
       .hero p { color: rgba(248, 250, 252, 0.78); }
-      .hero-meta, .hero-actions, .service-metrics, .stats-grid, .service-list, .actions, .flash-stack {
+      .hero-meta, .hero-actions, .service-metrics, .stats-grid, .service-list, .actions {
         display: flex;
         gap: 10px;
         flex-wrap: wrap;
@@ -141,22 +141,6 @@
       .hero-box p {
         margin-top: 8px;
         font-size: 14px;
-      }
-      .flash-stack {
-        margin-top: 18px;
-        display: grid;
-      }
-      .flash {
-        padding: 14px 16px;
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.2);
-        background: #fff;
-        color: var(--ink-soft);
-      }
-      .flash.success {
-        border-color: rgba(14, 165, 166, 0.22);
-        background: rgba(14, 165, 166, 0.08);
-        color: #0f766e;
       }
       .stats-grid {
         margin-top: 18px;
@@ -497,14 +481,6 @@
           </div>
         </div>
       </section>
-
-      {% if messages %}
-        <section class="flash-stack" aria-live="polite">
-          {% for message in messages %}
-            <div class="flash {% if 'success' in message.tags %}success{% endif %}">{{ message }}</div>
-          {% endfor %}
-        </section>
-      {% endif %}
 
       <section class="stats-grid">
         <article class="stat-card">

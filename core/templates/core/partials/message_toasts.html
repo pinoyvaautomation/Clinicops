@@ -1,0 +1,159 @@
+{% if messages %}
+  <style>
+    .toast-stack {
+      position: fixed;
+      top: 96px;
+      right: 16px;
+      width: min(360px, calc(100vw - 32px));
+      display: grid;
+      gap: 12px;
+      z-index: 1800;
+      pointer-events: none;
+    }
+    .toast {
+      position: relative;
+      overflow: hidden;
+      display: grid;
+      gap: 6px;
+      padding: 15px 48px 15px 16px;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      border-radius: 20px;
+      background: rgba(255, 255, 255, 0.96);
+      box-shadow: 0 20px 42px rgba(15, 23, 42, 0.18);
+      backdrop-filter: blur(16px);
+      color: #0f172a;
+      pointer-events: auto;
+      transition: transform 0.22s ease, opacity 0.22s ease;
+    }
+    .toast::before {
+      content: '';
+      position: absolute;
+      inset: 0 auto 0 0;
+      width: 4px;
+      background: linear-gradient(180deg, #0f172a, #0ea5a6);
+    }
+    .toast.success {
+      border-color: rgba(16, 185, 129, 0.24);
+      background: linear-gradient(135deg, rgba(236, 253, 245, 0.98), rgba(255, 255, 255, 0.96));
+    }
+    .toast.success::before {
+      background: linear-gradient(180deg, #10b981, #0f766e);
+    }
+    .toast.error,
+    .toast.danger {
+      border-color: rgba(239, 68, 68, 0.24);
+      background: linear-gradient(135deg, rgba(254, 242, 242, 0.98), rgba(255, 255, 255, 0.96));
+    }
+    .toast.error::before,
+    .toast.danger::before {
+      background: linear-gradient(180deg, #ef4444, #b91c1c);
+    }
+    .toast.warning {
+      border-color: rgba(245, 158, 11, 0.28);
+      background: linear-gradient(135deg, rgba(255, 251, 235, 0.98), rgba(255, 255, 255, 0.96));
+    }
+    .toast.warning::before {
+      background: linear-gradient(180deg, #f59e0b, #b45309);
+    }
+    .toast.info {
+      border-color: rgba(14, 165, 166, 0.22);
+      background: linear-gradient(135deg, rgba(240, 253, 250, 0.98), rgba(255, 255, 255, 0.96));
+    }
+    .toast.info::before {
+      background: linear-gradient(180deg, #0ea5a6, #0f172a);
+    }
+    .toast.hide {
+      opacity: 0;
+      transform: translateX(18px);
+    }
+    .toast-label {
+      color: #64748b;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .toast-message {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.5;
+    }
+    .toast-close {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      width: 28px;
+      height: 28px;
+      border: none;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.06);
+      color: #334155;
+      font-size: 16px;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .toast-close:hover {
+      background: rgba(15, 23, 42, 0.1);
+    }
+    @media (max-width: 900px) {
+      .toast-stack {
+        top: 84px;
+        right: 8px;
+        left: 8px;
+        width: auto;
+      }
+    }
+  </style>
+
+  <section class="toast-stack" data-toast-stack aria-live="polite" aria-atomic="true">
+    {% for message in messages %}
+      <article class="toast {{ message.tags|default:'info' }}" data-toast role="status">
+        <div class="toast-label">
+          {% if 'success' in message.tags %}
+            Saved
+          {% elif 'error' in message.tags or 'danger' in message.tags %}
+            Action needed
+          {% elif 'warning' in message.tags %}
+            Notice
+          {% else %}
+            Update
+          {% endif %}
+        </div>
+        <p class="toast-message">{{ message }}</p>
+        <button class="toast-close" type="button" data-toast-close aria-label="Dismiss notification">&times;</button>
+      </article>
+    {% endfor %}
+  </section>
+
+  <script>
+    (function() {
+      const stack = document.querySelector('[data-toast-stack]');
+      if (!stack) return;
+
+      function dismissToast(toast) {
+        if (!toast || toast.dataset.closing === 'true') return;
+        toast.dataset.closing = 'true';
+        toast.classList.add('hide');
+        window.setTimeout(function() {
+          toast.remove();
+          if (!stack.querySelector('[data-toast]')) {
+            stack.remove();
+          }
+        }, 220);
+      }
+
+      stack.querySelectorAll('[data-toast]').forEach(function(toast, index) {
+        const closeBtn = toast.querySelector('[data-toast-close]');
+        const timeoutId = window.setTimeout(function() {
+          dismissToast(toast);
+        }, 4200 + (index * 180));
+
+        closeBtn?.addEventListener('click', function() {
+          window.clearTimeout(timeoutId);
+          dismissToast(toast);
+        });
+      });
+    })();
+  </script>
+{% endif %}

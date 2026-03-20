@@ -40,7 +40,7 @@
         margin: 0 auto;
         padding: 22px 24px 56px;
       }
-      .hero, .panel, .stat-card, .list-card, .message {
+      .hero, .panel, .stat-card, .list-card {
         border: 1px solid var(--line);
         border-radius: 26px;
         box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
@@ -168,14 +168,6 @@
         font: inherit;
         background: #fff;
         color: var(--ink);
-      }
-      .message {
-        margin-top: 18px;
-        padding: 14px 16px;
-        background: #eefbf7;
-        color: #17684d;
-        font-size: 14px;
-        font-weight: 600;
       }
       .stats-grid {
         margin-top: 18px;
@@ -324,12 +316,6 @@
           </div>
         </div>
       </section>
-
-      {% if messages %}
-        {% for message in messages %}
-          <div class="message">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
 
       <section class="panel">
         <div class="panel-head">
