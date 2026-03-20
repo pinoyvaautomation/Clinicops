@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+import hashlib
 from zoneinfo import ZoneInfo
 
 import logging
@@ -13,6 +14,7 @@ from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.conf import settings
+from django.db import transaction
 from django.http import HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
@@ -46,6 +48,7 @@ from .models import (
     AppointmentType,
     Clinic,
     ClinicSubscription,
+    PayPalWebhookEvent,
     Patient,
     Plan,
     Staff,
@@ -57,6 +60,7 @@ User = get_user_model()
 
 ALLOWED_GROUPS = {'Admin', 'Doctor', 'Nurse', 'FrontDesk'}
 logger = logging.getLogger(__name__)
+_UNSET = object()
 
 
 class ClinicLoginView(LoginView):
@@ -91,6 +95,122 @@ def _user_label(user) -> str:
 def _patient_label(patient: Patient) -> str:
     full_name = f'{patient.first_name} {patient.last_name}'.strip()
     return full_name or patient.email or f'Patient {patient.pk}'
+
+
+def _apply_subscription_state(
+    subscription: ClinicSubscription,
+    *,
+    plan=_UNSET,
+    raw_status=_UNSET,
+    started_at=_UNSET,
+    current_period_end=_UNSET,
+    last_event_type=_UNSET,
+):
+    update_fields = []
+
+    if plan is not _UNSET and plan is not None and subscription.plan_id != plan.id:
+        subscription.plan = plan
+        update_fields.append('plan')
+
+    if raw_status is not _UNSET and raw_status:
+        mapped_status = map_paypal_status(raw_status)
+        if subscription.status != mapped_status:
+            subscription.status = mapped_status
+            update_fields.append('status')
+
+    if started_at is not _UNSET and subscription.started_at != started_at:
+        subscription.started_at = started_at
+        update_fields.append('started_at')
+
+    if current_period_end is not _UNSET and subscription.current_period_end != current_period_end:
+        subscription.current_period_end = current_period_end
+        update_fields.append('current_period_end')
+
+    if last_event_type is not _UNSET and subscription.last_event_type != last_event_type:
+        subscription.last_event_type = last_event_type
+        update_fields.append('last_event_type')
+
+    if update_fields:
+        subscription.save(update_fields=update_fields)
+
+    return subscription
+
+
+def _paypal_event_id(event: dict, raw_body: bytes) -> str:
+    return event.get('id') or f"raw-{hashlib.sha256(raw_body).hexdigest()}"
+
+
+def _clinic_id_from_custom_id(custom_id: str | None) -> int | None:
+    if not custom_id or not custom_id.startswith('clinic-'):
+        return None
+    try:
+        return int(custom_id.split('-', 1)[1])
+    except (IndexError, ValueError):
+        return None
+
+
+def _upsert_pending_subscription(
+    *,
+    clinic: Clinic,
+    plan: Plan,
+    subscription_id: str,
+    last_event_type: str,
+):
+    subscription, _ = ClinicSubscription.objects.update_or_create(
+        paypal_subscription_id=subscription_id,
+        defaults={
+            'clinic': clinic,
+            'plan': plan,
+            'status': ClinicSubscription.Status.PENDING,
+            'last_event_type': last_event_type,
+        },
+    )
+    return subscription
+
+
+def _sync_subscription_from_paypal(subscription: ClinicSubscription, *, last_event_type: str):
+    details = get_subscription(subscription.paypal_subscription_id)
+    billing_info = details.get('billing_info') or {}
+    _apply_subscription_state(
+        subscription,
+        raw_status=details.get('status') or _UNSET,
+        started_at=parse_paypal_datetime(details.get('start_time')) or _UNSET,
+        current_period_end=parse_paypal_datetime(billing_info.get('next_billing_time')),
+        last_event_type=last_event_type,
+    )
+    return details
+
+
+def _finalize_paypal_event(
+    webhook_event: PayPalWebhookEvent,
+    *,
+    status: str,
+    summary: str = '',
+    error_message: str = '',
+    subscription: ClinicSubscription | None = None,
+):
+    webhook_event.status = status
+    webhook_event.summary = summary
+    webhook_event.error_message = error_message
+    webhook_event.processed_at = timezone.now()
+    webhook_event.clinic_subscription = subscription
+    update_fields = ['status', 'summary', 'error_message', 'processed_at', 'clinic_subscription']
+    webhook_event.save(update_fields=update_fields)
+
+
+def _build_paypal_webhook_event(event: dict, raw_body: bytes, *, subscription_id: str | None):
+    resource = event.get('resource', {}) or {}
+    return PayPalWebhookEvent.objects.get_or_create(
+        event_id=_paypal_event_id(event, raw_body),
+        defaults={
+            'event_type': event.get('event_type') or '',
+            'resource_type': resource.get('resource_type') or '',
+            'resource_id': subscription_id or resource.get('id') or '',
+            'summary': event.get('summary') or '',
+            'status': PayPalWebhookEvent.ProcessingStatus.RECEIVED,
+            'payload': event,
+        },
+    )
 
 
 def _build_walk_in_form(*, clinic: Clinic, data=None, prefix: str | None = None):
@@ -2189,34 +2309,16 @@ def signup_activate(request):
             return HttpResponseForbidden('Signup session mismatch.')
 
     plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
-    subscription, _ = ClinicSubscription.objects.update_or_create(
-        paypal_subscription_id=subscription_id,
-        defaults={
-            'clinic': clinic,
-            'plan': plan,
-            'status': ClinicSubscription.Status.PENDING,
-            'last_event_type': 'CLIENT_APPROVED',
-        },
+    subscription = _upsert_pending_subscription(
+        clinic=clinic,
+        plan=plan,
+        subscription_id=subscription_id,
+        last_event_type='CLIENT_APPROVED',
     )
     try:
-        details = get_subscription(subscription_id)
+        _sync_subscription_from_paypal(subscription, last_event_type='CLIENT_SYNCED')
     except PayPalError:
-        details = None
-
-    if details:
-        subscription.status = map_paypal_status(details.get('status'))
-        subscription.started_at = (
-            parse_paypal_datetime(details.get('start_time')) or subscription.started_at
-        )
-        billing_info = details.get('billing_info') or {}
-        subscription.current_period_end = parse_paypal_datetime(billing_info.get('next_billing_time'))
-        subscription.last_event_type = 'CLIENT_SYNCED'
-        subscription.save(update_fields=[
-            'status',
-            'started_at',
-            'current_period_end',
-            'last_event_type',
-        ])
+        logger.warning('PayPal subscription sync failed during signup activation for %s', subscription_id)
 
     return JsonResponse({'ok': True, 'subscription_id': subscription.paypal_subscription_id})
 
@@ -2285,34 +2387,16 @@ def billing_activate(request):
     plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
     clinic = staff.clinic
 
-    subscription, _ = ClinicSubscription.objects.update_or_create(
-        paypal_subscription_id=subscription_id,
-        defaults={
-            'clinic': clinic,
-            'plan': plan,
-            'status': ClinicSubscription.Status.PENDING,
-            'last_event_type': 'CLIENT_APPROVED',
-        },
+    subscription = _upsert_pending_subscription(
+        clinic=clinic,
+        plan=plan,
+        subscription_id=subscription_id,
+        last_event_type='CLIENT_APPROVED',
     )
     try:
-        details = get_subscription(subscription_id)
+        _sync_subscription_from_paypal(subscription, last_event_type='CLIENT_SYNCED')
     except PayPalError:
-        details = None
-
-    if details:
-        subscription.status = map_paypal_status(details.get('status'))
-        subscription.started_at = (
-            parse_paypal_datetime(details.get('start_time')) or subscription.started_at
-        )
-        billing_info = details.get('billing_info') or {}
-        subscription.current_period_end = parse_paypal_datetime(billing_info.get('next_billing_time'))
-        subscription.last_event_type = 'CLIENT_SYNCED'
-        subscription.save(update_fields=[
-            'status',
-            'started_at',
-            'current_period_end',
-            'last_event_type',
-        ])
+        logger.warning('PayPal subscription sync failed during billing activation for %s', subscription_id)
 
     return JsonResponse({'ok': True, 'subscription_id': subscription.paypal_subscription_id})
 
@@ -2335,23 +2419,9 @@ def billing_sync(request):
         return JsonResponse({'ok': False, 'error': 'No subscription found.'}, status=400)
 
     try:
-        details = get_subscription(subscription.paypal_subscription_id)
+        _sync_subscription_from_paypal(subscription, last_event_type='MANUAL_SYNC')
     except PayPalError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
-
-    subscription.status = map_paypal_status(details.get('status'))
-    subscription.started_at = (
-        parse_paypal_datetime(details.get('start_time')) or subscription.started_at
-    )
-    billing_info = details.get('billing_info') or {}
-    subscription.current_period_end = parse_paypal_datetime(billing_info.get('next_billing_time'))
-    subscription.last_event_type = 'MANUAL_SYNC'
-    subscription.save(update_fields=[
-        'status',
-        'started_at',
-        'current_period_end',
-        'last_event_type',
-    ])
 
     return JsonResponse({'ok': True, 'status': subscription.status})
 
@@ -2359,8 +2429,9 @@ def billing_sync(request):
 @csrf_exempt
 @require_POST
 def paypal_webhook(request):
+    raw_body = request.body
     try:
-        event = json.loads(request.body.decode('utf-8'))
+        event = json.loads(raw_body.decode('utf-8'))
     except json.JSONDecodeError:
         return HttpResponseBadRequest('Invalid JSON payload.')
 
@@ -2376,6 +2447,17 @@ def paypal_webhook(request):
     resource = event.get('resource', {}) or {}
 
     if not event_type.startswith('BILLING.SUBSCRIPTION'):
+        webhook_event, _ = _build_paypal_webhook_event(event, raw_body, subscription_id=None)
+        if webhook_event.status in {
+            PayPalWebhookEvent.ProcessingStatus.PROCESSED,
+            PayPalWebhookEvent.ProcessingStatus.IGNORED,
+        }:
+            return JsonResponse({'ok': True, 'duplicate': True, 'ignored': True})
+        _finalize_paypal_event(
+            webhook_event,
+            status=PayPalWebhookEvent.ProcessingStatus.IGNORED,
+            summary='Ignored non-subscription webhook.',
+        )
         return JsonResponse({'ok': True, 'ignored': True})
 
     subscription_id = (
@@ -2387,54 +2469,91 @@ def paypal_webhook(request):
         logger.warning('PayPal webhook missing subscription id for %s', event_type)
         return JsonResponse({'ok': True, 'ignored': True})
 
+    webhook_event, created = _build_paypal_webhook_event(event, raw_body, subscription_id=subscription_id)
+    if not created:
+        if webhook_event.status in {
+            PayPalWebhookEvent.ProcessingStatus.PROCESSED,
+            PayPalWebhookEvent.ProcessingStatus.IGNORED,
+        }:
+            return JsonResponse({'ok': True, 'duplicate': True, 'status': webhook_event.status})
+        webhook_event.event_type = event_type
+        webhook_event.resource_id = subscription_id
+        webhook_event.summary = event.get('summary') or ''
+        webhook_event.payload = event
+        webhook_event.error_message = ''
+        webhook_event.status = PayPalWebhookEvent.ProcessingStatus.RECEIVED
+        webhook_event.processed_at = None
+        webhook_event.save(update_fields=[
+            'event_type',
+            'resource_id',
+            'summary',
+            'payload',
+            'error_message',
+            'status',
+            'processed_at',
+        ])
+
     plan_id = resource.get('plan_id')
     plan = Plan.objects.filter(paypal_plan_id=plan_id).first() if plan_id else None
-
-    status = map_paypal_status(resource.get('status'))
     started_at = parse_paypal_datetime(resource.get('start_time'))
-    next_billing = None
     billing_info = resource.get('billing_info') or {}
-    next_billing = parse_paypal_datetime(billing_info.get('next_billing_time'))
+    next_billing = parse_paypal_datetime(billing_info.get('next_billing_time')) if 'next_billing_time' in billing_info else _UNSET
 
-    subscription = ClinicSubscription.objects.filter(paypal_subscription_id=subscription_id).first()
-    if not subscription:
-        clinic = None
-        custom_id = resource.get('custom_id') or ''
-        if custom_id.startswith('clinic-'):
-            try:
-                clinic_id = int(custom_id.split('-', 1)[1])
-            except (IndexError, ValueError):
-                clinic_id = None
-            if clinic_id:
-                clinic = Clinic.objects.filter(id=clinic_id).first()
+    try:
+        with transaction.atomic():
+            subscription = (
+                ClinicSubscription.objects.select_for_update()
+                .filter(paypal_subscription_id=subscription_id)
+                .first()
+            )
+            if not subscription:
+                clinic = None
+                clinic_id = _clinic_id_from_custom_id(resource.get('custom_id'))
+                if clinic_id:
+                    clinic = Clinic.objects.filter(id=clinic_id).first()
 
-        if not clinic or not plan:
-            logger.warning('PayPal webhook could not map subscription %s', subscription_id)
-            return JsonResponse({'ok': True, 'ignored': True})
+                if not clinic or not plan:
+                    logger.warning('PayPal webhook could not map subscription %s', subscription_id)
+                    _finalize_paypal_event(
+                        webhook_event,
+                        status=PayPalWebhookEvent.ProcessingStatus.IGNORED,
+                        summary=f'Ignored {event_type}: subscription could not be mapped.',
+                    )
+                    return JsonResponse({'ok': True, 'ignored': True})
 
-        subscription = ClinicSubscription.objects.create(
-            clinic=clinic,
-            plan=plan,
-            paypal_subscription_id=subscription_id,
-            status=status,
-            started_at=started_at,
-            current_period_end=next_billing,
-            last_event_type=event_type,
+                subscription = ClinicSubscription.objects.create(
+                    clinic=clinic,
+                    plan=plan,
+                    paypal_subscription_id=subscription_id,
+                    status=map_paypal_status(resource.get('status')),
+                    started_at=started_at,
+                    current_period_end=None if next_billing is _UNSET else next_billing,
+                    last_event_type=event_type,
+                )
+            else:
+                _apply_subscription_state(
+                    subscription,
+                    plan=plan if plan else _UNSET,
+                    raw_status=resource.get('status') or _UNSET,
+                    started_at=started_at or _UNSET,
+                    current_period_end=next_billing,
+                    last_event_type=event_type,
+                )
+
+            _finalize_paypal_event(
+                webhook_event,
+                status=PayPalWebhookEvent.ProcessingStatus.PROCESSED,
+                summary=f'Processed {event_type} for {subscription_id}.',
+                subscription=subscription,
+            )
+    except Exception as exc:
+        logger.exception('Failed to process PayPal webhook %s', event_type)
+        _finalize_paypal_event(
+            webhook_event,
+            status=PayPalWebhookEvent.ProcessingStatus.FAILED,
+            summary=f'Failed {event_type} for {subscription_id}.',
+            error_message=str(exc),
         )
-        return JsonResponse({'ok': True, 'status': subscription.status})
-
-    if plan:
-        subscription.plan = plan
-    subscription.status = status
-    subscription.started_at = started_at or subscription.started_at
-    subscription.current_period_end = next_billing
-    subscription.last_event_type = event_type
-    subscription.save(update_fields=[
-        'plan',
-        'status',
-        'started_at',
-        'current_period_end',
-        'last_event_type',
-    ])
+        return JsonResponse({'ok': False, 'error': 'Webhook processing failed.'}, status=500)
 
     return JsonResponse({'ok': True, 'status': subscription.status})

@@ -1,5 +1,6 @@
 import json
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
@@ -12,7 +13,7 @@ from django.urls import reverse
 
 from .admin import AppointmentAdmin
 from .booking import build_available_slots
-from .models import Appointment, AppointmentType, Clinic, ClinicSubscription, Patient, Plan, Staff
+from .models import Appointment, AppointmentType, Clinic, ClinicSubscription, PayPalWebhookEvent, Patient, Plan, Staff
 from .tasks import send_upcoming_appointment_reminders
 
 User = get_user_model()
@@ -293,6 +294,92 @@ class BillingActivateTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(ClinicSubscription.objects.filter(paypal_subscription_id='I-PRO123').exists())
+
+
+class PayPalWebhookTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Webhook Clinic', timezone='UTC')
+        self.plan = Plan.objects.create(
+            name='Starter',
+            paypal_plan_id='P-WEBHOOK1',
+            interval=Plan.Interval.MONTH,
+            price_cents=2500,
+        )
+
+    @patch('core.views.verify_webhook_signature', return_value=True)
+    def test_webhook_is_idempotent(self, verify_mock):
+        subscription = ClinicSubscription.objects.create(
+            clinic=self.clinic,
+            plan=self.plan,
+            paypal_subscription_id='I-WEBHOOK-1',
+            status=ClinicSubscription.Status.PENDING,
+        )
+        payload = {
+            'id': 'WH-1',
+            'event_type': 'BILLING.SUBSCRIPTION.ACTIVATED',
+            'resource': {
+                'id': subscription.paypal_subscription_id,
+                'status': 'ACTIVE',
+                'plan_id': self.plan.paypal_plan_id,
+                'start_time': '2026-03-21T12:00:00Z',
+                'billing_info': {
+                    'next_billing_time': '2026-04-21T12:00:00Z',
+                },
+            },
+        }
+
+        first = self.client.post(
+            reverse('paypal-webhook'),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+        second = self.client.post(
+            reverse('paypal-webhook'),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+        subscription.refresh_from_db()
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(verify_mock.call_count, 2)
+        self.assertEqual(subscription.status, ClinicSubscription.Status.ACTIVE)
+        self.assertEqual(PayPalWebhookEvent.objects.count(), 1)
+        self.assertEqual(
+            PayPalWebhookEvent.objects.get().status,
+            PayPalWebhookEvent.ProcessingStatus.PROCESSED,
+        )
+
+    @patch('core.views.verify_webhook_signature', return_value=True)
+    def test_webhook_can_create_subscription_from_custom_id(self, verify_mock):
+        payload = {
+            'id': 'WH-2',
+            'event_type': 'BILLING.SUBSCRIPTION.ACTIVATED',
+            'resource': {
+                'id': 'I-WEBHOOK-2',
+                'status': 'ACTIVE',
+                'plan_id': self.plan.paypal_plan_id,
+                'custom_id': f'clinic-{self.clinic.id}',
+                'start_time': '2026-03-21T12:00:00Z',
+                'billing_info': {
+                    'next_billing_time': '2026-04-21T12:00:00Z',
+                },
+            },
+        }
+
+        response = self.client.post(
+            reverse('paypal-webhook'),
+            data=json.dumps(payload),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(verify_mock.called)
+        subscription = ClinicSubscription.objects.get(paypal_subscription_id='I-WEBHOOK-2')
+        self.assertEqual(subscription.clinic_id, self.clinic.id)
+        self.assertEqual(subscription.plan_id, self.plan.id)
+        self.assertEqual(subscription.status, ClinicSubscription.Status.ACTIVE)
+        self.assertEqual(PayPalWebhookEvent.objects.count(), 1)
 
 
 class ClinicSignupTests(TestCase):

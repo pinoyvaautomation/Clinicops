@@ -30,11 +30,12 @@ except Exception:
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
+DEFAULT_SECRET_KEY = 'django-insecure-0*w2i$(6=$93#uiufsulhsc*yaol)^s%tppm!3efrk%dy+s0f2'
+DEFAULT_SECURED_FIELDS_KEY = 'TtY8MAeXuhdKDd1HfGUwim-vQ8H7fXyRQ9J8pTi_-lg='
+DEFAULT_SECURED_FIELDS_HASH_SALT = 'dev-salt'
+
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY',
-    'django-insecure-0*w2i$(6=$93#uiufsulhsc*yaol)^s%tppm!3efrk%dy+s0f2',
-)
+SECRET_KEY = os.environ.get('SECRET_KEY', DEFAULT_SECRET_KEY)
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = os.environ.get('DEBUG', 'true').lower() == 'true'
@@ -207,9 +208,9 @@ if _secured_keys:
     else:
         SECURED_FIELDS_KEY = _secured_keys.strip()
 else:
-    SECURED_FIELDS_KEY = 'TtY8MAeXuhdKDd1HfGUwim-vQ8H7fXyRQ9J8pTi_-lg='
+    SECURED_FIELDS_KEY = DEFAULT_SECURED_FIELDS_KEY
 
-SECURED_FIELDS_HASH_SALT = os.environ.get('SECURED_FIELDS_HASH_SALT', 'dev-salt')
+SECURED_FIELDS_HASH_SALT = os.environ.get('SECURED_FIELDS_HASH_SALT', DEFAULT_SECURED_FIELDS_HASH_SALT)
 
 APPOINTMENT_SLOT_MINUTES = int(os.environ.get('APPOINTMENT_SLOT_MINUTES', '30'))
 APPOINTMENT_DAY_START = int(os.environ.get('APPOINTMENT_DAY_START', '9'))
@@ -247,6 +248,25 @@ Q_CLUSTER = {
     'bulk': 10,
 }
 
+X_FRAME_OPTIONS = 'DENY'
+SECURE_CROSS_ORIGIN_OPENER_POLICY = 'same-origin'
+SECURE_CROSS_ORIGIN_RESOURCE_POLICY = 'same-origin'
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'core': {
+            'handlers': ['console'],
+            'level': os.environ.get('CORE_LOG_LEVEL', 'INFO'),
+        },
+    },
+}
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 

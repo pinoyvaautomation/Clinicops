@@ -1,137 +1,86 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>{{ clinic.name }} - Patient Signup</title>
-    <style>
-      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
-      * { box-sizing: border-box; }
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: #f3f4f6;
-        color: #1f2937;
-      }
-      .page {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
-      .card {
-        width: 100%;
-        max-width: 520px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
-      }
-      .card-header {
-        background: var(--brand);
-        color: #fff;
-        padding: 18px 20px;
-        font-size: 20px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .card-header img {
-        height: 28px;
-        width: auto;
-      }
-      .card-header.logo-broken img { display: none; }
-      .card-header.logo-broken .logo-fallback { display: inline; }
-      .logo-fallback { display: none; font-weight: 700; }
-      .card-body { padding: 22px 20px 24px; }
-      label { display: block; margin-top: 12px; font-weight: 600; }
-      input {
-        width: 100%;
-        padding: 10px 12px;
-        margin-top: 6px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-      }
-      button {
-        margin-top: 18px;
-        width: 100%;
-        padding: 12px;
-        background: var(--brand);
-        color: #fff;
-        border: none;
-        border-radius: 6px;
-        font-weight: 700;
-        letter-spacing: 0.3px;
-      }
-      .muted { color: #6b7280; font-size: 14px; margin-top: 6px; }
-      .errorlist { color: #b91c1c; margin: 8px 0; }
-      .success { color: #047857; }
-    </style>
-  </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
-    <main class="page">
-      <div class="card">
-        <div class="card-header">
-          {% if public_logo_url %}
-            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.card-header').classList.add('logo-broken')">
-            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
-          {% endif %}
-          <span>{{ clinic.name }} Patient Signup</span>
-        </div>
-        <div class="card-body">
-          <p class="muted">Create a patient account to manage your appointments.</p>
+{% extends "public_shell.html" %}
 
-          {% if verification_sent %}
-            <p class="success">
-              Verification email sent. Please check your inbox to activate your account.
-              <a href="{% url 'resend-verification' %}?email={{ form.email.value }}">Resend verification</a>
-            </p>
-          {% endif %}
+{% block title %}{{ clinic.name }} Patient Signup{% endblock %}
+{% block shell_class %}shell--wide{% endblock %}
+{% block hero_eyebrow %}Patient account setup{% endblock %}
+{% block hero_title %}Create your {{ clinic.name }} portal account{% endblock %}
+{% block hero_text %}Set up one patient account to manage bookings, view upcoming visits, and keep your details connected to the clinic. The flow stays simple on desktop, tablet, and mobile so you can finish signup in one pass.{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">Linked to {{ clinic.name }}</span>
+    <span class="pill">Booking-ready after activation</span>
+  </div>
+{% endblock %}
+{% block hero_points %}
+  <div class="hero-points">
+    <div class="point">
+      <strong>Manage appointments in one place</strong>
+      <p>Use the patient portal to review upcoming visits and keep contact details current.</p>
+    </div>
+    <div class="point">
+      <strong>Verification keeps access secure</strong>
+      <p>New accounts are activated through email verification before sign-in is enabled.</p>
+    </div>
+  </div>
+{% endblock %}
+{% block panel_title %}Create patient account{% endblock %}
+{% block panel_intro %}
+  <p class="panel-copy">Use your personal details for this clinic. After signup, we will send a verification email before the account becomes active.</p>
+{% endblock %}
+{% block panel_body %}
+  {% if verification_sent %}
+    <div class="flash flash--success">
+      Verification email sent. Please check your inbox to activate your account.
+      <a class="inline-link" href="{% url 'resend-verification' %}?email={{ form.email.value|urlencode }}">Resend verification</a>
+    </div>
+  {% endif %}
 
-          <form method="post">
-            {% csrf_token %}
-            {{ form.non_field_errors }}
+  <form method="post" class="stack-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
 
-            <label for="id_first_name">First name</label>
-            {{ form.first_name }}
-            {{ form.first_name.errors }}
-
-            <label for="id_last_name">Last name</label>
-            {{ form.last_name }}
-            {{ form.last_name.errors }}
-
-            <label for="id_email">Email</label>
-            {{ form.email }}
-            {{ form.email.errors }}
-
-            <label for="id_phone">Phone</label>
-            {{ form.phone }}
-            {{ form.phone.errors }}
-
-            <label for="id_dob">Date of birth</label>
-            {{ form.dob }}
-            {{ form.dob.errors }}
-
-            <label for="id_password">Password</label>
-            {{ form.password }}
-            {{ form.password.errors }}
-
-            <label for="id_confirm_password">Confirm password</label>
-            {{ form.confirm_password }}
-            {{ form.confirm_password.errors }}
-
-            <button type="submit">Create account</button>
-          </form>
-          <p class="muted">Already have an account? <a href="{% url 'login' %}">Sign in</a>.</p>
-        </div>
+    <div class="field-grid">
+      <div class="field">
+        <label for="id_first_name">First name</label>
+        {{ form.first_name }}
+        {{ form.first_name.errors }}
       </div>
-    </main>
-    {% include "core/partials/site_footer.html" %}
-  </body>
-</html>
+      <div class="field">
+        <label for="id_last_name">Last name</label>
+        {{ form.last_name }}
+        {{ form.last_name.errors }}
+      </div>
+      <div class="field">
+        <label for="id_email">Email</label>
+        {{ form.email }}
+        {{ form.email.errors }}
+      </div>
+      <div class="field">
+        <label for="id_phone">Phone</label>
+        {{ form.phone }}
+        {{ form.phone.errors }}
+      </div>
+      <div class="field field--wide">
+        <label for="id_dob">Date of birth</label>
+        {{ form.dob }}
+        {{ form.dob.errors }}
+      </div>
+      <div class="field">
+        <label for="id_password">Password</label>
+        {{ form.password }}
+        {{ form.password.errors }}
+      </div>
+      <div class="field">
+        <label for="id_confirm_password">Confirm password</label>
+        {{ form.confirm_password }}
+        {{ form.confirm_password.errors }}
+      </div>
+    </div>
+
+    <button class="submit" type="submit">Create account</button>
+  </form>
+
+  <div class="action-row">
+    <a class="button button--secondary" href="{% url 'login' %}">Already have an account? Sign in</a>
+  </div>
+{% endblock %}

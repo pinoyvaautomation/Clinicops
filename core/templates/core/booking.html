@@ -1,114 +1,114 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>{{ clinic.name }} - Book Appointment</title>
-    <style>
-      :root { --brand: {{ clinic.brand_color|default:"#1d4ed8" }}; }
-      * { box-sizing: border-box; }
-      body { font-family: Arial, sans-serif; margin: 0; color: #1f2937; background: #f8fafc; }
-      a { color: var(--brand); text-decoration: none; }
-      a:hover { text-decoration: underline; }
-      .muted { color: #6b7280; font-size: 14px; }
-      .page { max-width: 860px; margin: 0 auto; padding: 32px 24px 48px; }
-      .page-header { text-align: center; margin-bottom: 24px; }
-      h1 { margin: 0 0 6px; color: var(--brand); font-size: 32px; }
-      h2 { margin: 0 0 8px; }
-      .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 24px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
-      label { display: block; margin-top: 14px; font-weight: 600; }
-      input, select, textarea { width: 100%; padding: 10px 12px; margin-top: 6px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 14px; }
-      button { margin-top: 18px; padding: 12px 16px; background: var(--brand); color: #fff; border: none; border-radius: 6px; font-weight: 600; }
-      .errorlist { color: #b91c1c; margin: 8px 0; }
-      .section-divider { height: 1px; background: #e5e7eb; margin: 18px 0; }
-      @media (max-width: 900px) {
-        .page { padding: 24px 16px 40px; }
-        .card { padding: 20px; }
-      }
-      @media (max-width: 700px) {
-        .page-header { text-align: left; }
-      }
-    </style>
-  </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
+{% extends "public_shell.html" %}
 
-    <main class="page">
-      <div class="page-header">
-        <h1>Book an appointment</h1>
-        <div class="muted">Choose a service and an available time that works for you.</div>
-      </div>
+{% block title %}{{ clinic.name }} Book Appointment{% endblock %}
+{% block shell_class %}shell--wide{% endblock %}
+{% block hero_eyebrow %}Online booking{% endblock %}
+{% block hero_title %}Book with {{ clinic.name }}{% endblock %}
+{% block hero_text %}Choose a service, pick an open slot, and submit the appointment in one flow. The booking experience now uses the same branded layout as the rest of the product, so patients are not dropped into a generic form page.{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">{{ appointment_types|length }} service{{ appointment_types|length|pluralize }} available</span>
+    <span class="pill">{{ slot_count }} open slot{{ slot_count|pluralize }} in this view</span>
+  </div>
+{% endblock %}
+{% block hero_points %}
+  <div class="hero-points">
+    <div class="point">
+      <strong>Pick a service first</strong>
+      <p>Availability updates based on the selected appointment type so the patient only sees workable booking windows.</p>
+    </div>
+    <div class="point">
+      <strong>Portal-ready follow-up</strong>
+      <p>Patients can create an account for easier appointment tracking or sign in if they already have access.</p>
+    </div>
+  </div>
+{% endblock %}
+{% block panel_title %}Book appointment{% endblock %}
+{% block panel_intro %}
+  <p class="panel-copy">
+    Want a patient account?
+    <a class="inline-link" href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
+    Already have one?
+    <a class="inline-link" href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
+  </p>
+{% endblock %}
+{% block panel_body %}
+  {% if appointment_types %}
+    <div class="section-card">
+      <h3>Choose appointment type</h3>
+      <p>Update the service first so the available slot list stays accurate.</p>
+      <form method="get" class="stack-form" style="margin-top: 14px;">
+        <div class="field">
+          <label for="type">Appointment type</label>
+          <select id="type" name="type" onchange="this.form.submit()">
+            {% for appt_type in appointment_types %}
+              <option value="{{ appt_type.id }}" {% if selected_type and appt_type.id == selected_type.id %}selected{% endif %}>
+                {{ appt_type.name }} ({{ appt_type.duration_minutes }} min)
+              </option>
+            {% endfor %}
+          </select>
+          <noscript>
+            <button class="submit" type="submit" style="margin-top: 12px;">Update slots</button>
+          </noscript>
+        </div>
+      </form>
+      {% if selected_type %}
+        <div class="field-help">Selected service: <strong>{{ selected_type.name }}</strong> for {{ selected_type.duration_minutes }} minutes.</div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="flash flash--info">No appointment types are configured yet. Please contact the clinic directly.</div>
+  {% endif %}
 
-      <section class="card">
-        <h2>Book Appointment</h2>
-        <p class="muted">
-          Want a patient account? <a href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
-          Already have one? <a href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
-        </p>
+  {% if appointment_types and slot_count == 0 %}
+    <div class="flash flash--danger">No appointment slots are available right now. Please check back later.</div>
+  {% endif %}
 
-        {% if appointment_types %}
-          <form method="get">
-            <label for="type">Appointment type</label>
-            <select id="type" name="type" onchange="this.form.submit()">
-              {% for appt_type in appointment_types %}
-                <option value="{{ appt_type.id }}" {% if selected_type and appt_type.id == selected_type.id %}selected{% endif %}>
-                  {{ appt_type.name }} ({{ appt_type.duration_minutes }} min)
-                </option>
-              {% endfor %}
-            </select>
-            <noscript>
-              <button type="submit">Update slots</button>
-            </noscript>
-          </form>
-          {% if selected_type %}
-            <div class="muted">Selected: {{ selected_type.name }} ({{ selected_type.duration_minutes }} min)</div>
-          {% endif %}
-          <div class="section-divider"></div>
-        {% else %}
-          <div class="muted">No appointment types configured.</div>
-        {% endif %}
+  {% if appointment_types and slot_count != 0 %}
+    <form method="post" class="stack-form" style="margin-top: 14px;">
+      {% csrf_token %}
+      {{ form.non_field_errors }}
+      {{ form.appointment_type_id }}
 
-        {% if slot_count == 0 %}
-          <p>No appointment slots are available right now. Please check back later.</p>
-        {% else %}
-        <form method="post">
-          {% csrf_token %}
-          {{ form.non_field_errors }}
-          {{ form.appointment_type_id }}
-
+      <div class="field-grid">
+        <div class="field">
           <label for="id_first_name">First name</label>
           {{ form.first_name }}
           {{ form.first_name.errors }}
-
+        </div>
+        <div class="field">
           <label for="id_last_name">Last name</label>
           {{ form.last_name }}
           {{ form.last_name.errors }}
-
+        </div>
+        <div class="field">
           <label for="id_email">Email</label>
           {{ form.email }}
           {{ form.email.errors }}
-
+        </div>
+        <div class="field">
           <label for="id_phone">Phone</label>
           {{ form.phone }}
           {{ form.phone.errors }}
-
+        </div>
+        <div class="field field--wide">
           <label for="id_dob">Date of birth (optional)</label>
           {{ form.dob }}
           {{ form.dob.errors }}
-
+        </div>
+        <div class="field field--wide">
           <label for="id_slot">Available slots</label>
           {{ form.slot }}
           {{ form.slot.errors }}
-
+        </div>
+        <div class="field field--wide">
           <label for="id_notes">Notes (optional)</label>
           {{ form.notes }}
           {{ form.notes.errors }}
+        </div>
+      </div>
 
-          <button type="submit">Book appointment</button>
-        </form>
-        {% endif %}
-      </section>
-    </main>
-
-    {% include "core/partials/site_footer.html" %}
-  </body>
-</html>
+      <button class="submit" type="submit">Book appointment</button>
+    </form>
+  {% endif %}
+{% endblock %}

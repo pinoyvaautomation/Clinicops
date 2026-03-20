@@ -1,84 +1,27 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Page not found</title>
-    <style>
-      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
-      * { box-sizing: border-box; }
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: #f3f4f6;
-        color: #1f2937;
-      }
-      .page {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
-      .card {
-        width: 100%;
-        max-width: 520px;
-        background: #fff;
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        overflow: hidden;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
-      }
-      .card-header {
-        background: var(--brand);
-        color: #fff;
-        padding: 18px 20px;
-        font-size: 20px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .card-header img {
-        height: 28px;
-        width: auto;
-      }
-      .card-header.logo-broken img { display: none; }
-      .card-header.logo-broken .logo-fallback { display: inline; }
-      .logo-fallback { display: none; font-weight: 700; }
-      .card-body { padding: 22px 20px 24px; }
-      .muted { color: #6b7280; font-size: 14px; margin-top: 6px; }
-      .cta {
-        display: inline-block;
-        margin-top: 16px;
-        background: var(--brand);
-        color: #fff;
-        padding: 10px 14px;
-        border-radius: 6px;
-        text-decoration: none;
-        font-weight: 700;
-      }
-    </style>
-  </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
-    <main class="page">
-      <div class="card">
-        <div class="card-header">
-          {% if public_logo_url %}
-            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.card-header').classList.add('logo-broken')">
-            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
-          {% endif %}
-          <span>Page not found</span>
-        </div>
-        <div class="card-body">
-          <p class="muted">The page you’re looking for doesn’t exist or has been moved.</p>
-          <a class="cta" href="{% url 'home' %}">Go to home</a>
-        </div>
-      </div>
-    </main>
-    {% include "core/partials/site_footer.html" %}
-  </body>
-</html>
+{% extends "public_shell.html" %}
+
+{% block title %}Page Not Found{% endblock %}
+{% block hero_eyebrow %}Not found{% endblock %}
+{% block hero_title %}This page is no longer where the link expected{% endblock %}
+{% block hero_text %}The address may be outdated, mistyped, or tied to a page that has moved. The safest next step is to return to the main entry point and navigate from there.{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">404 response</span>
+    <span class="pill">Return to the product entry point</span>
+  </div>
+{% endblock %}
+{% block panel_title %}Page not found{% endblock %}
+{% block panel_intro %}
+  <p class="panel-copy">The page you're looking for doesn't exist or has been moved.</p>
+{% endblock %}
+{% block panel_body %}
+  <div class="summary-card">
+    <h3>Try one of these instead</h3>
+    <p>Go back to the public home or return to sign in if you were trying to reach the clinic or patient portal.</p>
+  </div>
+
+  <div class="action-row">
+    <a class="button button--primary" href="{% url 'home' %}">Go to home</a>
+    <a class="button button--secondary" href="{% url 'login' %}">Go to sign in</a>
+  </div>
+{% endblock %}

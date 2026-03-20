@@ -27,6 +27,35 @@ class BookingForm(forms.Form):
             self.fields['slot'].choices = slot_choices
         if appointment_type_id is not None:
             self.fields['appointment_type_id'].initial = appointment_type_id
+        self.fields['first_name'].widget.attrs.update(
+            {
+                'placeholder': 'Jamie',
+                'autocomplete': 'given-name',
+            }
+        )
+        self.fields['last_name'].widget.attrs.update(
+            {
+                'placeholder': 'Patient',
+                'autocomplete': 'family-name',
+            }
+        )
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'patient@email.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['phone'].widget.attrs.update(
+            {
+                'placeholder': '+63 912 345 6789',
+                'autocomplete': 'tel',
+            }
+        )
+        self.fields['notes'].widget.attrs.update(
+            {
+                'placeholder': 'Optional booking notes',
+            }
+        )
 
 
 class ClinicAuthenticationForm(AuthenticationForm):
@@ -59,6 +88,22 @@ class ClinicAuthenticationForm(AuthenticationForm):
 class AppointmentLookupForm(forms.Form):
     email = forms.EmailField()
     confirmation_code = forms.CharField(max_length=12)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'patient@email.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['confirmation_code'].widget.attrs.update(
+            {
+                'placeholder': 'ABC123',
+                'autocomplete': 'off',
+                'style': 'text-transform: uppercase;',
+            }
+        )
 
 
 class ClinicSignupForm(forms.Form):
@@ -140,6 +185,45 @@ class PatientSignupForm(forms.Form):
     def clean_email(self):
         return self.cleaned_data['email'].strip().lower()
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['first_name'].widget.attrs.update(
+            {
+                'placeholder': 'Jamie',
+                'autocomplete': 'given-name',
+            }
+        )
+        self.fields['last_name'].widget.attrs.update(
+            {
+                'placeholder': 'Patient',
+                'autocomplete': 'family-name',
+            }
+        )
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'patient@email.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['phone'].widget.attrs.update(
+            {
+                'placeholder': '+63 912 345 6789',
+                'autocomplete': 'tel',
+            }
+        )
+        self.fields['password'].widget.attrs.update(
+            {
+                'placeholder': 'Create a password',
+                'autocomplete': 'new-password',
+            }
+        )
+        self.fields['confirm_password'].widget.attrs.update(
+            {
+                'placeholder': 'Repeat your password',
+                'autocomplete': 'new-password',
+            }
+        )
+
     def clean(self):
         cleaned = super().clean()
         password = cleaned.get('password')
@@ -151,6 +235,15 @@ class PatientSignupForm(forms.Form):
 
 class ResendVerificationForm(forms.Form):
     email = forms.EmailField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'owner@clinic.com',
+                'autocomplete': 'email',
+            }
+        )
 
     def clean_email(self):
         return self.cleaned_data['email'].strip().lower()

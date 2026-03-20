@@ -1,23 +1,22 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Subscription Required</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 32px; color: #1f2937; }
-      .panel { border: 1px solid #e5e7eb; padding: 16px; border-radius: 6px; max-width: 520px; }
-      .muted { color: #6b7280; }
-    </style>
-  </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
-    <div class="panel">
-      <h1>Booking temporarily unavailable</h1>
-      <p class="muted">
-        {{ clinic.name }} does not currently have an active subscription.
-      </p>
-      <p>Please contact the clinic directly to schedule an appointment.</p>
-    </div>
-    {% include "core/partials/site_footer.html" %}
-  </body>
-</html>
+{% extends "public_shell.html" %}
+
+{% block title %}Booking Temporarily Unavailable{% endblock %}
+{% block hero_eyebrow %}Booking paused{% endblock %}
+{% block hero_title %}Booking temporarily unavailable{% endblock %}
+{% block hero_text %}This clinic does not currently have an active subscription for online booking. Patients should contact the clinic directly until service access is restored.{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">{{ clinic.name }}</span>
+    <span class="pill">Manual scheduling recommended</span>
+  </div>
+{% endblock %}
+{% block panel_title %}Please contact the clinic directly{% endblock %}
+{% block panel_intro %}
+  <p class="panel-copy">{{ clinic.name }} does not currently have an active subscription for online booking.</p>
+{% endblock %}
+{% block panel_body %}
+  <div class="summary-card">
+    <h3>What to do now</h3>
+    <p>Reach out to the clinic by phone, email, or its normal contact channel to arrange the appointment manually.</p>
+  </div>
+{% endblock %}

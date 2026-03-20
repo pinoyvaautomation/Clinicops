@@ -1,23 +1,24 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Email verification</title>
-    <style>
-      body { font-family: Arial, sans-serif; margin: 48px; color: #1f2937; }
-      .ok { color: #047857; }
-      .error { color: #b91c1c; }
-    </style>
-  </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
-    {% if status == 'ok' %}
-      <h1 class="ok">Email verified</h1>
-      <p>Your account is now active. You can <a href="{% url 'login' %}">sign in</a>.</p>
-    {% else %}
-      <h1 class="error">Verification link invalid</h1>
-      <p>This link is invalid or expired.</p>
-    {% endif %}
-    {% include "core/partials/site_footer.html" %}
-  </body>
-</html>
+{% extends "public_shell.html" %}
+
+{% block title %}Email Verification{% endblock %}
+{% block hero_eyebrow %}{% if status == 'ok' %}Activation complete{% else %}Activation issue{% endif %}{% endblock %}
+{% block hero_title %}{% if status == 'ok' %}The account is verified{% else %}This verification link is no longer valid{% endif %}{% endblock %}
+{% block hero_text %}{% if status == 'ok' %}Email verification succeeded and the account is now active. The user can move directly into sign-in and continue with clinic or patient access.{% else %}The link may have expired or already been used. The safest recovery path is to request a new verification email and continue from there.{% endif %}{% endblock %}
+{% block panel_title %}{% if status == 'ok' %}Email verified{% else %}Verification link invalid{% endif %}{% endblock %}
+{% block panel_intro %}
+  <p class="panel-copy">{% if status == 'ok' %}The account is active now. Continue to sign in with the existing credentials.{% else %}Request another verification email and continue with a fresh activation link.{% endif %}</p>
+{% endblock %}
+{% block panel_body %}
+  {% if status == 'ok' %}
+    <div class="flash flash--success">Verification completed successfully.</div>
+    <div class="action-row">
+      <a class="button button--primary" href="{% url 'login' %}">Sign in</a>
+    </div>
+  {% else %}
+    <div class="flash flash--danger">This link is invalid or expired.</div>
+    <div class="action-row">
+      <a class="button button--primary" href="{% url 'resend-verification' %}">Resend verification</a>
+      <a class="button button--secondary" href="{% url 'login' %}">Back to sign in</a>
+    </div>
+  {% endif %}
+{% endblock %}

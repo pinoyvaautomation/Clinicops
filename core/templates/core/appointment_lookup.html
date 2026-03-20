@@ -1,119 +1,63 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Appointment Lookup</title>
-    <style>
-      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: #f3f4f6;
-        color: #1f2937;
-      }
-      .page {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
-      .panel {
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        max-width: 520px;
-        width: 100%;
-        background: #fff;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
-        overflow: hidden;
-      }
-      .card-header {
-        background: var(--brand);
-        color: #fff;
-        padding: 18px 20px;
-        font-size: 20px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .card-header img {
-        height: 28px;
-        width: auto;
-      }
-      .logo-fallback { display: none; font-weight: 700; }
-      .card-header.logo-broken img { display: none; }
-      .card-header.logo-broken .logo-fallback { display: inline; }
-      .card-body { padding: 20px 18px 22px; }
-      label { display: block; margin-top: 12px; font-weight: 600; }
-      input {
-        width: 100%;
-        padding: 10px 12px;
-        margin-top: 6px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-      }
-      button {
-        margin-top: 16px;
-        padding: 12px;
-        border-radius: 6px;
-        width: 100%;
-        background: var(--brand, #0f5132);
-        color: #fff;
-        border: none;
-        font-weight: 700;
-      }
-      .error { color: #b91c1c; margin-top: 8px; }
-      .muted { color: #6b7280; }
-    </style>
-  </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
-    <main class="page">
-      <div class="panel">
-        <div class="card-header">
-          {% if public_logo_url %}
-            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.card-header').classList.add('logo-broken')">
-            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
-          {% endif %}
-          <span>Find your appointment</span>
+{% extends "public_shell.html" %}
+
+{% block title %}Appointment Lookup{% endblock %}
+{% block hero_eyebrow %}Confirmation lookup{% endblock %}
+{% block hero_title %}Find an appointment from the confirmation code{% endblock %}
+{% block hero_text %}Use the booking email and confirmation code to pull up the appointment details without needing a portal account. This gives patients a direct self-serve path after booking.{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">No account required</span>
+    <span class="pill">Fast booking confirmation</span>
+  </div>
+{% endblock %}
+{% block panel_title %}Find your appointment{% endblock %}
+{% block panel_intro %}
+  <p class="panel-copy">Enter the booking email and confirmation code exactly as they appear in the confirmation message.</p>
+{% endblock %}
+{% block panel_body %}
+  {% if error_message %}
+    <div class="flash flash--danger">{{ error_message }}</div>
+  {% endif %}
+
+  <form method="post" class="stack-form">
+    {% csrf_token %}
+    {{ form.non_field_errors }}
+    <div class="field">
+      <label for="id_email">Email</label>
+      {{ form.email }}
+      {{ form.email.errors }}
+    </div>
+    <div class="field">
+      <label for="id_confirmation_code">Confirmation code</label>
+      {{ form.confirmation_code }}
+      {{ form.confirmation_code.errors }}
+    </div>
+    <button class="submit" type="submit">Find appointment</button>
+  </form>
+
+  {% if appointment %}
+    <div class="section-card" style="margin-top: 14px;">
+      <h3>Appointment details</h3>
+      <div class="detail-list" style="margin-top: 12px;">
+        <div class="detail-row">
+          <span class="detail-label">Clinic</span>
+          <span class="detail-value">{{ appointment.clinic.name }}</span>
         </div>
-        <div class="card-body">
-          <p class="muted">Enter your email and confirmation code.</p>
-          <form method="post">
-            {% csrf_token %}
-            {{ form.non_field_errors }}
-            <label for="id_email">Email</label>
-            {{ form.email }}
-            {{ form.email.errors }}
-
-            <label for="id_confirmation_code">Confirmation code</label>
-            {{ form.confirmation_code }}
-            {{ form.confirmation_code.errors }}
-
-            <button type="submit">Find appointment</button>
-          </form>
-
-          {% if error_message %}
-            <div class="error">{{ error_message }}</div>
-          {% endif %}
-
-          {% if appointment %}
-            <hr>
-            <h2>Appointment details</h2>
-            <p><strong>Clinic:</strong> {{ appointment.clinic.name }}</p>
-            <p><strong>Staff:</strong> {{ appointment.staff }}</p>
-            <p><strong>Time:</strong> {{ appointment_local|date:"M j, Y, g:i A" }}</p>
-            {% if appointment.appointment_type %}
-              <p><strong>Type:</strong> {{ appointment.appointment_type.name }}</p>
-            {% endif %}
-          {% endif %}
+        <div class="detail-row">
+          <span class="detail-label">Staff</span>
+          <span class="detail-value">{{ appointment.staff }}</span>
         </div>
+        <div class="detail-row">
+          <span class="detail-label">Time</span>
+          <span class="detail-value">{{ appointment_local|date:"M j, Y, g:i A" }}</span>
+        </div>
+        {% if appointment.appointment_type %}
+          <div class="detail-row">
+            <span class="detail-label">Type</span>
+            <span class="detail-value">{{ appointment.appointment_type.name }}</span>
+          </div>
+        {% endif %}
       </div>
-    </main>
-    {% include "core/partials/site_footer.html" %}
-  </body>
-</html>
+    </div>
+  {% endif %}
+{% endblock %}

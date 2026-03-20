@@ -1,81 +1,49 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="utf-8">
-    <title>Booking Confirmed - {{ clinic.name }}</title>
-    <style>
-      :root { --brand: {{ public_brand_color|default:"#0f5132" }}; }
-      body {
-        font-family: Arial, sans-serif;
-        margin: 0;
-        min-height: 100vh;
-        display: flex;
-        flex-direction: column;
-        background: #f3f4f6;
-        color: #1f2937;
-      }
-      .page {
-        flex: 1;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        padding: 24px;
-      }
-      .panel {
-        border: 1px solid #e5e7eb;
-        border-radius: 10px;
-        max-width: 520px;
-        width: 100%;
-        background: #fff;
-        box-shadow: 0 12px 28px rgba(15, 23, 42, 0.12);
-        overflow: hidden;
-      }
-      .card-header {
-        background: var(--brand);
-        color: #fff;
-        padding: 18px 20px;
-        font-size: 20px;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .card-header img {
-        height: 28px;
-        width: auto;
-      }
-      .logo-fallback { display: none; font-weight: 700; }
-      .card-header.logo-broken img { display: none; }
-      .card-header.logo-broken .logo-fallback { display: inline; }
-      .card-body { padding: 20px 18px 22px; }
-      .muted { color: #6b7280; }
-    </style>
-  </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
-    <main class="page">
-      <div class="panel">
-        <div class="card-header">
-          {% if public_logo_url %}
-            <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.card-header').classList.add('logo-broken')">
-            <span class="logo-fallback">{{ public_brand_name|default:"ClinicOps" }}</span>
-          {% endif %}
-          <span>Booking confirmed</span>
-        </div>
-        <div class="card-body">
-          <p class="muted">Thank you. Your appointment has been booked.</p>
-          <p><strong>Clinic:</strong> {{ clinic.name }}</p>
-          <p><strong>Staff:</strong> {{ appointment.staff }}</p>
-          {% if appointment.appointment_type %}
-            <p><strong>Type:</strong> {{ appointment.appointment_type.name }}</p>
-          {% endif %}
-          <p><strong>Time:</strong> {{ appointment_local|date:"M j, Y, g:i A" }}</p>
-          <p><strong>Confirmation code:</strong> {{ appointment.confirmation_code }}</p>
-          <p class="muted">Use this code on the appointment lookup page.</p>
-          <p><a href="/appointments/lookup/">View or confirm appointment</a></p>
-        </div>
+{% extends "public_shell.html" %}
+
+{% block title %}Booking Confirmed {{ clinic.name }}{% endblock %}
+{% block hero_eyebrow %}Booking confirmed{% endblock %}
+{% block hero_title %}Your appointment is booked{% endblock %}
+{% block hero_text %}The booking request was accepted and the appointment is now reserved. Save the confirmation code below so you can look the appointment up later without needing to call the clinic.{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">{{ clinic.name }}</span>
+    <span class="pill">Confirmation ready</span>
+  </div>
+{% endblock %}
+{% block panel_title %}Booking details{% endblock %}
+{% block panel_intro %}
+  <p class="panel-copy">Use the confirmation code on the appointment lookup page if you need to confirm the details later.</p>
+{% endblock %}
+{% block panel_body %}
+  <div class="detail-list">
+    <div class="detail-row">
+      <span class="detail-label">Clinic</span>
+      <span class="detail-value">{{ clinic.name }}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Staff</span>
+      <span class="detail-value">{{ appointment.staff }}</span>
+    </div>
+    {% if appointment.appointment_type %}
+      <div class="detail-row">
+        <span class="detail-label">Service</span>
+        <span class="detail-value">{{ appointment.appointment_type.name }}</span>
       </div>
-    </main>
-    {% include "core/partials/site_footer.html" %}
-  </body>
-</html>
+    {% endif %}
+    <div class="detail-row">
+      <span class="detail-label">Time</span>
+      <span class="detail-value">{{ appointment_local|date:"M j, Y, g:i A" }}</span>
+    </div>
+    <div class="detail-row">
+      <span class="detail-label">Confirmation code</span>
+      <span class="code-chip">{{ appointment.confirmation_code }}</span>
+    </div>
+  </div>
+
+  <div class="action-row">
+    <a class="button button--primary" href="{% url 'appointment-lookup' %}">Look up appointment</a>
+    {% if clinic.slug %}
+      <a class="button button--secondary" href="{% url 'patient-signup-slug' clinic.slug %}">Create patient account</a>
+    {% endif %}
+  </div>
+{% endblock %}

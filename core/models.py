@@ -236,3 +236,39 @@ class ClinicSubscription(models.Model):
 
     def __str__(self) -> str:
         return f'{self.clinic.name} - {self.plan.name} ({self.status})'
+
+
+class PayPalWebhookEvent(models.Model):
+    class ProcessingStatus(models.TextChoices):
+        RECEIVED = 'received', 'Received'
+        PROCESSED = 'processed', 'Processed'
+        IGNORED = 'ignored', 'Ignored'
+        FAILED = 'failed', 'Failed'
+
+    event_id = models.CharField(max_length=128, unique=True)
+    event_type = models.CharField(max_length=128, blank=True)
+    resource_type = models.CharField(max_length=64, blank=True)
+    resource_id = models.CharField(max_length=128, blank=True)
+    summary = models.CharField(max_length=255, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=ProcessingStatus.choices,
+        default=ProcessingStatus.RECEIVED,
+    )
+    payload = models.JSONField(default=dict, blank=True)
+    error_message = models.TextField(blank=True)
+    clinic_subscription = models.ForeignKey(
+        ClinicSubscription,
+        on_delete=models.SET_NULL,
+        related_name='webhook_events',
+        blank=True,
+        null=True,
+    )
+    received_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(blank=True, null=True)
+
+    class Meta:
+        ordering = ['-received_at']
+
+    def __str__(self) -> str:
+        return f'{self.event_type or "PayPal event"} ({self.event_id})'
