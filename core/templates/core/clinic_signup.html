@@ -3,35 +3,36 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Clinic Signup</title>
+    <title>{{ public_brand_name|default:"ClinicOps" }} Signup</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
 
       :root {
-        --brand: #14532d;
-        --brand-soft: rgba(20, 83, 45, 0.08);
+        --brand: {{ public_brand_color|default:"#0f5132" }};
         --ink: #0f172a;
         --ink-soft: #334155;
         --muted: #64748b;
-        --line: rgba(148, 163, 184, 0.24);
+        --line: rgba(148, 163, 184, 0.22);
         --panel: rgba(255, 255, 255, 0.94);
+        --danger: #b42318;
+        --danger-bg: #fff2f1;
         --success: #166534;
         --success-bg: #ecfdf3;
         --warning: #9a6700;
-        --warning-bg: #fff7dd;
-        --danger: #b42318;
-        --danger-bg: #fff2f1;
+        --warning-bg: #fff8dd;
       }
 
       * { box-sizing: border-box; }
       body {
         margin: 0;
         min-height: 100vh;
+        display: flex;
+        flex-direction: column;
         font-family: 'IBM Plex Sans', Arial, sans-serif;
         color: var(--ink);
         background:
-          radial-gradient(circle at top left, rgba(20, 83, 45, 0.12), transparent 28%),
-          radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 26%),
+          radial-gradient(circle at top left, rgba(15, 81, 50, 0.12), transparent 30%),
+          radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 28%),
           linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
       }
       h1, h2, h3, strong {
@@ -41,36 +42,43 @@
       a {
         color: var(--brand);
       }
-      .wrap {
-        max-width: 1240px;
+      .page {
+        flex: 1;
+        width: min(1180px, calc(100% - 32px));
         margin: 0 auto;
-        padding: 22px 24px 56px;
+        padding: 34px 0 56px;
       }
-      .hero, .step-card, .status-card {
+      .shell {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(0, 1.02fr) minmax(420px, 520px);
+        align-items: stretch;
+      }
+      .hero, .signup-card {
         border: 1px solid var(--line);
-        border-radius: 28px;
-        box-shadow: 0 20px 46px rgba(148, 163, 184, 0.14);
+        border-radius: 30px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
       }
       .hero {
-        padding: 30px;
+        padding: 34px;
         color: #f8fafc;
         background:
-          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 28%),
-          linear-gradient(135deg, #0f172a 0%, #111827 54%, #14532d 160%);
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 24%),
+          linear-gradient(135deg, #0f172a 0%, #111827 56%, var(--brand) 160%);
+        position: relative;
+        overflow: hidden;
       }
-      .hero-grid, .content-grid, .field-grid, .step-meta, .hero-actions, .plan-preview-grid {
-        display: grid;
-        gap: 16px;
+      .hero::after {
+        content: '';
+        position: absolute;
+        inset: auto -12% -18% auto;
+        width: 280px;
+        height: 280px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 66%);
+        pointer-events: none;
       }
-      .hero-grid {
-        grid-template-columns: minmax(0, 1.5fr) minmax(320px, 0.95fr);
-      }
-      .content-grid {
-        margin-top: 18px;
-        grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.95fr);
-        align-items: start;
-      }
-      .eyebrow, .pill, .step-pill {
+      .eyebrow, .pill {
         display: inline-flex;
         align-items: center;
         gap: 8px;
@@ -79,159 +87,184 @@
         border-radius: 999px;
         font-size: 13px;
         font-weight: 600;
-      }
-      .eyebrow, .pill {
         background: rgba(255, 255, 255, 0.12);
         color: #f8fafc;
       }
-      .step-pill {
-        background: var(--brand-soft);
-        color: var(--brand);
-      }
       .hero h1 {
-        margin: 16px 0 12px;
-        font-size: clamp(2.4rem, 5vw, 4.4rem);
+        margin: 18px 0 12px;
+        font-size: clamp(2.4rem, 5vw, 4.1rem);
         line-height: 0.96;
       }
-      .hero p, .meta, .note {
-        margin: 0;
-        line-height: 1.65;
-      }
       .hero p {
-        max-width: 760px;
+        margin: 0;
+        max-width: 580px;
         color: rgba(248, 250, 252, 0.78);
+        line-height: 1.7;
         font-size: 1.04rem;
       }
-      .hero-actions {
-        margin-top: 24px;
-        grid-template-columns: repeat(auto-fit, minmax(180px, max-content));
+      .hero-meta, .hero-points, .card-footer, .summary-grid {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
       }
-      .btn, .btn-secondary, .btn-ghost, .btn-brand {
+      .hero-meta {
+        margin-top: 20px;
+      }
+      .hero-points {
+        margin-top: 28px;
+        display: grid;
+        gap: 12px;
+      }
+      .point {
+        padding: 16px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .point strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 1.08rem;
+      }
+      .point p {
+        margin: 0;
+        font-size: 0.95rem;
+      }
+      .signup-card {
+        background: var(--panel);
+        overflow: hidden;
+      }
+      .signup-head {
+        padding: 26px 26px 14px;
+      }
+      .brand-row {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        color: var(--ink);
+      }
+      .brand-row img {
+        height: 34px;
+        width: auto;
+      }
+      .brand-mark {
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+        color: #fff;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 46px;
-        padding: 12px 18px;
-        border-radius: 16px;
-        border: 1px solid transparent;
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: transform 0.14s ease, box-shadow 0.14s ease, border-color 0.14s ease;
+        font-weight: 700;
+        font-size: 1rem;
       }
-      .btn:hover, .btn-secondary:hover, .btn-ghost:hover, .btn-brand:hover {
-        transform: translateY(-1px);
+      .logo-fallback {
+        display: none;
       }
-      .btn {
-        background: #fff;
-        color: var(--ink);
+      .brand-row.logo-broken img {
+        display: none;
       }
-      .btn-secondary {
-        background: rgba(255, 255, 255, 0.08);
-        color: #fff;
-        border-color: rgba(255, 255, 255, 0.14);
-      }
-      .btn-ghost {
-        background: rgba(255, 255, 255, 0.92);
-        color: var(--ink-soft);
-        border-color: var(--line);
-      }
-      .btn-brand {
-        color: #fff;
-        background: linear-gradient(135deg, var(--brand), #0f172a);
-        box-shadow: 0 16px 32px rgba(15, 23, 42, 0.18);
-      }
-      .hero-side {
-        display: grid;
-        gap: 14px;
-      }
-      .status-card {
-        padding: 22px;
-        background: rgba(255, 255, 255, 0.08);
-        border-color: rgba(255, 255, 255, 0.14);
-      }
-      .status-card strong {
-        display: block;
-        margin: 10px 0 8px;
-        font-size: 1.55rem;
-      }
-      .status-card p {
-        color: rgba(248, 250, 252, 0.76);
-      }
-      .step-card {
-        padding: 26px;
-        background: var(--panel);
-      }
-      .step-head {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 14px;
-        margin-bottom: 18px;
-      }
-      .step-head p {
-        margin: 10px 0 0;
-        color: var(--muted);
-        line-height: 1.6;
-      }
-      .step-state {
+      .brand-row.logo-broken .logo-fallback {
         display: inline-flex;
-        align-items: center;
-        min-height: 34px;
-        padding: 7px 12px;
-        border-radius: 999px;
-        background: rgba(15, 23, 42, 0.05);
-        color: var(--ink-soft);
-        font-size: 12px;
+      }
+      .step-tabs {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        margin: 18px 0 0;
+      }
+      .step-tab {
+        min-height: 44px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(15, 23, 42, 0.04);
+        color: #64748b;
+        font-size: 13px;
         font-weight: 700;
         letter-spacing: 0.04em;
         text-transform: uppercase;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
       }
-      .step-state.ready {
+      .step-tab.active {
+        background: rgba(15, 81, 50, 0.1);
+        color: var(--brand);
+        border-color: rgba(15, 81, 50, 0.14);
+      }
+      .step-tab.done {
         background: var(--success-bg);
         color: var(--success);
+        border-color: rgba(22, 101, 52, 0.14);
       }
-      .step-state.locked {
-        background: rgba(15, 23, 42, 0.06);
-        color: #475569;
+      .signup-head h2 {
+        margin: 18px 0 8px;
+        font-size: 2rem;
       }
-      .step-meta {
-        grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
-        margin-top: 18px;
-      }
-      .metric {
-        padding: 16px;
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        background: #fff;
-      }
-      .metric .kicker {
+      .signup-head p {
+        margin: 0;
         color: var(--muted);
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.06em;
-        text-transform: uppercase;
+        line-height: 1.6;
       }
-      .metric strong {
+      .signup-body {
+        padding: 0 26px 26px;
+      }
+      .flash, .banner {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(180, 35, 24, 0.18);
+        background: var(--danger-bg);
+        color: var(--danger);
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .banner {
+        margin-top: 0;
+        background: #fff;
+        color: var(--ink-soft);
+        border-color: rgba(148, 163, 184, 0.18);
+        font-weight: 500;
+      }
+      .banner strong {
         display: block;
-        margin-top: 10px;
-        font-size: 1.2rem;
+        margin-bottom: 6px;
+        color: var(--ink);
+      }
+      .banner.success {
+        background: var(--success-bg);
+        border-color: rgba(22, 101, 52, 0.16);
+      }
+      .banner.success strong,
+      .banner.success {
+        color: var(--success);
+      }
+      .banner.warning {
+        background: var(--warning-bg);
+        border-color: rgba(154, 103, 0, 0.16);
+      }
+      .banner.warning strong,
+      .banner.warning {
+        color: var(--warning);
       }
       form {
+        margin-top: 18px;
         display: grid;
-        gap: 16px;
+        gap: 14px;
       }
       .field-grid {
+        display: grid;
+        gap: 14px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
       }
-      .field-block {
-        padding: 16px;
+      .field {
+        padding: 14px;
         border-radius: 20px;
         border: 1px solid rgba(148, 163, 184, 0.18);
         background: #fff;
       }
-      .field-block.full {
+      .field.full {
         grid-column: 1 / -1;
       }
       label {
@@ -246,10 +279,15 @@
         min-height: 48px;
         border: 1px solid rgba(148, 163, 184, 0.28);
         border-radius: 14px;
-        padding: 11px 13px;
+        padding: 12px 14px;
         font: inherit;
         background: #fff;
         color: var(--ink);
+      }
+      input:focus, select:focus {
+        outline: none;
+        border-color: var(--brand);
+        box-shadow: 0 0 0 4px rgba(15, 81, 50, 0.08);
       }
       .help {
         margin-top: 8px;
@@ -267,293 +305,323 @@
         font-size: 13px;
         font-weight: 600;
       }
-      .banner {
-        padding: 16px 18px;
-        border-radius: 20px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        background: #fff;
+      .submit {
+        margin-top: 4px;
+        width: 100%;
+        min-height: 52px;
+        border: none;
+        border-radius: 16px;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+        color: #fff;
+        font-size: 0.98rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        cursor: pointer;
       }
-      .banner strong {
-        display: block;
-        margin-bottom: 6px;
-        font-size: 1rem;
+      .summary-grid {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
       }
-      .banner.success {
-        border-color: rgba(22, 101, 52, 0.2);
-        background: var(--success-bg);
-        color: var(--success);
-      }
-      .banner.warning {
-        border-color: rgba(154, 103, 0, 0.22);
-        background: var(--warning-bg);
-        color: var(--warning);
-      }
-      .plan-preview-grid {
-        grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-        margin-top: 18px;
-      }
-      .plan-preview {
-        padding: 16px;
+      .summary-card {
+        padding: 14px;
         border-radius: 18px;
         border: 1px solid rgba(148, 163, 184, 0.18);
         background: #fff;
       }
-      .plan-preview strong {
-        display: block;
-        font-size: 1.08rem;
+      .summary-card .kicker {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.06em;
+        text-transform: uppercase;
       }
-      .plan-preview span {
+      .summary-card strong {
         display: block;
         margin-top: 8px;
-        color: var(--muted);
-        font-size: 13px;
+        font-size: 1rem;
+        line-height: 1.4;
       }
       .payment-shell {
-        padding: 18px;
-        border-radius: 22px;
+        margin-top: 18px;
+        padding: 16px;
+        border-radius: 20px;
         border: 1px solid rgba(148, 163, 184, 0.18);
         background: linear-gradient(180deg, #fff, #f8fafc);
       }
-      .payment-shell label {
-        margin-bottom: 10px;
-      }
       #paypal-button-container {
-        margin-top: 18px;
+        margin-top: 16px;
       }
       #signup-error,
       #signup-success {
         margin-top: 16px;
       }
-      #signup-success {
-        color: var(--success);
-      }
       #signup-success a {
         font-weight: 700;
       }
-      .locked-copy {
-        margin-top: 16px;
-        padding: 16px;
-        border-radius: 18px;
-        background: rgba(15, 23, 42, 0.04);
-        color: var(--ink-soft);
+      .plans-inline {
+        margin-top: 18px;
+        display: grid;
+        gap: 10px;
       }
-      @media (max-width: 1080px) {
-        .hero-grid,
-        .content-grid {
+      .plan-row {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      .plan-row strong {
+        display: block;
+        font-size: 0.98rem;
+      }
+      .plan-row span {
+        color: var(--muted);
+        font-size: 13px;
+      }
+      .card-footer {
+        margin-top: 18px;
+        display: grid;
+        gap: 10px;
+      }
+      .support-link {
+        color: var(--brand);
+        text-decoration: none;
+        font-weight: 600;
+      }
+      .support-link:hover {
+        text-decoration: underline;
+      }
+      .muted {
+        color: var(--muted);
+        font-size: 14px;
+      }
+      @media (max-width: 980px) {
+        .shell {
           grid-template-columns: 1fr;
         }
       }
-      @media (max-width: 820px) {
-        .wrap {
-          padding: 18px 16px 44px;
-        }
-        .hero,
-        .step-card,
-        .status-card {
-          border-radius: 24px;
-        }
-        .field-grid {
+      @media (max-width: 680px) {
+        .field-grid,
+        .summary-grid {
           grid-template-columns: 1fr;
         }
       }
       @media (max-width: 560px) {
-        .hero {
-          padding: 24px 20px;
+        .page {
+          width: calc(100% - 24px);
+          padding-top: 22px;
+          padding-bottom: 40px;
         }
-        .step-card {
-          padding: 22px 18px;
+        .hero, .signup-card {
+          border-radius: 24px;
         }
-        .step-head {
-          flex-direction: column;
-          align-items: flex-start;
-        }
-        .hero-actions {
-          grid-template-columns: 1fr;
-        }
-        .btn,
-        .btn-secondary,
-        .btn-ghost,
-        .btn-brand {
-          width: 100%;
+        .hero,
+        .signup-head,
+        .signup-body {
+          padding-left: 20px;
+          padding-right: 20px;
         }
       }
     </style>
   </head>
   <body>
     {% include "core/partials/public_nav.html" %}
+    <main class="page">
+      <section class="shell">
+        <article class="hero">
+          <div class="eyebrow">Clinic Onboarding</div>
+          <h1>Set up your clinic and move straight into billing.</h1>
+          <p>The signup flow now follows the same focused pattern as sign in: create the clinic owner account first, then switch the action card into subscription activation once the account is ready.</p>
+          <div class="hero-meta">
+            <span class="pill">Two-step setup</span>
+            <span class="pill">PayPal subscription activation</span>
+          </div>
 
-    <main class="wrap">
-      <section class="hero">
-        <div class="hero-grid">
-          <div>
-            <div class="eyebrow">Clinic Onboarding</div>
-            <h1>Launch your clinic portal in two clear steps.</h1>
-            <p>Create the clinic owner account first, then activate billing through the subscription plan that fits the clinic. The flow stays simple, secure, and ready for the first login.</p>
-            <div class="hero-actions">
-              <a class="btn" href="{% url 'login' %}">Already have an account?</a>
-              <a class="btn-secondary" href="#signup-step-1">Start with account setup</a>
+          <div class="hero-points">
+            <div class="point">
+              <strong>Create the clinic owner account</strong>
+              <p>Add the clinic name, timezone, and owner credentials before any payment step becomes available.</p>
+            </div>
+            <div class="point">
+              <strong>Switch into payment automatically</strong>
+              <p>After account creation, the same card changes into the payment state instead of sending the user to a different-looking layout.</p>
+            </div>
+            <div class="point">
+              <strong>Verify email before first login</strong>
+              <p>The owner still receives a verification email, so the security flow stays consistent with the rest of the product.</p>
             </div>
           </div>
-          <div class="hero-side">
-            <article class="status-card">
-              <div class="eyebrow">Step 1</div>
-              <strong>Create the clinic owner</strong>
-              <p>Add the clinic name, timezone, and owner credentials. Email verification still applies before dashboard access.</p>
-            </article>
-            <article class="status-card">
-              <div class="eyebrow">Step 2</div>
-              <strong>Choose a subscription</strong>
-              <p>Once the clinic record exists, PayPal activation unlocks the live billing connection and gets the account ready for use.</p>
-            </article>
-          </div>
-        </div>
-      </section>
+        </article>
 
-      <section class="content-grid">
-        <article class="step-card" id="signup-step-1">
-          <div class="step-head">
-            <div>
-              <span class="step-pill">Step 1</span>
+        <article class="signup-card">
+          <div class="signup-head">
+            <div class="brand-row{% if public_logo_url %}{% else %} logo-broken{% endif %}">
+              {% if public_logo_url %}
+                <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.brand-row').classList.add('logo-broken')">
+                <span class="brand-mark logo-fallback">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
+              {% else %}
+                <span class="brand-mark">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
+              {% endif %}
+              <strong>{{ public_brand_name|default:"ClinicOps" }}</strong>
+            </div>
+
+            <div class="step-tabs" aria-label="Signup progress">
+              <div class="step-tab {% if clinic %}done{% else %}active{% endif %}">Account</div>
+              <div class="step-tab {% if clinic %}active{% endif %} {% if not clinic %}locked{% endif %}">Payment</div>
+            </div>
+
+            {% if clinic %}
+              <h2>Activate subscription</h2>
+              <p>{{ clinic.name }} is created. Choose the clinic plan and finish PayPal activation from this same panel.</p>
+            {% else %}
               <h2>Create clinic account</h2>
-              <p>Set up the clinic identity and the primary admin credentials. This is the owner account used to verify email and access the portal.</p>
-            </div>
-            <span class="step-state {% if clinic %}ready{% endif %}">{% if clinic %}Completed{% else %}In progress{% endif %}</span>
+              <p>Set up the clinic owner details first. Payment unlocks immediately after the clinic account is created.</p>
+            {% endif %}
           </div>
 
-          {% if clinic %}
-            <div class="banner success">
-              <strong>{{ clinic.name }} is ready for billing setup.</strong>
-              <div>The clinic account has been created and linked to the owner email <strong>{{ clinic.email }}</strong>.</div>
-            </div>
+          <div class="signup-body">
+            {% if not clinic %}
+              {% if form.non_field_errors %}
+                {% for error in form.non_field_errors %}
+                  <div class="flash">{{ error }}</div>
+                {% endfor %}
+              {% endif %}
 
-            <div class="step-meta">
-              <div class="metric">
-                <div class="kicker">Clinic</div>
-                <strong>{{ clinic.name }}</strong>
-              </div>
-              <div class="metric">
-                <div class="kicker">Timezone</div>
-                <strong>{{ clinic.timezone }}</strong>
-              </div>
-            </div>
+              <form method="post">
+                {% csrf_token %}
 
-            {% if verification_sent %}
-              <div class="banner warning" style="margin-top:16px;">
-                <strong>Verification email sent</strong>
-                <div>Please verify the clinic owner email before signing in to the dashboard. <a href="{% url 'resend-verification' %}?email={{ clinic.email }}">Resend verification</a>.</div>
-              </div>
-            {% endif %}
-          {% else %}
-            <form method="post">
-              {% csrf_token %}
-              {{ form.non_field_errors }}
-
-              <div class="field-grid">
-                <div class="field-block full">
+                <div class="field full">
                   <label for="{{ form.clinic_name.id_for_label }}">Clinic name</label>
                   {{ form.clinic_name }}
                   {{ form.clinic_name.errors }}
                 </div>
 
-                <div class="field-block full">
+                <div class="field full">
                   <label for="{{ form.timezone.id_for_label }}">Timezone</label>
                   {{ form.timezone }}
                   {{ form.timezone.errors }}
-                  <div class="help">Use the clinic's operating timezone so schedules, reminders, and billing dates line up correctly.</div>
+                  <div class="help">Use the clinic operating timezone so appointments, reminders, and billing dates stay aligned.</div>
                 </div>
 
-                <div class="field-block">
-                  <label for="{{ form.admin_first_name.id_for_label }}">Owner first name</label>
-                  {{ form.admin_first_name }}
-                  {{ form.admin_first_name.errors }}
+                <div class="field-grid">
+                  <div class="field">
+                    <label for="{{ form.admin_first_name.id_for_label }}">Owner first name</label>
+                    {{ form.admin_first_name }}
+                    {{ form.admin_first_name.errors }}
+                  </div>
+
+                  <div class="field">
+                    <label for="{{ form.admin_last_name.id_for_label }}">Owner last name</label>
+                    {{ form.admin_last_name }}
+                    {{ form.admin_last_name.errors }}
+                  </div>
                 </div>
 
-                <div class="field-block">
-                  <label for="{{ form.admin_last_name.id_for_label }}">Owner last name</label>
-                  {{ form.admin_last_name }}
-                  {{ form.admin_last_name.errors }}
-                </div>
-
-                <div class="field-block full">
+                <div class="field full">
                   <label for="{{ form.admin_email.id_for_label }}">Owner email</label>
                   {{ form.admin_email }}
                   {{ form.admin_email.errors }}
-                  <div class="help">This email becomes the admin login and receives the verification link.</div>
+                  <div class="help">This email becomes the admin login and receives the verification message.</div>
                 </div>
 
-                <div class="field-block">
-                  <label for="{{ form.password.id_for_label }}">Password</label>
-                  {{ form.password }}
-                  {{ form.password.errors }}
+                <div class="field-grid">
+                  <div class="field">
+                    <label for="{{ form.password.id_for_label }}">Password</label>
+                    {{ form.password }}
+                    {{ form.password.errors }}
+                  </div>
+
+                  <div class="field">
+                    <label for="{{ form.confirm_password.id_for_label }}">Confirm password</label>
+                    {{ form.confirm_password }}
+                    {{ form.confirm_password.errors }}
+                  </div>
                 </div>
 
-                <div class="field-block">
-                  <label for="{{ form.confirm_password.id_for_label }}">Confirm password</label>
-                  {{ form.confirm_password }}
-                  {{ form.confirm_password.errors }}
+                <button class="submit" type="submit">Create Clinic Account</button>
+              </form>
+            {% else %}
+              <div class="banner success">
+                <strong>{{ clinic.name }} account created</strong>
+                <div>The clinic owner is set to <strong>{{ clinic.email }}</strong>. Continue with subscription activation below.</div>
+              </div>
+
+              <div class="summary-grid">
+                <div class="summary-card">
+                  <div class="kicker">Clinic</div>
+                  <strong>{{ clinic.name }}</strong>
+                </div>
+                <div class="summary-card">
+                  <div class="kicker">Timezone</div>
+                  <strong>{{ clinic.timezone }}</strong>
                 </div>
               </div>
 
-              <div style="display:flex; gap:12px; flex-wrap:wrap;">
-                <button class="btn-brand" type="submit">Create clinic account</button>
-                <a class="btn-ghost" href="{% url 'login' %}">Back to sign in</a>
-              </div>
-            </form>
-          {% endif %}
-        </article>
+              {% if verification_sent %}
+                <div class="banner warning" style="margin-top:16px;">
+                  <strong>Verification email sent</strong>
+                  <div>Please verify the owner email before signing in. <a href="{% url 'resend-verification' %}?email={{ clinic.email }}">Resend verification</a>.</div>
+                </div>
+              {% endif %}
 
-        <article class="step-card">
-          <div class="step-head">
-            <div>
-              <span class="step-pill">Step 2</span>
-              <h2>Choose plan</h2>
-              <p>Activate the clinic subscription after the account exists. Plans stay visible here so the owner knows what unlocks next.</p>
+              {% if not paypal_client_id %}
+                <div class="banner warning" style="margin-top:16px;">
+                  <strong>PayPal is not configured yet</strong>
+                  <div>Finish the billing setup before clinic subscriptions can be activated.</div>
+                </div>
+              {% elif not plans %}
+                <div class="banner warning" style="margin-top:16px;">
+                  <strong>No plans available</strong>
+                  <div>Add active plans in admin before taking a clinic subscription live.</div>
+                </div>
+              {% else %}
+                <div class="plans-inline">
+                  {% for plan in plans %}
+                    <div class="plan-row">
+                      <div>
+                        <strong>{{ plan.name }}</strong>
+                        <span>{{ plan.interval|title }} subscription</span>
+                      </div>
+                      <strong>{{ plan.currency }} {{ plan.price_dollars|floatformat:2 }}</strong>
+                    </div>
+                  {% endfor %}
+                </div>
+
+                <div class="payment-shell">
+                  <form id="csrf-form">{% csrf_token %}</form>
+
+                  <div class="field" style="padding:0; border:none; background:transparent;">
+                    <label for="plan">Subscription plan</label>
+                    <select id="plan">
+                      {% for plan in plans %}
+                        <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
+                          {{ plan.name }} - {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <div class="help">Select the clinic plan, then continue in PayPal to activate recurring billing.</div>
+                  </div>
+
+                  <div id="paypal-button-container"></div>
+                  <p id="signup-error" class="errorlist" style="display:none;"></p>
+                  <div id="signup-success" class="banner success" style="display:none;"></div>
+                </div>
+              {% endif %}
+            {% endif %}
+
+            <div class="card-footer">
+              <a class="support-link" href="{% url 'login' %}">Back to sign in</a>
+              {% if clinic %}
+                <a class="support-link" href="{% url 'resend-verification' %}?email={{ clinic.email }}">Resend verification email</a>
+              {% endif %}
+              <div class="muted">{% if clinic %}Billing lives in the payment step above. After activation and verification, the clinic owner can sign in.{% else %}Payment stays locked until the clinic owner account is created successfully.{% endif %}</div>
             </div>
-            <span class="step-state {% if clinic and paypal_client_id and plans %}ready{% else %}locked{% endif %}">{% if clinic and paypal_client_id and plans %}Ready{% else %}Locked{% endif %}</span>
           </div>
-
-          {% if plans %}
-            <div class="plan-preview-grid">
-              {% for plan in plans %}
-                <div class="plan-preview">
-                  <strong>{{ plan.name }}</strong>
-                  <span>{{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}</span>
-                </div>
-              {% endfor %}
-            </div>
-          {% endif %}
-
-          {% if not clinic %}
-            <div class="locked-copy">
-              Complete step 1 first. Payment activation will unlock immediately after the clinic account is created.
-            </div>
-          {% elif not paypal_client_id %}
-            <div class="banner warning" style="margin-top:18px;">
-              <strong>PayPal is not configured yet.</strong>
-              <div>Finish the payment provider setup before clinic subscriptions can be activated.</div>
-            </div>
-          {% elif not plans %}
-            <div class="banner warning" style="margin-top:18px;">
-              <strong>No plans available.</strong>
-              <div>Add active plans in admin before taking a clinic subscription live.</div>
-            </div>
-          {% else %}
-            <div class="payment-shell">
-              <form id="csrf-form">{% csrf_token %}</form>
-              <label for="plan">Subscription plan</label>
-              <select id="plan">
-                {% for plan in plans %}
-                  <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
-                    {{ plan.name }} - {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
-                  </option>
-                {% endfor %}
-              </select>
-              <div class="help">PayPal will open the subscription confirmation once the clinic selects a plan.</div>
-              <div id="paypal-button-container"></div>
-              <p id="signup-error" class="errorlist" style="display:none;"></p>
-              <div id="signup-success" class="banner success" style="display:none;"></div>
-            </div>
-          {% endif %}
         </article>
       </section>
     </main>
