@@ -48,11 +48,13 @@ from .models import (
     AppointmentType,
     Clinic,
     ClinicSubscription,
+    Notification,
     PayPalWebhookEvent,
     Patient,
     Plan,
     Staff,
 )
+from .notifications import create_clinic_notifications
 from .paypal import PayPalError, get_subscription, verify_webhook_signature
 from .subscriptions import clinic_has_active_subscription, map_paypal_status, parse_paypal_datetime
 
@@ -95,6 +97,134 @@ def _user_label(user) -> str:
 def _patient_label(patient: Patient) -> str:
     full_name = f'{patient.first_name} {patient.last_name}'.strip()
     return full_name or patient.email or f'Patient {patient.pk}'
+
+
+def _appointment_time_label(appointment: Appointment) -> str:
+    tz = ZoneInfo(appointment.clinic.timezone or 'UTC')
+    local_start = timezone.localtime(appointment.start_at, tz)
+    return local_start.strftime('%b %d, %Y %I:%M %p')
+
+
+def _notification_link(path_name: str, *args) -> str:
+    return reverse(path_name, args=args) if args else reverse(path_name)
+
+
+def _notify_clinic_appointment_created(*, appointment: Appointment, actor=None, event_type=None, title='Appointment added'):
+    service_name = appointment.appointment_type.name if appointment.appointment_type else 'General appointment'
+    create_clinic_notifications(
+        appointment.clinic,
+        actor=actor,
+        event_type=event_type or Notification.EventType.APPOINTMENT_CREATED,
+        level=Notification.Level.SUCCESS,
+        title=title,
+        body=(
+            f'{_patient_label(appointment.patient)} is scheduled with {_user_label(appointment.staff.user)} '
+            f'on {_appointment_time_label(appointment)} for {service_name}.'
+        ),
+        link=_notification_link('staff-appointments'),
+        metadata={
+            'appointment_id': appointment.id,
+            'patient_id': appointment.patient_id,
+            'staff_id': appointment.staff_id,
+        },
+    )
+
+
+def _notify_clinic_appointment_updated(*, appointment: Appointment, actor=None):
+    service_name = appointment.appointment_type.name if appointment.appointment_type else 'General appointment'
+    create_clinic_notifications(
+        appointment.clinic,
+        actor=actor,
+        event_type=Notification.EventType.APPOINTMENT_UPDATED,
+        level=Notification.Level.INFO,
+        title='Appointment updated',
+        body=(
+            f'{_patient_label(appointment.patient)} now has {service_name} with '
+            f'{_user_label(appointment.staff.user)} on {_appointment_time_label(appointment)}.'
+        ),
+        link=_notification_link('staff-appointments'),
+        metadata={'appointment_id': appointment.id},
+    )
+
+
+def _notify_clinic_staff_change(*, clinic: Clinic, member: Staff, actor=None, created=False):
+    create_clinic_notifications(
+        clinic,
+        actor=actor,
+        event_type=Notification.EventType.STAFF_ADDED if created else Notification.EventType.STAFF_UPDATED,
+        level=Notification.Level.SUCCESS if created else Notification.Level.INFO,
+        title='Staff added' if created else 'Staff updated',
+        body=f'{_user_label(member.user)} was {"added to" if created else "updated in"} the clinic staff roster.',
+        link=_notification_link('staff-members'),
+        metadata={'staff_id': member.id, 'user_id': member.user_id},
+    )
+
+
+def _notify_clinic_service_change(*, clinic: Clinic, appointment_type: AppointmentType, actor=None, created=False):
+    create_clinic_notifications(
+        clinic,
+        actor=actor,
+        event_type=Notification.EventType.SERVICE_ADDED if created else Notification.EventType.SERVICE_UPDATED,
+        level=Notification.Level.SUCCESS if created else Notification.Level.INFO,
+        title='Service added' if created else 'Service updated',
+        body=(
+            f'{appointment_type.name} is now configured for {appointment_type.duration_minutes} minutes'
+            + (
+                f' at ${appointment_type.price_cents / 100:.2f}.'
+                if appointment_type.price_cents is not None
+                else '.'
+            )
+        ),
+        link=_notification_link('appointment-types'),
+        metadata={'appointment_type_id': appointment_type.id},
+    )
+
+
+def _notify_clinic_patient_signup(*, clinic: Clinic, patient: Patient):
+    create_clinic_notifications(
+        clinic,
+        event_type=Notification.EventType.PATIENT_SIGNED_UP,
+        level=Notification.Level.SUCCESS,
+        title='New patient signup',
+        body=f'{_patient_label(patient)} created a patient account for {clinic.name}.',
+        link=_notification_link('staff-patients'),
+        metadata={'patient_id': patient.id},
+    )
+
+
+def _subscription_notification_level(status: str) -> str:
+    if status == ClinicSubscription.Status.ACTIVE:
+        return Notification.Level.SUCCESS
+    if status in {ClinicSubscription.Status.SUSPENDED, ClinicSubscription.Status.CANCELLED, ClinicSubscription.Status.EXPIRED}:
+        return Notification.Level.WARNING
+    return Notification.Level.INFO
+
+
+def _notify_clinic_subscription_change(
+    *,
+    clinic: Clinic,
+    subscription: ClinicSubscription,
+    actor=None,
+    title='Subscription updated',
+    created=False,
+):
+    plan_name = subscription.plan.name if subscription.plan_id else 'Clinic plan'
+    status_label = subscription.get_status_display().lower()
+    create_clinic_notifications(
+        clinic,
+        actor=actor,
+        admins_only=True,
+        event_type=(
+            Notification.EventType.SUBSCRIPTION_ACTIVATED
+            if created or subscription.status == ClinicSubscription.Status.ACTIVE
+            else Notification.EventType.SUBSCRIPTION_UPDATED
+        ),
+        level=_subscription_notification_level(subscription.status),
+        title=title,
+        body=f'{plan_name} is currently {status_label} for {clinic.name}.',
+        link=_notification_link('billing'),
+        metadata={'subscription_id': subscription.id, 'status': subscription.status},
+    )
 
 
 def _apply_subscription_state(
@@ -1002,6 +1132,12 @@ def _clinic_booking(request, clinic: Clinic):
                                 [patient.email],
                                 fail_silently=True,
                             )
+                        _notify_clinic_appointment_created(
+                            appointment=appointment,
+                            actor=request.user if request.user.is_authenticated else None,
+                            event_type=Notification.EventType.ONLINE_BOOKING_CREATED,
+                            title='Online booking received',
+                        )
                         messages.success(request, 'Your appointment is booked.')
                         return render(
                             request,
@@ -1275,7 +1411,7 @@ def _patient_signup(request, clinic: Clinic):
                 if Patient.objects.filter(user=user, clinic=clinic).exists():
                     form.add_error('email', 'You already have an account for this clinic. Please sign in.')
                 else:
-                    Patient.objects.create(
+                    patient = Patient.objects.create(
                         user=user,
                         clinic=clinic,
                         first_name=form.cleaned_data['first_name'],
@@ -1287,6 +1423,7 @@ def _patient_signup(request, clinic: Clinic):
                     if not user.is_active:
                         _send_verification_email(request, user, clinic=clinic)
                         verification_sent = True
+                    _notify_clinic_patient_signup(clinic=clinic, patient=patient)
                     return render(
                         request,
                         'core/patient_signup_success.html',
@@ -1308,7 +1445,7 @@ def _patient_signup(request, clinic: Clinic):
                 patient_group = Group.objects.filter(name='Patient').first()
                 if patient_group:
                     user.groups.add(patient_group)
-                Patient.objects.create(
+                patient = Patient.objects.create(
                     user=user,
                     clinic=clinic,
                     first_name=form.cleaned_data['first_name'],
@@ -1318,6 +1455,7 @@ def _patient_signup(request, clinic: Clinic):
                     dob=form.cleaned_data.get('dob'),
                 )
                 _send_verification_email(request, user, clinic=clinic)
+                _notify_clinic_patient_signup(clinic=clinic, patient=patient)
                 return render(
                     request,
                     'core/patient_signup_success.html',
@@ -1415,6 +1553,60 @@ def patient_portal(request):
 
 
 @login_required
+def notifications_view(request):
+    notifications = list(
+        Notification.objects.filter(recipient=request.user)
+        .select_related('clinic', 'actor')
+        .order_by('-created_at')
+    )
+    default_tz = timezone.get_current_timezone()
+    notification_rows = [
+        {
+            'item': notification,
+            'created_at_local': timezone.localtime(
+                notification.created_at,
+                ZoneInfo(notification.clinic.timezone or 'UTC') if notification.clinic else default_tz,
+            ),
+        }
+        for notification in notifications
+    ]
+    unread_rows = [row for row in notification_rows if not row['item'].is_read]
+    read_rows = [row for row in notification_rows if row['item'].is_read]
+
+    return render(
+        request,
+        'core/notifications.html',
+        {
+            'notification_rows': notification_rows,
+            'unread_rows': unread_rows,
+            'read_rows': read_rows,
+            'total_notifications': len(notification_rows),
+            'unread_total': len(unread_rows),
+            'read_total': len(read_rows),
+        },
+    )
+
+
+@login_required
+@require_POST
+def notification_mark_read(request, notification_id: int):
+    notification = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
+    notification.mark_read()
+    return redirect(request.POST.get('next') or 'notifications')
+
+
+@login_required
+@require_POST
+def notifications_mark_all_read(request):
+    unread_qs = Notification.objects.filter(recipient=request.user, is_read=False)
+    unread_count = unread_qs.count()
+    if unread_count:
+        unread_qs.update(is_read=True, read_at=timezone.now())
+        messages.success(request, f'{unread_count} notification{"s" if unread_count != 1 else ""} marked as read.')
+    return redirect(request.POST.get('next') or 'notifications')
+
+
+@login_required
 def staff_appointments(request):
     staff, error = _require_staff_portal(request)
     if error:
@@ -1433,6 +1625,7 @@ def staff_appointments(request):
         if walkin_form.is_valid():
             appointment = _save_walk_in_appointment(walkin_form, clinic, tz)
             if appointment:
+                _notify_clinic_appointment_created(appointment=appointment, actor=request.user)
                 messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
                 return redirect(request.get_full_path())
         open_create_modal = True
@@ -1590,6 +1783,8 @@ def staff_appointment_edit(request, appointment_id: int):
                         'is_frontdesk': _is_frontdesk(request.user) and not _is_admin(request.user),
                     },
                 )
+            if changes:
+                _notify_clinic_appointment_updated(appointment=updated, actor=request.user)
             messages.success(request, 'Appointment updated.')
             return redirect('staff-appointments')
     else:
@@ -1640,6 +1835,7 @@ def staff_appointment_create(request):
         if form.is_valid():
             appointment = _save_walk_in_appointment(form, clinic, tz)
             if appointment:
+                _notify_clinic_appointment_created(appointment=appointment, actor=request.user)
                 messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
                 return redirect('staff-appointments')
     else:
@@ -1826,6 +2022,12 @@ def staff_members(request):
         if add_form.is_valid():
             member = _save_staff_member_form(request, clinic, add_form)
             if member:
+                _notify_clinic_staff_change(
+                    clinic=clinic,
+                    member=member,
+                    actor=request.user,
+                    created=True,
+                )
                 messages.success(request, f'Staff added: {_user_label(member.user)}.')
                 return redirect('staff-members')
         open_modal = True
@@ -2005,6 +2207,12 @@ def appointment_types(request):
                 price_cents=price_cents if price_cents is not None else None,
                 is_active=bool(add_form.cleaned_data.get('is_active')),
             )
+            _notify_clinic_service_change(
+                clinic=clinic,
+                appointment_type=appointment_type,
+                actor=request.user,
+                created=True,
+            )
             messages.success(request, f'Service added: {appointment_type.name}.')
             return redirect('appointment-types')
         open_modal = True
@@ -2044,6 +2252,12 @@ def appointment_type_create(request):
                 price_cents=price_cents if price_cents is not None else None,
                 is_active=bool(form.cleaned_data.get('is_active')),
             )
+            _notify_clinic_service_change(
+                clinic=clinic,
+                appointment_type=appointment_type,
+                actor=request.user,
+                created=True,
+            )
             messages.success(request, f'Service added: {appointment_type.name}.')
             return redirect('appointment-types')
     else:
@@ -2081,6 +2295,12 @@ def appointment_type_edit(request, type_id: int):
             appt_type.price_cents = price_cents if price_cents is not None else None
             appt_type.is_active = bool(form.cleaned_data.get('is_active'))
             appt_type.save(update_fields=['name', 'duration_minutes', 'price_cents', 'is_active'])
+            _notify_clinic_service_change(
+                clinic=clinic,
+                appointment_type=appt_type,
+                actor=request.user,
+                created=False,
+            )
             messages.success(request, f'Service updated: {appt_type.name}.')
             return redirect('appointment-types')
         return render(
@@ -2125,6 +2345,12 @@ def staff_member_create(request):
         if form.is_valid():
             member = _save_staff_member_form(request, clinic, form)
             if member:
+                _notify_clinic_staff_change(
+                    clinic=clinic,
+                    member=member,
+                    actor=request.user,
+                    created=True,
+                )
                 messages.success(request, f'Staff added: {_user_label(member.user)}.')
                 return redirect('staff-members')
     else:
@@ -2159,6 +2385,12 @@ def staff_member_edit(request, staff_id: int):
         if form.is_valid():
             saved_member = _save_staff_member_form(request, clinic, form, member=member)
             if saved_member:
+                _notify_clinic_staff_change(
+                    clinic=clinic,
+                    member=saved_member,
+                    actor=request.user,
+                    created=False,
+                )
                 messages.success(request, f'Staff updated: {_user_label(saved_member.user)}.')
                 return redirect('staff-members')
         if from_modal:
@@ -2386,6 +2618,10 @@ def billing_activate(request):
 
     plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
     clinic = staff.clinic
+    existing_subscription = ClinicSubscription.objects.filter(
+        paypal_subscription_id=subscription_id,
+    ).first()
+    previous_status = existing_subscription.status if existing_subscription else None
 
     subscription = _upsert_pending_subscription(
         clinic=clinic,
@@ -2397,6 +2633,20 @@ def billing_activate(request):
         _sync_subscription_from_paypal(subscription, last_event_type='CLIENT_SYNCED')
     except PayPalError:
         logger.warning('PayPal subscription sync failed during billing activation for %s', subscription_id)
+
+    if existing_subscription is None or previous_status != subscription.status:
+        notification_title = (
+            'Subscription activated'
+            if subscription.status == ClinicSubscription.Status.ACTIVE
+            else 'Subscription activation recorded'
+        )
+        _notify_clinic_subscription_change(
+            clinic=clinic,
+            subscription=subscription,
+            actor=request.user,
+            title=notification_title,
+            created=subscription.status == ClinicSubscription.Status.ACTIVE,
+        )
 
     return JsonResponse({'ok': True, 'subscription_id': subscription.paypal_subscription_id})
 
@@ -2418,10 +2668,20 @@ def billing_sync(request):
     if not subscription:
         return JsonResponse({'ok': False, 'error': 'No subscription found.'}, status=400)
 
+    previous_status = subscription.status
     try:
         _sync_subscription_from_paypal(subscription, last_event_type='MANUAL_SYNC')
     except PayPalError as exc:
         return JsonResponse({'ok': False, 'error': str(exc)}, status=400)
+
+    if previous_status != subscription.status:
+        _notify_clinic_subscription_change(
+            clinic=clinic,
+            subscription=subscription,
+            actor=request.user,
+            title='Subscription synced',
+            created=subscription.status == ClinicSubscription.Status.ACTIVE,
+        )
 
     return JsonResponse({'ok': True, 'status': subscription.status})
 
@@ -2501,12 +2761,15 @@ def paypal_webhook(request):
 
     try:
         with transaction.atomic():
+            subscription_was_created = False
+            previous_status = None
             subscription = (
                 ClinicSubscription.objects.select_for_update()
                 .filter(paypal_subscription_id=subscription_id)
                 .first()
             )
             if not subscription:
+                subscription_was_created = True
                 clinic = None
                 clinic_id = _clinic_id_from_custom_id(resource.get('custom_id'))
                 if clinic_id:
@@ -2531,6 +2794,7 @@ def paypal_webhook(request):
                     last_event_type=event_type,
                 )
             else:
+                previous_status = subscription.status
                 _apply_subscription_state(
                     subscription,
                     plan=plan if plan else _UNSET,
@@ -2546,6 +2810,23 @@ def paypal_webhook(request):
                 summary=f'Processed {event_type} for {subscription_id}.',
                 subscription=subscription,
             )
+            should_notify = subscription_was_created or previous_status != subscription.status
+            notification_title = (
+                'Subscription activated'
+                if subscription.status == ClinicSubscription.Status.ACTIVE
+                else 'Subscription status changed'
+            )
+            if should_notify:
+                transaction.on_commit(
+                    lambda clinic=subscription.clinic,
+                    subscription=subscription,
+                    title=notification_title: _notify_clinic_subscription_change(
+                        clinic=clinic,
+                        subscription=subscription,
+                        title=title,
+                        created=subscription.status == ClinicSubscription.Status.ACTIVE,
+                    )
+                )
     except Exception as exc:
         logger.exception('Failed to process PayPal webhook %s', event_type)
         _finalize_paypal_event(

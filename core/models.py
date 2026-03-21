@@ -1,4 +1,5 @@
 import secured_fields
+from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
 from django.contrib.auth import get_user_model
@@ -236,6 +237,81 @@ class ClinicSubscription(models.Model):
 
     def __str__(self) -> str:
         return f'{self.clinic.name} - {self.plan.name} ({self.status})'
+
+
+class Notification(models.Model):
+    class Level(models.TextChoices):
+        INFO = 'info', 'Info'
+        SUCCESS = 'success', 'Success'
+        WARNING = 'warning', 'Warning'
+        ERROR = 'error', 'Error'
+
+    class EventType(models.TextChoices):
+        GENERIC = 'generic', 'Generic'
+        ONLINE_BOOKING_CREATED = 'online_booking_created', 'Online Booking Created'
+        APPOINTMENT_CREATED = 'appointment_created', 'Appointment Created'
+        APPOINTMENT_UPDATED = 'appointment_updated', 'Appointment Updated'
+        STAFF_ADDED = 'staff_added', 'Staff Added'
+        STAFF_UPDATED = 'staff_updated', 'Staff Updated'
+        SERVICE_ADDED = 'service_added', 'Service Added'
+        SERVICE_UPDATED = 'service_updated', 'Service Updated'
+        PATIENT_SIGNED_UP = 'patient_signed_up', 'Patient Signed Up'
+        SUBSCRIPTION_ACTIVATED = 'subscription_activated', 'Subscription Activated'
+        SUBSCRIPTION_UPDATED = 'subscription_updated', 'Subscription Updated'
+
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+        blank=True,
+        null=True,
+    )
+    recipient = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='notifications',
+    )
+    actor = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='triggered_notifications',
+        blank=True,
+        null=True,
+    )
+    event_type = models.CharField(
+        max_length=64,
+        choices=EventType.choices,
+        default=EventType.GENERIC,
+    )
+    level = models.CharField(
+        max_length=16,
+        choices=Level.choices,
+        default=Level.INFO,
+    )
+    title = models.CharField(max_length=140)
+    body = models.TextField(blank=True)
+    link = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    is_read = models.BooleanField(default=False)
+    read_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['recipient', 'is_read', '-created_at']),
+            models.Index(fields=['clinic', '-created_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.title} -> {self.recipient}'
+
+    def mark_read(self, *, when=None):
+        if self.is_read:
+            return
+        self.is_read = True
+        self.read_at = when or timezone.now()
+        self.save(update_fields=['is_read', 'read_at'])
 
 
 class PayPalWebhookEvent(models.Model):

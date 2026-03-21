@@ -13,7 +13,17 @@ from django.urls import reverse
 
 from .admin import AppointmentAdmin
 from .booking import build_available_slots
-from .models import Appointment, AppointmentType, Clinic, ClinicSubscription, PayPalWebhookEvent, Patient, Plan, Staff
+from .models import (
+    Appointment,
+    AppointmentType,
+    Clinic,
+    ClinicSubscription,
+    Notification,
+    PayPalWebhookEvent,
+    Patient,
+    Plan,
+    Staff,
+)
 from .tasks import send_upcoming_appointment_reminders
 
 User = get_user_model()
@@ -201,6 +211,11 @@ class BookingViewTests(TestCase):
         appointment = Appointment.objects.first()
         self.assertEqual(appointment.appointment_type_id, appointment_type.id)
         self.assertIsNotNone(appointment.confirmation_code)
+        self.assertEqual(Notification.objects.count(), 1)
+        notification = Notification.objects.get()
+        self.assertEqual(notification.recipient_id, user.id)
+        self.assertEqual(notification.event_type, Notification.EventType.ONLINE_BOOKING_CREATED)
+        self.assertEqual(notification.link, reverse('staff-appointments'))
 
     def test_booking_slug_route(self):
         clinic = Clinic.objects.create(name='Slug Clinic', timezone='UTC')
@@ -294,6 +309,76 @@ class BillingActivateTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(ClinicSubscription.objects.filter(paypal_subscription_id='I-PRO123').exists())
+        self.assertEqual(Notification.objects.filter(recipient=user).count(), 1)
+        notification = Notification.objects.get(recipient=user)
+        self.assertEqual(notification.link, reverse('billing'))
+        self.assertIn(notification.title, {'Subscription activation recorded', 'Subscription activated'})
+
+
+class NotificationCenterTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Notify Clinic', timezone='UTC')
+        self.user = User.objects.create_user(username='notifyadmin', password='password')
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.user.groups.add(admin_group)
+        self.staff = Staff.objects.create(user=self.user, clinic=self.clinic)
+        self.client.force_login(self.user)
+
+    def test_notifications_page_and_mark_read_actions(self):
+        unread_one = Notification.objects.create(
+            clinic=self.clinic,
+            recipient=self.user,
+            event_type=Notification.EventType.STAFF_ADDED,
+            level=Notification.Level.SUCCESS,
+            title='Staff added',
+            body='A new staff member joined the clinic.',
+            link=reverse('staff-members'),
+        )
+        unread_two = Notification.objects.create(
+            clinic=self.clinic,
+            recipient=self.user,
+            event_type=Notification.EventType.SERVICE_UPDATED,
+            level=Notification.Level.INFO,
+            title='Service updated',
+            body='General checkup duration changed.',
+            link=reverse('appointment-types'),
+        )
+        read_notification = Notification.objects.create(
+            clinic=self.clinic,
+            recipient=self.user,
+            event_type=Notification.EventType.GENERIC,
+            level=Notification.Level.INFO,
+            title='Older message',
+            body='This one is already read.',
+            is_read=True,
+            read_at=timezone.now(),
+        )
+
+        response = self.client.get(reverse('notifications'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, unread_one.title)
+        self.assertContains(response, unread_two.title)
+        self.assertContains(response, read_notification.title)
+        self.assertEqual(response.context['unread_total'], 2)
+        self.assertEqual(response.context['total_notifications'], 3)
+
+        mark_one = self.client.post(
+            reverse('notification-mark-read', args=[unread_one.id]),
+            data={'next': reverse('notifications')},
+        )
+        self.assertEqual(mark_one.status_code, 302)
+        unread_one.refresh_from_db()
+        self.assertTrue(unread_one.is_read)
+
+        mark_all = self.client.post(
+            reverse('notifications-mark-all-read'),
+            data={'next': reverse('notifications')},
+        )
+        self.assertEqual(mark_all.status_code, 302)
+        unread_two.refresh_from_db()
+        self.assertTrue(unread_two.is_read)
+        self.assertEqual(Notification.objects.filter(recipient=self.user, is_read=False).count(), 0)
 
 
 class PayPalWebhookTests(TestCase):
@@ -305,6 +390,10 @@ class PayPalWebhookTests(TestCase):
             interval=Plan.Interval.MONTH,
             price_cents=2500,
         )
+        self.admin_user = User.objects.create_user(username='webhookadmin', password='password')
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.admin_user.groups.add(admin_group)
+        self.admin_staff = Staff.objects.create(user=self.admin_user, clinic=self.clinic)
 
     @patch('core.views.verify_webhook_signature', return_value=True)
     def test_webhook_is_idempotent(self, verify_mock):
@@ -328,16 +417,17 @@ class PayPalWebhookTests(TestCase):
             },
         }
 
-        first = self.client.post(
-            reverse('paypal-webhook'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
-        second = self.client.post(
-            reverse('paypal-webhook'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            first = self.client.post(
+                reverse('paypal-webhook'),
+                data=json.dumps(payload),
+                content_type='application/json',
+            )
+            second = self.client.post(
+                reverse('paypal-webhook'),
+                data=json.dumps(payload),
+                content_type='application/json',
+            )
 
         subscription.refresh_from_db()
         self.assertEqual(first.status_code, 200)
@@ -349,6 +439,10 @@ class PayPalWebhookTests(TestCase):
             PayPalWebhookEvent.objects.get().status,
             PayPalWebhookEvent.ProcessingStatus.PROCESSED,
         )
+        self.assertEqual(Notification.objects.filter(recipient=self.admin_user).count(), 1)
+        notification = Notification.objects.get(recipient=self.admin_user)
+        self.assertEqual(notification.title, 'Subscription activated')
+        self.assertEqual(notification.event_type, Notification.EventType.SUBSCRIPTION_ACTIVATED)
 
     @patch('core.views.verify_webhook_signature', return_value=True)
     def test_webhook_can_create_subscription_from_custom_id(self, verify_mock):
@@ -367,11 +461,12 @@ class PayPalWebhookTests(TestCase):
             },
         }
 
-        response = self.client.post(
-            reverse('paypal-webhook'),
-            data=json.dumps(payload),
-            content_type='application/json',
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            response = self.client.post(
+                reverse('paypal-webhook'),
+                data=json.dumps(payload),
+                content_type='application/json',
+            )
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(verify_mock.called)
@@ -380,6 +475,7 @@ class PayPalWebhookTests(TestCase):
         self.assertEqual(subscription.plan_id, self.plan.id)
         self.assertEqual(subscription.status, ClinicSubscription.Status.ACTIVE)
         self.assertEqual(PayPalWebhookEvent.objects.count(), 1)
+        self.assertEqual(Notification.objects.filter(recipient=self.admin_user).count(), 1)
 
 
 class ClinicSignupTests(TestCase):

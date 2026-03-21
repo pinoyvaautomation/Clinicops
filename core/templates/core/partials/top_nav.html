@@ -136,6 +136,46 @@
     height: 100%;
     object-fit: cover;
   }
+  .notification-btn {
+    position: relative;
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: #ffffff;
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: background 0.16s ease, border-color 0.16s ease, color 0.16s ease;
+  }
+  .notification-btn:hover {
+    background: rgba(15, 23, 42, 0.06);
+    text-decoration: none;
+  }
+  .notification-btn.active {
+    background: rgba(14, 165, 166, 0.12);
+    border-color: rgba(14, 165, 166, 0.2);
+    color: #0f766e;
+  }
+  .notification-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    min-width: 18px;
+    height: 18px;
+    padding: 0 5px;
+    border-radius: 999px;
+    background: #ef4444;
+    color: #fff;
+    font-size: 11px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 6px 14px rgba(239, 68, 68, 0.24);
+  }
   .avatar-menu {
     position: absolute;
     right: 16px;
@@ -347,6 +387,24 @@
     <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
       <span></span>
     </button>
+    {% if nav_is_staff %}
+      <a
+        class="notification-btn{% if request.resolver_match.url_name == 'notifications' %} active{% endif %}"
+        href="{% url 'notifications' %}"
+        aria-label="Notifications"
+        title="Notifications"
+      >
+        <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
+          <path d="M12 4.75a4 4 0 0 0-4 4v2.18c0 .7-.23 1.38-.65 1.93L6 14.5h12l-1.35-1.64a3 3 0 0 1-.65-1.93V8.75a4 4 0 0 0-4-4Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M10 17.5a2 2 0 0 0 4 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+        </svg>
+        {% if nav_notifications_unread_count %}
+          <span class="notification-badge">
+            {% if nav_notifications_unread_count > 99 %}99+{% else %}{{ nav_notifications_unread_count }}{% endif %}
+          </span>
+        {% endif %}
+      </a>
+    {% endif %}
     <div style="position: relative;">
       <button type="button" class="avatar-btn" id="avatar-btn">
         {% if nav_avatar_url %}

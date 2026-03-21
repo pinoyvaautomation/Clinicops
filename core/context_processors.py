@@ -1,6 +1,6 @@
 from django.conf import settings
 
-from .models import Patient, Staff
+from .models import Notification, Patient, Staff
 
 ALLOWED_GROUPS = {'Admin', 'Doctor', 'Nurse', 'FrontDesk'}
 
@@ -23,6 +23,7 @@ def user_roles(request):
     patient_multi = False
     patient_clinic_options = []
     patient_selected_id = None
+    unread_notifications = Notification.objects.filter(recipient=user, is_read=False).count()
 
     try:
         staff = user.staff
@@ -62,4 +63,5 @@ def user_roles(request):
         'nav_patient_multi': patient_multi,
         'nav_patient_clinics': patient_clinic_options,
         'nav_patient_selected_id': patient_selected_id,
+        'nav_notifications_unread_count': unread_notifications,
     }
