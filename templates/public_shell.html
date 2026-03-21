@@ -407,6 +407,25 @@
           grid-template-columns: 1fr;
         }
       }
+      @media (max-width: 820px) {
+        .panel {
+          order: 1;
+        }
+        .hero {
+          order: 2;
+          padding-top: 26px;
+          padding-bottom: 26px;
+        }
+        .hero h1 {
+          font-size: clamp(2rem, 8vw, 3rem);
+        }
+        .hero-copy {
+          font-size: 1rem;
+        }
+        .hero-points {
+          display: none;
+        }
+      }
       @media (max-width: 720px) {
         .field-grid {
           grid-template-columns: 1fr;
