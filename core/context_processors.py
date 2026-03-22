@@ -43,6 +43,7 @@ def user_roles(request):
         default_tz = timezone.get_current_timezone()
         notification_preview = [
             {
+                'id': item.id,
                 'title': item.title,
                 'body': item.body,
                 'link': item.link,

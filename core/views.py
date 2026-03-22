@@ -21,7 +21,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
+from django.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.cache import never_cache
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
@@ -1585,6 +1585,21 @@ def notifications_view(request):
             'read_total': len(read_rows),
         },
     )
+
+
+@login_required
+def notification_open(request, notification_id: int):
+    notification = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
+    notification.mark_read()
+
+    next_url = request.GET.get('next') or notification.link or reverse('notifications')
+    if not url_has_allowed_host_and_scheme(
+        next_url,
+        allowed_hosts={request.get_host()},
+        require_https=request.is_secure(),
+    ):
+        next_url = reverse('notifications')
+    return redirect(next_url)
 
 
 @login_required

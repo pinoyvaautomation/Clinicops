@@ -380,6 +380,26 @@ class NotificationCenterTests(TestCase):
         self.assertTrue(unread_two.is_read)
         self.assertEqual(Notification.objects.filter(recipient=self.user, is_read=False).count(), 0)
 
+    def test_open_notification_marks_it_read_and_redirects(self):
+        notification = Notification.objects.create(
+            clinic=self.clinic,
+            recipient=self.user,
+            event_type=Notification.EventType.APPOINTMENT_CREATED,
+            level=Notification.Level.SUCCESS,
+            title='Appointment added',
+            body='A new appointment was booked.',
+            link=reverse('staff-appointments'),
+        )
+
+        response = self.client.get(
+            f"{reverse('notification-open', args=[notification.id])}?next={reverse('staff-appointments')}"
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('staff-appointments'))
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
+
 
 class PayPalWebhookTests(TestCase):
     def setUp(self):

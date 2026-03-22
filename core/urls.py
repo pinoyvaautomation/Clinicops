@@ -31,6 +31,7 @@ urlpatterns = [
     path('appointments/lookup/', views.appointment_lookup, name='appointment-lookup'),
     path('portal/', views.patient_portal, name='patient-portal'),
     path('notifications/', views.notifications_view, name='notifications'),
+    path('notifications/<int:notification_id>/open/', views.notification_open, name='notification-open'),
     path('notifications/<int:notification_id>/read/', views.notification_mark_read, name='notification-mark-read'),
     path('notifications/read-all/', views.notifications_mark_all_read, name='notifications-mark-all-read'),
     path('billing/', views.billing_view, name='billing'),

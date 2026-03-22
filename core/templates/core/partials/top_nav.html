@@ -577,7 +577,7 @@
             <div class="notification-menu__list">
               {% for item in nav_notification_preview %}
                 {% if item.link %}
-                  <a class="notification-item{% if not item.is_read %} unread{% endif %}" href="{{ item.link }}">
+                  <a class="notification-item{% if not item.is_read %} unread{% endif %}" href="{% url 'notification-open' item.id %}?next={{ item.link|urlencode }}">
                     <div class="notification-item__meta">
                       <strong>{{ item.title }}</strong>
                       <span class="notification-item__time">{{ item.created_at_label }}</span>
@@ -590,7 +590,7 @@
                     {% endif %}
                   </a>
                 {% else %}
-                  <div class="notification-item--static{% if not item.is_read %} unread{% endif %}">
+                  <a class="notification-item{% if not item.is_read %} unread{% endif %}" href="{% url 'notification-open' item.id %}">
                     <div class="notification-item__meta">
                       <strong>{{ item.title }}</strong>
                       <span class="notification-item__time">{{ item.created_at_label }}</span>
@@ -601,7 +601,7 @@
                     {% if not item.is_read %}
                       <span class="notification-item__pill {{ item.level }}">Unread</span>
                     {% endif %}
-                  </div>
+                  </a>
                 {% endif %}
               {% endfor %}
             </div>

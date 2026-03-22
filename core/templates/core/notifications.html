@@ -298,7 +298,9 @@
                     </div>
                     <div class="notification-actions">
                       {% if notification.link %}
-                        <a class="button" href="{{ notification.link }}">Open</a>
+                        <a class="button" href="{% url 'notification-open' notification.id %}?next={{ notification.link|urlencode }}">Open</a>
+                      {% else %}
+                        <a class="button" href="{% url 'notification-open' notification.id %}">Open</a>
                       {% endif %}
                       <form method="post" action="{% url 'notification-mark-read' notification.id %}">
                         {% csrf_token %}
@@ -341,11 +343,13 @@
                     <div class="notification-actor">
                       {% if notification.actor %}Triggered by {{ notification.actor.get_full_name|default:notification.actor.username }}{% elif notification.clinic %}{{ notification.clinic.name }}{% else %}System update{% endif %}
                     </div>
-                    {% if notification.link %}
-                      <div class="notification-actions">
-                        <a class="button" href="{{ notification.link }}">Open</a>
-                      </div>
-                    {% endif %}
+                    <div class="notification-actions">
+                      {% if notification.link %}
+                        <a class="button" href="{% url 'notification-open' notification.id %}?next={{ notification.link|urlencode }}">Open</a>
+                      {% else %}
+                        <a class="button" href="{% url 'notification-open' notification.id %}">Open</a>
+                      {% endif %}
+                    </div>
                   </div>
                 </article>
               {% endwith %}
