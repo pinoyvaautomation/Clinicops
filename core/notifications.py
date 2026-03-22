@@ -5,13 +5,16 @@ from .models import Notification, Staff
 User = get_user_model()
 
 
-def _clinic_staff_recipients(clinic, *, admins_only=False):
+def _clinic_staff_recipients(clinic, *, admins_only=False, role_names=None):
     staff_qs = (
         Staff.objects.filter(clinic=clinic, is_active=True, user__is_active=True)
         .select_related('user')
         .order_by('user__id')
         .distinct()
     )
+    if role_names:
+        scoped_staff = list(staff_qs.filter(user__groups__name__in=role_names).distinct())
+        return [member.user for member in scoped_staff]
     if admins_only:
         admin_staff = list(staff_qs.filter(user__groups__name='Admin'))
         if admin_staff:
@@ -29,10 +32,15 @@ def create_clinic_notifications(
     level=Notification.Level.INFO,
     actor=None,
     admins_only=False,
+    role_names=None,
     recipients=None,
     metadata=None,
 ):
-    recipient_users = recipients or _clinic_staff_recipients(clinic, admins_only=admins_only)
+    recipient_users = recipients or _clinic_staff_recipients(
+        clinic,
+        admins_only=admins_only,
+        role_names=role_names,
+    )
     deduped_users = []
     seen_ids = set()
     for user in recipient_users:

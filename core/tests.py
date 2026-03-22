@@ -25,6 +25,7 @@ from .models import (
     Staff,
 )
 from .tasks import send_upcoming_appointment_reminders
+from .views import _notify_clinic_service_change
 
 User = get_user_model()
 
@@ -215,7 +216,7 @@ class BookingViewTests(TestCase):
         notification = Notification.objects.get()
         self.assertEqual(notification.recipient_id, user.id)
         self.assertEqual(notification.event_type, Notification.EventType.ONLINE_BOOKING_CREATED)
-        self.assertEqual(notification.link, reverse('staff-appointments'))
+        self.assertEqual(notification.link, reverse('staff-appointment-edit', args=[appointment.id]))
 
     def test_booking_slug_route(self):
         clinic = Clinic.objects.create(name='Slug Clinic', timezone='UTC')
@@ -322,6 +323,25 @@ class NotificationCenterTests(TestCase):
         admin_group, _ = Group.objects.get_or_create(name='Admin')
         self.user.groups.add(admin_group)
         self.staff = Staff.objects.create(user=self.user, clinic=self.clinic)
+        self.frontdesk_user = User.objects.create_user(username='notifyfrontdesk', password='password')
+        frontdesk_group, _ = Group.objects.get_or_create(name='FrontDesk')
+        self.frontdesk_user.groups.add(frontdesk_group)
+        self.frontdesk_staff = Staff.objects.create(user=self.frontdesk_user, clinic=self.clinic)
+        self.patient = Patient.objects.create(
+            clinic=self.clinic,
+            first_name='Jamie',
+            last_name='Patient',
+            email='notify-patient@example.com',
+            phone='555-0811',
+        )
+        start = timezone.now() + timedelta(days=1)
+        self.appointment = Appointment.objects.create(
+            clinic=self.clinic,
+            staff=self.staff,
+            patient=self.patient,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+        )
         self.client.force_login(self.user)
 
     def test_notifications_page_and_mark_read_actions(self):
@@ -399,6 +419,49 @@ class NotificationCenterTests(TestCase):
         self.assertEqual(response['Location'], reverse('staff-appointments'))
         notification.refresh_from_db()
         self.assertTrue(notification.is_read)
+
+    def test_frontdesk_notification_open_redirects_to_appointment_detail(self):
+        notification = Notification.objects.create(
+            clinic=self.clinic,
+            recipient=self.frontdesk_user,
+            event_type=Notification.EventType.APPOINTMENT_CREATED,
+            level=Notification.Level.SUCCESS,
+            title='Appointment added',
+            body='A new appointment was booked.',
+            link=reverse('staff-appointments'),
+            metadata={
+                'appointment_id': self.appointment.id,
+                'patient_id': self.patient.id,
+                'staff_id': self.staff.id,
+            },
+        )
+        self.client.force_login(self.frontdesk_user)
+
+        response = self.client.get(
+            f"{reverse('notification-open', args=[notification.id])}?next={reverse('staff-appointments')}"
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('staff-appointment-edit', args=[self.appointment.id]))
+        notification.refresh_from_db()
+        self.assertTrue(notification.is_read)
+
+    def test_service_notifications_are_admin_only(self):
+        appointment_type = AppointmentType.objects.create(
+            clinic=self.clinic,
+            name='General checkup',
+            duration_minutes=30,
+        )
+
+        _notify_clinic_service_change(
+            clinic=self.clinic,
+            appointment_type=appointment_type,
+            actor=self.user,
+            created=False,
+        )
+
+        self.assertEqual(Notification.objects.filter(recipient=self.user).count(), 1)
+        self.assertEqual(Notification.objects.filter(recipient=self.frontdesk_user).count(), 0)
 
 
 class PayPalWebhookTests(TestCase):

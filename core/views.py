@@ -109,11 +109,28 @@ def _notification_link(path_name: str, *args) -> str:
     return reverse(path_name, args=args) if args else reverse(path_name)
 
 
+def _appointment_notification_recipients(appointment: Appointment):
+    recipients = list(
+        User.objects.filter(
+            staff__clinic=appointment.clinic,
+            staff__is_active=True,
+            is_active=True,
+            groups__name__in=['Admin', 'FrontDesk'],
+        )
+        .distinct()
+        .order_by('id')
+    )
+    if appointment.staff_id and appointment.staff.user_id and appointment.staff.user.is_active:
+        recipients.append(appointment.staff.user)
+    return recipients
+
+
 def _notify_clinic_appointment_created(*, appointment: Appointment, actor=None, event_type=None, title='Appointment added'):
     service_name = appointment.appointment_type.name if appointment.appointment_type else 'General appointment'
     create_clinic_notifications(
         appointment.clinic,
         actor=actor,
+        recipients=_appointment_notification_recipients(appointment),
         event_type=event_type or Notification.EventType.APPOINTMENT_CREATED,
         level=Notification.Level.SUCCESS,
         title=title,
@@ -121,7 +138,7 @@ def _notify_clinic_appointment_created(*, appointment: Appointment, actor=None, 
             f'{_patient_label(appointment.patient)} is scheduled with {_user_label(appointment.staff.user)} '
             f'on {_appointment_time_label(appointment)} for {service_name}.'
         ),
-        link=_notification_link('staff-appointments'),
+        link=_notification_link('staff-appointment-edit', appointment.id),
         metadata={
             'appointment_id': appointment.id,
             'patient_id': appointment.patient_id,
@@ -135,6 +152,7 @@ def _notify_clinic_appointment_updated(*, appointment: Appointment, actor=None):
     create_clinic_notifications(
         appointment.clinic,
         actor=actor,
+        recipients=_appointment_notification_recipients(appointment),
         event_type=Notification.EventType.APPOINTMENT_UPDATED,
         level=Notification.Level.INFO,
         title='Appointment updated',
@@ -142,7 +160,7 @@ def _notify_clinic_appointment_updated(*, appointment: Appointment, actor=None):
             f'{_patient_label(appointment.patient)} now has {service_name} with '
             f'{_user_label(appointment.staff.user)} on {_appointment_time_label(appointment)}.'
         ),
-        link=_notification_link('staff-appointments'),
+        link=_notification_link('staff-appointment-edit', appointment.id),
         metadata={'appointment_id': appointment.id},
     )
 
@@ -151,11 +169,12 @@ def _notify_clinic_staff_change(*, clinic: Clinic, member: Staff, actor=None, cr
     create_clinic_notifications(
         clinic,
         actor=actor,
+        admins_only=True,
         event_type=Notification.EventType.STAFF_ADDED if created else Notification.EventType.STAFF_UPDATED,
         level=Notification.Level.SUCCESS if created else Notification.Level.INFO,
         title='Staff added' if created else 'Staff updated',
         body=f'{_user_label(member.user)} was {"added to" if created else "updated in"} the clinic staff roster.',
-        link=_notification_link('staff-members'),
+        link=_notification_link('staff-member-edit', member.id),
         metadata={'staff_id': member.id, 'user_id': member.user_id},
     )
 
@@ -164,6 +183,7 @@ def _notify_clinic_service_change(*, clinic: Clinic, appointment_type: Appointme
     create_clinic_notifications(
         clinic,
         actor=actor,
+        admins_only=True,
         event_type=Notification.EventType.SERVICE_ADDED if created else Notification.EventType.SERVICE_UPDATED,
         level=Notification.Level.SUCCESS if created else Notification.Level.INFO,
         title='Service added' if created else 'Service updated',
@@ -175,7 +195,7 @@ def _notify_clinic_service_change(*, clinic: Clinic, appointment_type: Appointme
                 else '.'
             )
         ),
-        link=_notification_link('appointment-types'),
+        link=_notification_link('appointment-type-edit', appointment_type.id),
         metadata={'appointment_type_id': appointment_type.id},
     )
 
@@ -183,11 +203,12 @@ def _notify_clinic_service_change(*, clinic: Clinic, appointment_type: Appointme
 def _notify_clinic_patient_signup(*, clinic: Clinic, patient: Patient):
     create_clinic_notifications(
         clinic,
+        role_names=['Admin', 'FrontDesk'],
         event_type=Notification.EventType.PATIENT_SIGNED_UP,
         level=Notification.Level.SUCCESS,
         title='New patient signup',
         body=f'{_patient_label(patient)} created a patient account for {clinic.name}.',
-        link=_notification_link('staff-patients'),
+        link=_notification_link('staff-patient-edit', patient.id),
         metadata={'patient_id': patient.id},
     )
 
@@ -225,6 +246,80 @@ def _notify_clinic_subscription_change(
         link=_notification_link('billing'),
         metadata={'subscription_id': subscription.id, 'status': subscription.status},
     )
+
+
+def _resolve_notification_destination(notification: Notification, user):
+    metadata = notification.metadata or {}
+    try:
+        staff_profile = user.staff
+    except Staff.DoesNotExist:
+        staff_profile = None
+
+    appointment_id = metadata.get('appointment_id')
+    if appointment_id and staff_profile:
+        appointment = (
+            Appointment.objects.filter(pk=appointment_id, clinic=staff_profile.clinic)
+            .select_related('staff')
+            .first()
+        )
+        if appointment:
+            if _is_admin(user):
+                return reverse('staff-appointment-edit', args=[appointment.id]), ''
+            if _is_frontdesk(user):
+                if appointment.status == Appointment.Status.COMPLETED:
+                    return reverse('staff-appointment-history', args=[appointment.id]), ''
+                return reverse('staff-appointment-edit', args=[appointment.id]), ''
+            if _is_doctor(user) and appointment.staff_id == staff_profile.id:
+                return reverse('staff-appointment-edit', args=[appointment.id]), ''
+            return reverse('staff-appointments'), ''
+
+    patient_id = metadata.get('patient_id')
+    if patient_id and staff_profile:
+        patient = Patient.objects.filter(pk=patient_id, clinic=staff_profile.clinic).first()
+        if patient:
+            if _is_admin(user) or _is_frontdesk(user):
+                return reverse('staff-patient-edit', args=[patient.id]), ''
+            if _is_doctor(user):
+                has_relationship = Appointment.objects.filter(
+                    clinic=staff_profile.clinic,
+                    staff=staff_profile,
+                    patient=patient,
+                ).exists()
+                if has_relationship:
+                    return reverse('staff-patient-edit', args=[patient.id]), ''
+            return reverse('staff-patients'), ''
+
+    staff_id = metadata.get('staff_id')
+    if staff_id and staff_profile:
+        if _is_admin(user):
+            member = Staff.objects.filter(pk=staff_id, clinic=staff_profile.clinic).first()
+            if member:
+                return reverse('staff-member-edit', args=[member.id]), ''
+        return reverse('notifications'), 'This staff update is only available to clinic admins.'
+
+    appointment_type_id = metadata.get('appointment_type_id')
+    if appointment_type_id and staff_profile:
+        if _is_admin(user):
+            appointment_type = AppointmentType.objects.filter(
+                pk=appointment_type_id,
+                clinic=staff_profile.clinic,
+            ).first()
+            if appointment_type:
+                return reverse('appointment-type-edit', args=[appointment_type.id]), ''
+        return reverse('notifications'), 'This service update is only available to clinic admins.'
+
+    subscription_id = metadata.get('subscription_id')
+    if subscription_id and staff_profile:
+        if _is_admin(user):
+            subscription = ClinicSubscription.objects.filter(
+                pk=subscription_id,
+                clinic=staff_profile.clinic,
+            ).first()
+            if subscription:
+                return reverse('billing'), ''
+        return reverse('notifications'), 'Billing updates are only available to clinic admins.'
+
+    return '', ''
 
 
 def _apply_subscription_state(
@@ -1592,13 +1687,16 @@ def notification_open(request, notification_id: int):
     notification = get_object_or_404(Notification, pk=notification_id, recipient=request.user)
     notification.mark_read()
 
-    next_url = request.GET.get('next') or notification.link or reverse('notifications')
+    resolved_url, info_message = _resolve_notification_destination(notification, request.user)
+    next_url = resolved_url or request.GET.get('next') or notification.link or reverse('notifications')
     if not url_has_allowed_host_and_scheme(
         next_url,
         allowed_hosts={request.get_host()},
         require_https=request.is_secure(),
     ):
         next_url = reverse('notifications')
+    if info_message:
+        messages.info(request, info_message)
     return redirect(next_url)
 
 
