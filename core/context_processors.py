@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .models import Notification, Patient, Staff
+from .plan_limits import clinic_can_use_notifications, clinic_usage_summary
 
 ALLOWED_GROUPS = {'Admin', 'Doctor', 'Nurse', 'FrontDesk'}
 
@@ -28,34 +29,39 @@ def user_roles(request):
     patient_selected_id = None
     unread_notifications = 0
     notification_preview = []
+    notifications_enabled = True
+    plan_usage = None
 
     try:
         staff = user.staff
         clinic = staff.clinic
         if staff.avatar:
             avatar_url = staff.avatar.url
-        latest_notifications = list(
-            Notification.objects.filter(recipient=user)
-            .select_related('clinic')
-            .order_by('-created_at')[:5]
-        )
-        unread_notifications = Notification.objects.filter(recipient=user, is_read=False).count()
-        default_tz = timezone.get_current_timezone()
-        notification_preview = [
-            {
-                'id': item.id,
-                'title': item.title,
-                'body': item.body,
-                'link': item.link,
-                'level': item.level,
-                'is_read': item.is_read,
-                'created_at_label': timezone.localtime(
-                    item.created_at,
-                    ZoneInfo(item.clinic.timezone or 'UTC') if item.clinic else default_tz,
-                ).strftime('%b %d, %I:%M %p'),
-            }
-            for item in latest_notifications
-        ]
+        plan_usage = clinic_usage_summary(clinic)
+        notifications_enabled = clinic_can_use_notifications(clinic, usage=plan_usage)
+        if notifications_enabled:
+            latest_notifications = list(
+                Notification.objects.filter(recipient=user)
+                .select_related('clinic')
+                .order_by('-created_at')[:5]
+            )
+            unread_notifications = Notification.objects.filter(recipient=user, is_read=False).count()
+            default_tz = timezone.get_current_timezone()
+            notification_preview = [
+                {
+                    'id': item.id,
+                    'title': item.title,
+                    'body': item.body,
+                    'link': item.link,
+                    'level': item.level,
+                    'is_read': item.is_read,
+                    'created_at_label': timezone.localtime(
+                        item.created_at,
+                        ZoneInfo(item.clinic.timezone or 'UTC') if item.clinic else default_tz,
+                    ).strftime('%b %d, %I:%M %p'),
+                }
+                for item in latest_notifications
+            ]
     except Staff.DoesNotExist:
         patient_profiles = (
             Patient.objects.filter(user=user)
@@ -89,6 +95,8 @@ def user_roles(request):
         'nav_patient_multi': patient_multi,
         'nav_patient_clinics': patient_clinic_options,
         'nav_patient_selected_id': patient_selected_id,
+        'nav_notifications_enabled': notifications_enabled,
         'nav_notifications_unread_count': unread_notifications,
         'nav_notification_preview': notification_preview,
+        'nav_plan_usage': plan_usage,
     }

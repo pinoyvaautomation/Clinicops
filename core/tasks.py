@@ -6,6 +6,7 @@ from django.core.mail import send_mail
 from django.utils import timezone
 
 from .models import Appointment
+from .plan_limits import clinic_can_send_reminders
 
 
 def send_upcoming_appointment_reminders() -> int:
@@ -26,6 +27,9 @@ def send_upcoming_appointment_reminders() -> int:
 
     sent_count = 0
     for appt in upcoming:
+        # Plan notes: reminder automation is a premium capability.
+        if not clinic_can_send_reminders(appt.clinic):
+            continue
         if not appt.patient.email:
             continue
 

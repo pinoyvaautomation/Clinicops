@@ -24,6 +24,7 @@ from .models import (
     Plan,
     Staff,
 )
+from .notifications import create_clinic_notifications
 from .tasks import send_upcoming_appointment_reminders
 from .views import _notify_clinic_service_change
 
@@ -314,6 +315,194 @@ class BillingActivateTests(TestCase):
         notification = Notification.objects.get(recipient=user)
         self.assertEqual(notification.link, reverse('billing'))
         self.assertIn(notification.title, {'Subscription activation recorded', 'Subscription activated'})
+
+
+class FreemiumPlanTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Freemium Clinic', timezone='UTC')
+        self.admin_user = User.objects.create_user(
+            username='freemium-admin@example.com',
+            email='freemium-admin@example.com',
+            password='password',
+        )
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.admin_user.groups.add(admin_group)
+        self.admin_staff = Staff.objects.create(user=self.admin_user, clinic=self.clinic)
+
+    def _activate_plan(self, plan):
+        return ClinicSubscription.objects.create(
+            clinic=self.clinic,
+            plan=plan,
+            paypal_subscription_id=f'LOCAL-{self.clinic.id}-{plan.id}',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+
+    def test_signup_activate_supports_free_plan_without_paypal(self):
+        free_plan = Plan.objects.create(
+            name='Free Trial',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_reminders=False,
+        )
+        session = self.client.session
+        session['signup_clinic_id'] = self.clinic.id
+        session.save()
+
+        response = self.client.post(
+            reverse('signup-activate'),
+            data=json.dumps({'clinic_id': self.clinic.id, 'plan_id': free_plan.id}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['is_free'])
+        subscription = ClinicSubscription.objects.get(clinic=self.clinic, plan=free_plan)
+        self.assertEqual(subscription.status, ClinicSubscription.Status.ACTIVE)
+        self.assertTrue(subscription.paypal_subscription_id.startswith('LOCAL-'))
+
+    def test_staff_creation_blocks_when_free_limit_is_reached(self):
+        free_plan = Plan.objects.create(
+            name='Free Seats',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=1,
+            service_limit=3,
+            monthly_appointment_limit=50,
+        )
+        self._activate_plan(free_plan)
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(
+            reverse('staff-members'),
+            data={
+                'add-email': 'newstaff@example.com',
+                'add-first_name': 'New',
+                'add-last_name': 'Staff',
+                'add-password': 'password123',
+                'add-role': 'Doctor',
+                'add-is_active': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Free plan limit reached')
+        self.assertEqual(Staff.objects.filter(clinic=self.clinic).count(), 1)
+
+    def test_public_booking_blocks_when_free_monthly_limit_is_reached(self):
+        free_plan = Plan.objects.create(
+            name='Free Visits',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=1,
+        )
+        self._activate_plan(free_plan)
+        appointment_type = AppointmentType.objects.create(
+            clinic=self.clinic,
+            name='Consult',
+            duration_minutes=30,
+        )
+        patient = Patient.objects.create(
+            clinic=self.clinic,
+            first_name='Existing',
+            last_name='Patient',
+            email='existing@example.com',
+            phone='555-0191',
+        )
+        start = timezone.now() + timedelta(days=1)
+        Appointment.objects.create(
+            clinic=self.clinic,
+            appointment_type=appointment_type,
+            staff=self.admin_staff,
+            patient=patient,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+        )
+
+        get_response = self.client.get(reverse('clinic-booking', args=[self.clinic.id]))
+        slot_value = get_response.context['form'].fields['slot'].choices[-1][0]
+        response = self.client.post(
+            reverse('clinic-booking', args=[self.clinic.id]),
+            data={
+                'first_name': 'Jamie',
+                'last_name': 'Patient',
+                'email': 'jamie@example.com',
+                'phone': '555-0999',
+                'appointment_type_id': appointment_type.id,
+                'slot': slot_value,
+                'notes': 'Blocked by free limit',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Free plan limit reached')
+        self.assertEqual(Appointment.objects.filter(clinic=self.clinic).count(), 1)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        REMINDER_WINDOW_MINUTES=60,
+    )
+    def test_reminders_skip_when_plan_disables_them(self):
+        free_plan = Plan.objects.create(
+            name='Free No Reminders',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_reminders=False,
+        )
+        self._activate_plan(free_plan)
+        patient = Patient.objects.create(
+            clinic=self.clinic,
+            first_name='Dana',
+            last_name='Patient',
+            email='dana-free@example.com',
+            phone='555-0133',
+        )
+        start = timezone.now() + timedelta(minutes=30)
+        Appointment.objects.create(
+            clinic=self.clinic,
+            staff=self.admin_staff,
+            patient=patient,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+        )
+
+        sent = send_upcoming_appointment_reminders()
+
+        self.assertEqual(sent, 0)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_notifications_skip_when_plan_disables_them(self):
+        free_plan = Plan.objects.create(
+            name='Free Quiet',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_notifications=False,
+        )
+        self._activate_plan(free_plan)
+
+        create_clinic_notifications(
+            self.clinic,
+            title='Quiet notification',
+            body='Should not persist on this plan.',
+        )
+
+        self.assertEqual(Notification.objects.filter(clinic=self.clinic).count(), 0)
 
 
 class NotificationCenterTests(TestCase):

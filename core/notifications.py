@@ -1,6 +1,7 @@
 from django.contrib.auth import get_user_model
 
 from .models import Notification, Staff
+from .plan_limits import clinic_can_use_notifications
 
 User = get_user_model()
 
@@ -36,6 +37,10 @@ def create_clinic_notifications(
     recipients=None,
     metadata=None,
 ):
+    # Plan notes: persistent notifications are controlled by the plan feature gate.
+    if clinic and not clinic_can_use_notifications(clinic):
+        return []
+
     recipient_users = recipients or _clinic_staff_recipients(
         clinic,
         admins_only=admins_only,

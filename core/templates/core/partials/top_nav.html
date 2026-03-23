@@ -543,7 +543,7 @@
     <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
       <span></span>
     </button>
-    {% if nav_is_staff %}
+    {% if nav_is_staff and nav_notifications_enabled %}
       <div class="nav-popover">
         <button
           type="button"

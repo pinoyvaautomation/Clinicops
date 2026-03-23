@@ -358,6 +358,9 @@
               <span class="pill">Local time {{ current_local_time|date:"g:i A" }}</span>
               <span class="pill">{{ clinic.timezone }}</span>
               <span class="pill">{{ start_date|date:"M j" }} to {{ end_date|date:"M j, Y" }}</span>
+              {% if plan_usage.has_plan %}
+                <span class="pill">{{ plan_usage.plan_name }}</span>
+              {% endif %}
             </div>
             <div class="hero-actions">
               <a class="btn" href="{% url 'calendar' %}?start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}{% if selected_staff_id %}&staff={{ selected_staff_id }}{% endif %}{% if selected_status %}&status={{ selected_status }}{% endif %}">Open calendar</a>
@@ -602,7 +605,20 @@
             <div class="card-grid" style="margin-top:16px;">
               <div class="meta">Plan: {{ current_subscription.plan.name }}</div>
               <div class="meta">Status: {{ current_subscription.status|title }}</div>
-              <div class="meta">Next billing: {% if current_subscription.current_period_end %}{{ current_subscription.current_period_end|date:"M j, Y" }}{% else %}Pending sync{% endif %}</div>
+              <div class="meta">
+                {% if current_subscription.plan.is_free %}
+                  Free plan active locally inside ClinicOps.
+                {% else %}
+                  Next billing: {% if current_subscription.current_period_end %}{{ current_subscription.current_period_end|date:"M j, Y" }}{% else %}Pending sync{% endif %}
+                {% endif %}
+              </div>
+              <div class="meta">
+                {% if plan_usage.is_free %}
+                  {{ plan_usage.staff.remaining_label }} · {{ plan_usage.services.remaining_label }} · {{ plan_usage.appointments.remaining_label }}
+                {% else %}
+                  Unlimited staff, services, and appointments on the current plan.
+                {% endif %}
+              </div>
             </div>
           {% else %}
             <div class="empty">

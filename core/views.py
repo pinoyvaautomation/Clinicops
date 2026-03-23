@@ -55,6 +55,15 @@ from .models import (
     Staff,
 )
 from .notifications import create_clinic_notifications
+from .plan_limits import (
+    clinic_can_accept_appointment,
+    clinic_can_add_service,
+    clinic_can_add_staff,
+    clinic_can_send_reminders,
+    clinic_can_use_notifications,
+    clinic_usage_summary,
+    get_current_subscription,
+)
 from .paypal import PayPalError, get_subscription, verify_webhook_signature
 from .subscriptions import clinic_has_active_subscription, map_paypal_status, parse_paypal_datetime
 
@@ -391,6 +400,77 @@ def _upsert_pending_subscription(
         },
     )
     return subscription
+
+
+def _local_subscription_id(*, clinic: Clinic, plan: Plan) -> str:
+    """Plan notes: Free plans use a local synthetic ID so they can bypass PayPal safely."""
+    return f'LOCAL-{clinic.id}-{plan.id}'
+
+
+def _activate_local_subscription(*, clinic: Clinic, plan: Plan, last_event_type: str):
+    """Plan notes: centralize local Free activation so signup and billing use the same path."""
+    local_subscription_id = _local_subscription_id(clinic=clinic, plan=plan)
+    subscription, _ = ClinicSubscription.objects.update_or_create(
+        paypal_subscription_id=local_subscription_id,
+        defaults={
+            'clinic': clinic,
+            'plan': plan,
+            'status': ClinicSubscription.Status.ACTIVE,
+            'started_at': timezone.now(),
+            'current_period_end': None,
+            'cancel_at_period_end': False,
+            'last_event_type': last_event_type,
+        },
+    )
+    ClinicSubscription.objects.filter(
+        clinic=clinic,
+        paypal_subscription_id__startswith='LOCAL-',
+        status=ClinicSubscription.Status.ACTIVE,
+    ).exclude(pk=subscription.pk).update(
+        status=ClinicSubscription.Status.CANCELLED,
+        last_event_type='LOCAL_REPLACED',
+    )
+    return subscription
+
+
+def _activate_selected_plan(
+    *,
+    clinic: Clinic,
+    plan: Plan,
+    subscription_id: str | None,
+    last_event_type: str,
+    sync_event_type: str,
+):
+    """Plan notes: Free plans activate locally, while paid plans stay on the existing PayPal flow."""
+    if plan.is_free:
+        return _activate_local_subscription(
+            clinic=clinic,
+            plan=plan,
+            last_event_type=last_event_type,
+        )
+
+    subscription = _upsert_pending_subscription(
+        clinic=clinic,
+        plan=plan,
+        subscription_id=subscription_id or '',
+        last_event_type=last_event_type,
+    )
+    try:
+        _sync_subscription_from_paypal(subscription, last_event_type=sync_event_type)
+    except PayPalError:
+        logger.warning(
+            'PayPal subscription sync failed during client activation for %s',
+            subscription_id,
+        )
+    return subscription
+
+
+def _limit_reached_message(*, item: dict, resource_label: str, action_label: str) -> str:
+    """Plan notes: keep Free-plan upgrade copy consistent wherever a quota blocks an action."""
+    return (
+        f'Free plan limit reached for {resource_label}: {item["summary_label"]}. '
+        f'Upgrade in billing to continue {action_label}.'
+    )
 
 
 def _sync_subscription_from_paypal(subscription: ClinicSubscription, *, last_event_type: str):
@@ -861,12 +941,7 @@ def calendar_view(request):
             .order_by('start_at')
         )
         summary = _build_schedule_summary(appointments, tz, start_date, end_date)
-        current_subscription = (
-            ClinicSubscription.objects.filter(clinic=clinic)
-            .select_related('plan')
-            .order_by('-created_at')
-            .first()
-        )
+        current_subscription = get_current_subscription(clinic)
         staff_list = list(Staff.objects.filter(clinic=clinic, is_active=True).select_related('user'))
         is_admin = request.user.is_superuser or request.user.groups.filter(name='Admin').exists()
         try:
@@ -1002,12 +1077,8 @@ def dashboard_view(request):
 
         scheduled_count = total_count - completed_count - cancelled_count
 
-        current_subscription = (
-            ClinicSubscription.objects.filter(clinic=clinic)
-            .select_related('plan')
-            .order_by('-created_at')
-            .first()
-        )
+        current_subscription = get_current_subscription(clinic)
+        plan_usage = clinic_usage_summary(clinic)
         staff_list = list(
             Staff.objects.filter(clinic=clinic, is_active=True).select_related('user')
         )
@@ -1093,6 +1164,7 @@ def dashboard_view(request):
             'selected_status': status or '',
             'chart_points': chart_points,
             'current_subscription': current_subscription,
+            'plan_usage': plan_usage,
             'is_admin': is_admin,
         }
         return render(request, 'core/dashboard.html', context)
@@ -1111,6 +1183,7 @@ def clinic_booking_slug(request, clinic_slug: str):
 def _clinic_booking(request, clinic: Clinic):
     if settings.ENFORCE_SUBSCRIPTION and not clinic_has_active_subscription(clinic):
         return render(request, 'core/subscription_required.html', {'clinic': clinic})
+    plan_usage = clinic_usage_summary(clinic)
     clinic_tz = ZoneInfo(clinic.timezone or 'UTC')
     staff_list = (
         Staff.objects.filter(clinic=clinic, is_active=True)
@@ -1149,100 +1222,113 @@ def _clinic_booking(request, clinic: Clinic):
             appointment_type_id=selected_type.id if selected_type else None,
         )
         if form.is_valid():
-            try:
-                staff_id, start_at = parse_slot_value(form.cleaned_data['slot'])
-            except ValueError:
-                form.add_error('slot', 'Selected slot is invalid. Please choose another.')
+            if not clinic_can_accept_appointment(clinic, usage=plan_usage):
+                form.add_error(
+                    None,
+                    _limit_reached_message(
+                        item=plan_usage['appointments'],
+                        resource_label='appointments',
+                        action_label='booking new appointments',
+                    ),
+                )
             else:
-                staff = staff_list.filter(id=staff_id).first()
-                if not staff:
-                    form.add_error('slot', 'Selected staff is not available.')
-                elif appointment_types.exists() and not selected_type:
-                    form.add_error('appointment_type_id', 'Please choose an appointment type.')
+                try:
+                    staff_id, start_at = parse_slot_value(form.cleaned_data['slot'])
+                except ValueError:
+                    form.add_error('slot', 'Selected slot is invalid. Please choose another.')
                 else:
-                    duration = timedelta(minutes=duration_minutes)
-                    end_at = start_at + duration
-                    start_at_local = timezone.localtime(start_at, clinic_tz)
-                    end_at_local = timezone.localtime(end_at, clinic_tz)
-                    email = form.cleaned_data['email'].strip().lower()
-                    patient = None
+                    staff = staff_list.filter(id=staff_id).first()
+                    if not staff:
+                        form.add_error('slot', 'Selected staff is not available.')
+                    elif appointment_types.exists() and not selected_type:
+                        form.add_error('appointment_type_id', 'Please choose an appointment type.')
+                    else:
+                        duration = timedelta(minutes=duration_minutes)
+                        end_at = start_at + duration
+                        start_at_local = timezone.localtime(start_at, clinic_tz)
+                        end_at_local = timezone.localtime(end_at, clinic_tz)
+                        email = form.cleaned_data['email'].strip().lower()
+                        patient = None
+                        patient_created = False
 
-                    if request.user.is_authenticated:
-                        patient = Patient.objects.filter(
-                            user=request.user,
-                            clinic=clinic,
-                        ).first()
-                        if not patient:
+                        if request.user.is_authenticated:
+                            patient = Patient.objects.filter(
+                                user=request.user,
+                                clinic=clinic,
+                            ).first()
+                            if not patient:
+                                patient = Patient.objects.filter(
+                                    clinic=clinic,
+                                    email=email,
+                                ).first()
+                                if patient and patient.user is None:
+                                    patient.user = request.user
+                                    patient.save(update_fields=['user'])
+                        else:
                             patient = Patient.objects.filter(
                                 clinic=clinic,
                                 email=email,
                             ).first()
-                            if patient and patient.user is None:
-                                patient.user = request.user
-                                patient.save(update_fields=['user'])
-                    else:
-                        patient = Patient.objects.filter(
-                            clinic=clinic,
-                            email=email,
-                        ).first()
 
-                    if not patient:
-                        patient = Patient.objects.create(
-                            user=request.user if request.user.is_authenticated else None,
-                            clinic=clinic,
-                            first_name=form.cleaned_data['first_name'],
-                            last_name=form.cleaned_data['last_name'],
-                            email=email,
-                            phone=form.cleaned_data['phone'],
-                            dob=form.cleaned_data.get('dob'),
-                        )
-
-                    appointment = Appointment(
-                        clinic=clinic,
-                        appointment_type=selected_type,
-                        staff=staff,
-                        patient=patient,
-                        start_at=start_at,
-                        end_at=end_at,
-                        notes=form.cleaned_data.get('notes'),
-                    )
-                    try:
-                        appointment.save()
-                    except ValidationError:
-                        patient.delete()
-                        form.add_error('slot', 'That time was just booked. Please choose another slot.')
-                    else:
-                        if getattr(settings, 'SEND_BOOKING_CONFIRMATION', True) and patient.email:
-                            send_mail(
-                                f'Appointment confirmed - {clinic.name}',
-                                (
-                                    f'Hello {patient.first_name},\n\n'
-                                    f'Your appointment at {clinic.name} is confirmed.\n'
-                                    f'Time: {start_at_local:%b %d, %Y %I:%M %p} - {end_at_local:%I:%M %p} ({clinic.timezone})\n'
-                                    f'Staff: {staff}\n'
-                                    f'Confirmation code: {appointment.confirmation_code}\n\n'
-                                    'Thank you.'
-                                ),
-                                settings.DEFAULT_FROM_EMAIL,
-                                [patient.email],
-                                fail_silently=True,
+                        if not patient:
+                            patient = Patient.objects.create(
+                                user=request.user if request.user.is_authenticated else None,
+                                clinic=clinic,
+                                first_name=form.cleaned_data['first_name'],
+                                last_name=form.cleaned_data['last_name'],
+                                email=email,
+                                phone=form.cleaned_data['phone'],
+                                dob=form.cleaned_data.get('dob'),
                             )
-                        _notify_clinic_appointment_created(
-                            appointment=appointment,
-                            actor=request.user if request.user.is_authenticated else None,
-                            event_type=Notification.EventType.ONLINE_BOOKING_CREATED,
-                            title='Online booking received',
+                            patient_created = True
+
+                        appointment = Appointment(
+                            clinic=clinic,
+                            appointment_type=selected_type,
+                            staff=staff,
+                            patient=patient,
+                            start_at=start_at,
+                            end_at=end_at,
+                            notes=form.cleaned_data.get('notes'),
                         )
-                        messages.success(request, 'Your appointment is booked.')
-                        return render(
-                            request,
-                            'core/booking_success.html',
-                            {
-                                'clinic': clinic,
-                                'appointment': appointment,
-                                'appointment_local': start_at_local,
-                            },
-                        )
+                        try:
+                            appointment.save()
+                        except ValidationError:
+                            if patient_created:
+                                patient.delete()
+                            form.add_error('slot', 'That time was just booked. Please choose another slot.')
+                        else:
+                            if getattr(settings, 'SEND_BOOKING_CONFIRMATION', True) and patient.email:
+                                send_mail(
+                                    f'Appointment confirmed - {clinic.name}',
+                                    (
+                                        f'Hello {patient.first_name},\n\n'
+                                        f'Your appointment at {clinic.name} is confirmed.\n'
+                                        f'Time: {start_at_local:%b %d, %Y %I:%M %p} - {end_at_local:%I:%M %p} ({clinic.timezone})\n'
+                                        f'Staff: {staff}\n'
+                                        f'Confirmation code: {appointment.confirmation_code}\n\n'
+                                        'Thank you.'
+                                    ),
+                                    settings.DEFAULT_FROM_EMAIL,
+                                    [patient.email],
+                                    fail_silently=True,
+                                )
+                            _notify_clinic_appointment_created(
+                                appointment=appointment,
+                                actor=request.user if request.user.is_authenticated else None,
+                                event_type=Notification.EventType.ONLINE_BOOKING_CREATED,
+                                title='Online booking received',
+                            )
+                            messages.success(request, 'Your appointment is booked.')
+                            return render(
+                                request,
+                                'core/booking_success.html',
+                                {
+                                    'clinic': clinic,
+                                    'appointment': appointment,
+                                    'appointment_local': start_at_local,
+                                },
+                            )
     else:
         form = BookingForm(
             slot_choices=slot_choices,
@@ -1258,6 +1344,7 @@ def _clinic_booking(request, clinic: Clinic):
             'appointment_types': appointment_types,
             'selected_type': selected_type,
             'form': form,
+            'plan_usage': plan_usage,
             'slot_count': len(slot_choices),
         },
     )
@@ -1418,9 +1505,14 @@ def settings_view(request):
 def clinic_signup(request):
     plans = Plan.objects.filter(is_active=True).order_by('price_cents')
     clinic = None
+    current_subscription = None
+    plan_usage = None
     clinic_id = request.session.get('signup_clinic_id')
     if clinic_id:
         clinic = Clinic.objects.filter(id=clinic_id).first()
+        if clinic:
+            current_subscription = get_current_subscription(clinic)
+            plan_usage = clinic_usage_summary(clinic)
 
     if request.method == 'POST' and not clinic:
         form = ClinicSignupForm(request.POST)
@@ -1460,6 +1552,8 @@ def clinic_signup(request):
                         'form': ClinicSignupForm(),
                         'clinic': clinic,
                         'plans': plans,
+                        'current_subscription': current_subscription,
+                        'plan_usage': plan_usage,
                         'paypal_client_id': settings.PAYPAL_CLIENT_ID,
                         'paypal_sdk_url': settings.PAYPAL_SDK_URL,
                         'verification_sent': True,
@@ -1475,6 +1569,8 @@ def clinic_signup(request):
             'form': form,
             'clinic': clinic,
             'plans': plans,
+            'current_subscription': current_subscription,
+            'plan_usage': plan_usage,
             'paypal_client_id': settings.PAYPAL_CLIENT_ID,
             'paypal_sdk_url': settings.PAYPAL_SDK_URL,
             'verification_sent': bool(clinic),
@@ -1727,6 +1823,7 @@ def staff_appointments(request):
 
     clinic = staff.clinic
     tz = ZoneInfo(clinic.timezone or 'UTC')
+    plan_usage = clinic_usage_summary(clinic)
     can_create = _is_admin(request.user) or _is_frontdesk(request.user)
     open_create_modal = False
     walkin_form = _build_walk_in_form(clinic=clinic, prefix='walkin')
@@ -1736,11 +1833,21 @@ def staff_appointments(request):
             return HttpResponseForbidden('Only Admin or Front Desk can create walk-in appointments.')
         walkin_form = _build_walk_in_form(clinic=clinic, data=request.POST, prefix='walkin')
         if walkin_form.is_valid():
-            appointment = _save_walk_in_appointment(walkin_form, clinic, tz)
-            if appointment:
-                _notify_clinic_appointment_created(appointment=appointment, actor=request.user)
-                messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
-                return redirect(request.get_full_path())
+            if not clinic_can_accept_appointment(clinic, usage=plan_usage):
+                walkin_form.add_error(
+                    None,
+                    _limit_reached_message(
+                        item=plan_usage['appointments'],
+                        resource_label='appointments',
+                        action_label='creating more appointments',
+                    ),
+                )
+            else:
+                appointment = _save_walk_in_appointment(walkin_form, clinic, tz)
+                if appointment:
+                    _notify_clinic_appointment_created(appointment=appointment, actor=request.user)
+                    messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
+                    return redirect(request.get_full_path())
         open_create_modal = True
 
     today = timezone.localdate(timezone.now(), tz)
@@ -1806,6 +1913,7 @@ def staff_appointments(request):
             'can_view_history': _is_admin(request.user) or _is_frontdesk(request.user) or _is_doctor(request.user),
             'walkin_form': walkin_form,
             'open_create_modal': open_create_modal,
+            'plan_usage': plan_usage,
         },
     )
 
@@ -1942,15 +2050,26 @@ def staff_appointment_create(request):
 
     clinic = staff.clinic
     tz = ZoneInfo(clinic.timezone or 'UTC')
+    plan_usage = clinic_usage_summary(clinic)
 
     if request.method == 'POST':
         form = _build_walk_in_form(clinic=clinic, data=request.POST)
         if form.is_valid():
-            appointment = _save_walk_in_appointment(form, clinic, tz)
-            if appointment:
-                _notify_clinic_appointment_created(appointment=appointment, actor=request.user)
-                messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
-                return redirect('staff-appointments')
+            if not clinic_can_accept_appointment(clinic, usage=plan_usage):
+                form.add_error(
+                    None,
+                    _limit_reached_message(
+                        item=plan_usage['appointments'],
+                        resource_label='appointments',
+                        action_label='creating more appointments',
+                    ),
+                )
+            else:
+                appointment = _save_walk_in_appointment(form, clinic, tz)
+                if appointment:
+                    _notify_clinic_appointment_created(appointment=appointment, actor=request.user)
+                    messages.success(request, f'Appointment added: {_patient_label(appointment.patient)}.')
+                    return redirect('staff-appointments')
     else:
         form = _build_walk_in_form(clinic=clinic)
 
@@ -1960,6 +2079,7 @@ def staff_appointment_create(request):
         {
             'clinic': clinic,
             'form': form,
+            'plan_usage': plan_usage,
         },
     )
 
@@ -2124,6 +2244,7 @@ def staff_members(request):
         return error
 
     clinic = staff.clinic
+    plan_usage = clinic_usage_summary(clinic)
     add_form = StaffMemberCreateForm(prefix='add')
     edit_form = StaffMemberUpdateForm(prefix='edit')
     open_modal = False
@@ -2133,16 +2254,26 @@ def staff_members(request):
     if request.method == 'POST':
         add_form = StaffMemberCreateForm(request.POST, prefix='add')
         if add_form.is_valid():
-            member = _save_staff_member_form(request, clinic, add_form)
-            if member:
-                _notify_clinic_staff_change(
-                    clinic=clinic,
-                    member=member,
-                    actor=request.user,
-                    created=True,
+            if not clinic_can_add_staff(clinic, usage=plan_usage):
+                add_form.add_error(
+                    None,
+                    _limit_reached_message(
+                        item=plan_usage['staff'],
+                        resource_label='staff seats',
+                        action_label='adding more staff',
+                    ),
                 )
-                messages.success(request, f'Staff added: {_user_label(member.user)}.')
-                return redirect('staff-members')
+            else:
+                member = _save_staff_member_form(request, clinic, add_form)
+                if member:
+                    _notify_clinic_staff_change(
+                        clinic=clinic,
+                        member=member,
+                        actor=request.user,
+                        created=True,
+                    )
+                    messages.success(request, f'Staff added: {_user_label(member.user)}.')
+                    return redirect('staff-members')
         open_modal = True
 
     return render(
@@ -2155,6 +2286,7 @@ def staff_members(request):
             'open_modal': open_modal,
             'open_edit_modal': open_edit_modal,
             'edit_action_url': edit_action_url,
+            'plan_usage': plan_usage,
             **_build_staff_members_context(clinic),
         },
     )
@@ -2303,6 +2435,7 @@ def appointment_types(request):
         return error
 
     clinic = staff.clinic
+    plan_usage = clinic_usage_summary(clinic)
     add_form = AppointmentTypeForm(prefix='add', clinic=clinic)
     edit_form = AppointmentTypeForm(prefix='edit', clinic=clinic)
     open_modal = False
@@ -2312,22 +2445,32 @@ def appointment_types(request):
     if request.method == 'POST':
         add_form = AppointmentTypeForm(request.POST, prefix='add', clinic=clinic)
         if add_form.is_valid():
-            price_cents = add_form.cleaned_data.get('price_cents')
-            appointment_type = AppointmentType.objects.create(
-                clinic=clinic,
-                name=add_form.cleaned_data['name'],
-                duration_minutes=add_form.cleaned_data['duration_minutes'],
-                price_cents=price_cents if price_cents is not None else None,
-                is_active=bool(add_form.cleaned_data.get('is_active')),
-            )
-            _notify_clinic_service_change(
-                clinic=clinic,
-                appointment_type=appointment_type,
-                actor=request.user,
-                created=True,
-            )
-            messages.success(request, f'Service added: {appointment_type.name}.')
-            return redirect('appointment-types')
+            if not clinic_can_add_service(clinic, usage=plan_usage):
+                add_form.add_error(
+                    None,
+                    _limit_reached_message(
+                        item=plan_usage['services'],
+                        resource_label='services',
+                        action_label='adding more services',
+                    ),
+                )
+            else:
+                price_cents = add_form.cleaned_data.get('price_cents')
+                appointment_type = AppointmentType.objects.create(
+                    clinic=clinic,
+                    name=add_form.cleaned_data['name'],
+                    duration_minutes=add_form.cleaned_data['duration_minutes'],
+                    price_cents=price_cents if price_cents is not None else None,
+                    is_active=bool(add_form.cleaned_data.get('is_active')),
+                )
+                _notify_clinic_service_change(
+                    clinic=clinic,
+                    appointment_type=appointment_type,
+                    actor=request.user,
+                    created=True,
+                )
+                messages.success(request, f'Service added: {appointment_type.name}.')
+                return redirect('appointment-types')
         open_modal = True
     catalog_context = _build_service_catalog_context(clinic)
 
@@ -2341,6 +2484,7 @@ def appointment_types(request):
             'open_modal': open_modal,
             'open_edit_modal': open_edit_modal,
             'edit_action_url': edit_action_url,
+            'plan_usage': plan_usage,
             **catalog_context,
         },
     )
@@ -2354,25 +2498,36 @@ def appointment_type_create(request):
 
     clinic = staff.clinic
     catalog_context = _build_service_catalog_context(clinic)
+    plan_usage = clinic_usage_summary(clinic)
     if request.method == 'POST':
         form = AppointmentTypeForm(request.POST, clinic=clinic)
         if form.is_valid():
-            price_cents = form.cleaned_data.get('price_cents')
-            appointment_type = AppointmentType.objects.create(
-                clinic=clinic,
-                name=form.cleaned_data['name'],
-                duration_minutes=form.cleaned_data['duration_minutes'],
-                price_cents=price_cents if price_cents is not None else None,
-                is_active=bool(form.cleaned_data.get('is_active')),
-            )
-            _notify_clinic_service_change(
-                clinic=clinic,
-                appointment_type=appointment_type,
-                actor=request.user,
-                created=True,
-            )
-            messages.success(request, f'Service added: {appointment_type.name}.')
-            return redirect('appointment-types')
+            if not clinic_can_add_service(clinic, usage=plan_usage):
+                form.add_error(
+                    None,
+                    _limit_reached_message(
+                        item=plan_usage['services'],
+                        resource_label='services',
+                        action_label='adding more services',
+                    ),
+                )
+            else:
+                price_cents = form.cleaned_data.get('price_cents')
+                appointment_type = AppointmentType.objects.create(
+                    clinic=clinic,
+                    name=form.cleaned_data['name'],
+                    duration_minutes=form.cleaned_data['duration_minutes'],
+                    price_cents=price_cents if price_cents is not None else None,
+                    is_active=bool(form.cleaned_data.get('is_active')),
+                )
+                _notify_clinic_service_change(
+                    clinic=clinic,
+                    appointment_type=appointment_type,
+                    actor=request.user,
+                    created=True,
+                )
+                messages.success(request, f'Service added: {appointment_type.name}.')
+                return redirect('appointment-types')
     else:
         form = AppointmentTypeForm(clinic=clinic)
 
@@ -2384,6 +2539,7 @@ def appointment_type_create(request):
             'form': form,
             'title': 'Add service',
             'submit_label': 'Create service',
+            'plan_usage': plan_usage,
             **catalog_context,
         },
     )
@@ -2453,19 +2609,30 @@ def staff_member_create(request):
         return error
 
     clinic = staff.clinic
+    plan_usage = clinic_usage_summary(clinic)
     if request.method == 'POST':
         form = StaffMemberCreateForm(request.POST)
         if form.is_valid():
-            member = _save_staff_member_form(request, clinic, form)
-            if member:
-                _notify_clinic_staff_change(
-                    clinic=clinic,
-                    member=member,
-                    actor=request.user,
-                    created=True,
+            if not clinic_can_add_staff(clinic, usage=plan_usage):
+                form.add_error(
+                    None,
+                    _limit_reached_message(
+                        item=plan_usage['staff'],
+                        resource_label='staff seats',
+                        action_label='adding more staff',
+                    ),
                 )
-                messages.success(request, f'Staff added: {_user_label(member.user)}.')
-                return redirect('staff-members')
+            else:
+                member = _save_staff_member_form(request, clinic, form)
+                if member:
+                    _notify_clinic_staff_change(
+                        clinic=clinic,
+                        member=member,
+                        actor=request.user,
+                        created=True,
+                    )
+                    messages.success(request, f'Staff added: {_user_label(member.user)}.')
+                    return redirect('staff-members')
     else:
         form = StaffMemberCreateForm()
 
@@ -2477,6 +2644,7 @@ def staff_member_create(request):
             'form': form,
             'title': 'Add staff',
             'submit_label': 'Create staff',
+            'plan_usage': plan_usage,
         },
     )
 
@@ -2629,8 +2797,8 @@ def signup_activate(request):
     clinic_id = payload.get('clinic_id')
     plan_id = payload.get('plan_id')
     subscription_id = payload.get('subscription_id')
-    if not clinic_id or not plan_id or not subscription_id:
-        return HttpResponseBadRequest('clinic_id, plan_id and subscription_id are required.')
+    if not clinic_id or not plan_id:
+        return HttpResponseBadRequest('clinic_id and plan_id are required.')
 
     try:
         clinic_id = int(clinic_id)
@@ -2654,18 +2822,26 @@ def signup_activate(request):
             return HttpResponseForbidden('Signup session mismatch.')
 
     plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
-    subscription = _upsert_pending_subscription(
+    if not plan.is_free and not subscription_id:
+        return HttpResponseBadRequest('subscription_id is required for paid plans.')
+
+    subscription = _activate_selected_plan(
         clinic=clinic,
         plan=plan,
         subscription_id=subscription_id,
-        last_event_type='CLIENT_APPROVED',
+        last_event_type='FREE_ACTIVATED' if plan.is_free else 'CLIENT_APPROVED',
+        sync_event_type='CLIENT_SYNCED',
     )
-    try:
-        _sync_subscription_from_paypal(subscription, last_event_type='CLIENT_SYNCED')
-    except PayPalError:
-        logger.warning('PayPal subscription sync failed during signup activation for %s', subscription_id)
 
-    return JsonResponse({'ok': True, 'subscription_id': subscription.paypal_subscription_id})
+    return JsonResponse(
+        {
+            'ok': True,
+            'subscription_id': subscription.paypal_subscription_id,
+            'is_free': plan.is_free,
+            'status': subscription.status,
+            'plan_name': plan.name,
+        }
+    )
 
 
 def _require_admin_staff(request):
@@ -2688,12 +2864,8 @@ def billing_view(request):
 
     clinic = staff.clinic
     plans = Plan.objects.filter(is_active=True).order_by('price_cents')
-    current_subscription = (
-        ClinicSubscription.objects.filter(clinic=clinic)
-        .order_by('-created_at')
-        .select_related('plan')
-        .first()
-    )
+    current_subscription = get_current_subscription(clinic)
+    plan_usage = clinic_usage_summary(clinic)
 
     return render(
         request,
@@ -2702,6 +2874,7 @@ def billing_view(request):
             'clinic': clinic,
             'plans': plans,
             'current_subscription': current_subscription,
+            'plan_usage': plan_usage,
             'paypal_client_id': settings.PAYPAL_CLIENT_ID,
             'paypal_sdk_url': settings.PAYPAL_SDK_URL,
             'current_local_time': timezone.localtime(
@@ -2726,28 +2899,31 @@ def billing_activate(request):
 
     plan_id = payload.get('plan_id')
     subscription_id = payload.get('subscription_id')
-    if not plan_id or not subscription_id:
-        return HttpResponseBadRequest('plan_id and subscription_id are required.')
+    if not plan_id:
+        return HttpResponseBadRequest('plan_id is required.')
 
     plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
     clinic = staff.clinic
-    existing_subscription = ClinicSubscription.objects.filter(
-        paypal_subscription_id=subscription_id,
-    ).first()
-    previous_status = existing_subscription.status if existing_subscription else None
+    previous_subscription = get_current_subscription(clinic)
+    previous_status = previous_subscription.status if previous_subscription else None
+    previous_plan_id = previous_subscription.plan_id if previous_subscription else None
 
-    subscription = _upsert_pending_subscription(
+    if not plan.is_free and not subscription_id:
+        return HttpResponseBadRequest('subscription_id is required for paid plans.')
+
+    subscription = _activate_selected_plan(
         clinic=clinic,
         plan=plan,
         subscription_id=subscription_id,
-        last_event_type='CLIENT_APPROVED',
+        last_event_type='FREE_ACTIVATED' if plan.is_free else 'CLIENT_APPROVED',
+        sync_event_type='CLIENT_SYNCED',
     )
-    try:
-        _sync_subscription_from_paypal(subscription, last_event_type='CLIENT_SYNCED')
-    except PayPalError:
-        logger.warning('PayPal subscription sync failed during billing activation for %s', subscription_id)
 
-    if existing_subscription is None or previous_status != subscription.status:
+    if (
+        previous_subscription is None
+        or previous_status != subscription.status
+        or previous_plan_id != subscription.plan_id
+    ):
         notification_title = (
             'Subscription activated'
             if subscription.status == ClinicSubscription.Status.ACTIVE
@@ -2761,7 +2937,15 @@ def billing_activate(request):
             created=subscription.status == ClinicSubscription.Status.ACTIVE,
         )
 
-    return JsonResponse({'ok': True, 'subscription_id': subscription.paypal_subscription_id})
+    return JsonResponse(
+        {
+            'ok': True,
+            'subscription_id': subscription.paypal_subscription_id,
+            'is_free': plan.is_free,
+            'status': subscription.status,
+            'plan_name': plan.name,
+        }
+    )
 
 
 @login_required
@@ -2772,14 +2956,14 @@ def billing_sync(request):
         return error
 
     clinic = staff.clinic
-    subscription = (
-        ClinicSubscription.objects.filter(clinic=clinic)
-        .select_related('plan')
-        .order_by('-created_at')
-        .first()
-    )
+    subscription = get_current_subscription(clinic)
     if not subscription:
         return JsonResponse({'ok': False, 'error': 'No subscription found.'}, status=400)
+    if subscription.plan.is_free or subscription.paypal_subscription_id.startswith('LOCAL-'):
+        return JsonResponse(
+            {'ok': False, 'error': 'Free plans do not sync with PayPal.'},
+            status=400,
+        )
 
     previous_status = subscription.status
     try:

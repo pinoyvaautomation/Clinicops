@@ -295,7 +295,7 @@
             </div>
             <div class="hero-actions">
               <a class="btn" href="{% url 'dashboard' %}">Back to dashboard</a>
-              {% if current_subscription %}
+              {% if current_subscription and not current_subscription.plan.is_free %}
                 <button id="sync-button" type="button" class="btn-secondary">Sync with PayPal</button>
               {% endif %}
             </div>
@@ -305,7 +305,16 @@
               <div class="kicker">Current status</div>
               {% if current_subscription %}
                 <strong>{{ current_subscription.status|title }}</strong>
-                <p>{{ current_subscription.plan.name }} plan{% if current_subscription.current_period_end %} renews {{ current_subscription.current_period_end|date:"M j, Y" }}{% endif %}.</p>
+                <p>
+                  {{ current_subscription.plan.name }} plan
+                  {% if current_subscription.plan.is_free %}
+                    is managed locally inside ClinicOps.
+                  {% elif current_subscription.current_period_end %}
+                    renews {{ current_subscription.current_period_end|date:"M j, Y" }}.
+                  {% else %}
+                    is waiting for the first PayPal sync.
+                  {% endif %}
+                </p>
               {% else %}
                 <strong>Not active</strong>
                 <p>No subscription is currently attached to this clinic.</p>
@@ -313,8 +322,8 @@
             </div>
             <div class="hero-box">
               <div class="kicker">Checkout route</div>
-              <strong>Direct PayPal</strong>
-              <p>The current MVP billing flow stays inside PayPal for subscription approval and payment method handling.</p>
+              <strong>Free or PayPal</strong>
+              <p>Free activates instantly inside ClinicOps. Premium stays on the existing PayPal subscription flow for recurring billing.</p>
             </div>
           </div>
         </div>
@@ -322,54 +331,67 @@
 
       <section class="stats-grid">
         <article class="stat-card">
-          <div class="label">Available plans</div>
-          <div class="value">{{ plans|length }}</div>
-          <div class="mini">Only active plans are shown to the clinic admin</div>
-        </article>
-        <article class="stat-card">
-          <div class="label">Subscription state</div>
-          <div class="value">{% if current_subscription %}{{ current_subscription.status|title }}{% else %}None{% endif %}</div>
-          <div class="mini">{% if current_subscription %}Plan: {{ current_subscription.plan.name }}{% else %}Choose a plan to begin billing{% endif %}</div>
-        </article>
-        <article class="stat-card">
           <div class="label">Current plan</div>
-          <div class="value">{% if current_subscription %}{{ current_subscription.plan.price_dollars|floatformat:2 }}{% else %}0.00{% endif %}</div>
-          <div class="mini">{% if current_subscription %}{{ current_subscription.plan.currency }} per {{ current_subscription.plan.interval }}{% else %}No active charge yet{% endif %}</div>
+          <div class="value">{% if plan_usage.has_plan %}{{ plan_usage.plan_name }}{% else %}None{% endif %}</div>
+          <div class="mini">{% if plan_usage.has_plan %}{{ plan_usage.plan_price_label }}{% else %}Select a plan to activate clinic access{% endif %}</div>
         </article>
         <article class="stat-card">
-          <div class="label">Next renewal</div>
-          <div class="value">{% if current_subscription and current_subscription.current_period_end %}{{ current_subscription.current_period_end|date:"M j" }}{% else %}Pending{% endif %}</div>
-          <div class="mini">{% if current_subscription and current_subscription.last_event_type %}Last event: {{ current_subscription.last_event_type }}{% else %}Awaiting first billing event{% endif %}</div>
+          <div class="label">Staff seats</div>
+          <div class="value">{% if not plan_usage.has_plan %}--{% elif plan_usage.staff.is_unlimited %}Unlimited{% else %}{{ plan_usage.staff.remaining }}{% endif %}</div>
+          <div class="mini">{% if plan_usage.has_plan %}{{ plan_usage.staff.summary_label }}{% else %}Activate a plan to start tracking seat limits{% endif %}</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Services</div>
+          <div class="value">{% if not plan_usage.has_plan %}--{% elif plan_usage.services.is_unlimited %}Unlimited{% else %}{{ plan_usage.services.remaining }}{% endif %}</div>
+          <div class="mini">{% if plan_usage.has_plan %}{{ plan_usage.services.summary_label }}{% else %}Activate a plan to start tracking service limits{% endif %}</div>
+        </article>
+        <article class="stat-card">
+          <div class="label">Appointments this month</div>
+          <div class="value">{% if not plan_usage.has_plan %}--{% elif plan_usage.appointments.is_unlimited %}Unlimited{% else %}{{ plan_usage.appointments.remaining }}{% endif %}</div>
+          <div class="mini">{% if plan_usage.has_plan %}{{ plan_usage.appointments.summary_label }} for {{ plan_usage.month_window_label }}{% else %}Activate a plan to start tracking monthly volume{% endif %}</div>
         </article>
       </section>
 
       <section class="content-grid">
         <article class="panel">
           <h2>Choose a plan</h2>
-          <p class="note">Pick the clinic plan first, then the PayPal subscription button will render for that selection.</p>
-
-          {% if not paypal_client_id %}
-            <div class="flash error" style="margin-top: 18px;">PayPal client ID is not configured, so checkout cannot load yet.</div>
-          {% endif %}
+          <p class="note">Free activates instantly. Premium keeps the current PayPal subscription checkout.</p>
 
           {% if plans %}
             <div class="field-block" style="margin-top: 18px;">
               <label for="plan">Plan selection</label>
               <select id="plan">
                 {% for plan in plans %}
-                  <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
+                  <option
+                    value="{{ plan.id }}"
+                    data-plan-mode="{% if plan.is_free %}free{% else %}premium{% endif %}"
+                    data-plan-name="{{ plan.name }}"
+                    data-paypal-plan-id="{{ plan.paypal_plan_id|default:'' }}"
+                    {% if current_subscription and current_subscription.plan_id == plan.id %}selected{% endif %}
+                  >
                     {{ plan.name }} | {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
                   </option>
                 {% endfor %}
               </select>
-              <p class="helper" style="margin: 10px 0 0;">The selected plan controls which PayPal subscription plan ID is used during checkout.</p>
+              <p id="plan-mode-note" class="helper" style="margin: 10px 0 0;">The selected plan controls whether this clinic activates locally or through PayPal.</p>
             </div>
 
             <div class="plan-list">
               {% for plan in plans %}
                 <div class="plan-card">
                   <strong>{{ plan.name }}</strong>
-                  <p>{{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} billed every {{ plan.interval }}.</p>
+                  {% if plan.is_free %}
+                    <p>
+                      {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} billed every {{ plan.interval }}.
+                      Includes {{ plan.staff_limit }} staff seats, {{ plan.service_limit }} services, and {{ plan.monthly_appointment_limit }} appointments per month.
+                      {% if not plan.includes_reminders %}Reminder automation stays on Premium.{% endif %}
+                    </p>
+                  {% else %}
+                    <p>
+                      {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} billed every {{ plan.interval }}.
+                      Unlimited staff, services, and appointments with reminders{% if plan.includes_notifications %}, notifications{% endif %}{% if plan.includes_custom_branding %}, and branding{% endif %}.
+                    </p>
+                  {% endif %}
                 </div>
               {% endfor %}
             </div>
@@ -377,6 +399,10 @@
             <form id="billing-csrf" method="post">
               {% csrf_token %}
             </form>
+            <div id="free-plan-container" style="display:none; margin-top:16px;">
+              <button id="activate-free-plan" type="button" class="btn-brand">Activate Free Plan</button>
+              <p class="helper" style="margin: 10px 0 0;">Use this for trial clinics that should start without PayPal billing.</p>
+            </div>
             <div id="paypal-button-container"></div>
             <div id="billing-error" class="flash error" style="display:none;"></div>
             <div id="billing-success" class="flash success" style="display:none;"></div>
@@ -397,31 +423,48 @@
               </p>
               <p class="meta" style="margin-top: 10px;">Plan: {{ current_subscription.plan.name }}</p>
               <p class="meta">Started: {% if current_subscription.started_at %}{{ current_subscription.started_at|date:"M j, Y" }}{% else %}Pending sync{% endif %}</p>
-              <p class="meta">Period end: {% if current_subscription.current_period_end %}{{ current_subscription.current_period_end|date:"M j, Y" }}{% else %}Unknown{% endif %}</p>
+              <p class="meta">
+                {% if current_subscription.plan.is_free %}
+                  Free plans stay active locally until the clinic upgrades.
+                {% else %}
+                  Period end: {% if current_subscription.current_period_end %}{{ current_subscription.current_period_end|date:"M j, Y" }}{% else %}Unknown{% endif %}
+                {% endif %}
+              </p>
             {% else %}
               <p class="meta" style="margin-top: 10px;">No active local subscription record exists yet for this clinic.</p>
             {% endif %}
           </div>
 
           <div class="snapshot" style="margin-top: 14px;">
-            <strong>Manual sync</strong>
-            <p class="meta" style="margin-top: 8px;">Use sync after checkout approval or if the local status looks stale compared to PayPal.</p>
+            <strong>Usage snapshot</strong>
+            <p class="meta" style="margin-top: 8px;">
+              {% if plan_usage.has_plan %}
+                {{ plan_usage.staff.remaining_label }}. {{ plan_usage.services.remaining_label }}. {{ plan_usage.appointments.remaining_label }} for {{ plan_usage.month_window_label }}.
+              {% else %}
+                No plan is active yet, so usage tracking will start after the first Free or Premium activation.
+              {% endif %}
+            </p>
           </div>
 
           <div class="snapshot" style="margin-top: 14px;">
             <strong>Implementation note</strong>
-            <p class="meta" style="margin-top: 8px;">The portal still treats Django as the local source of access control, while PayPal remains the payment processor.</p>
+            <p class="meta" style="margin-top: 8px;">The portal now treats Free plans as local access records, while Premium still uses PayPal as the payment processor.</p>
           </div>
         </aside>
       </section>
     </main>
     {% include "core/partials/site_footer.html" %}
 
-    {% if paypal_client_id %}
+    {% if plans %}
+      {% if paypal_client_id %}
       <script src="{{ paypal_sdk_url }}?client-id={{ paypal_client_id }}&vault=true&intent=subscription"></script>
+      {% endif %}
       <script>
         const planSelect = document.getElementById('plan');
         const container = document.getElementById('paypal-button-container');
+        const freePlanContainer = document.getElementById('free-plan-container');
+        const freePlanButton = document.getElementById('activate-free-plan');
+        const planModeNote = document.getElementById('plan-mode-note');
         const csrfTokenInput = document.querySelector('#billing-csrf [name=csrfmiddlewaretoken]');
         const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
         const syncButton = document.getElementById('sync-button');
@@ -458,21 +501,41 @@
           clearMessages();
           container.innerHTML = '';
 
-          if (!window.paypal || !paypal.Buttons) {
-            showError('PayPal checkout failed to load. Refresh the page and try again.');
-            return;
-          }
-
           const selectedOption = planSelect.options[planSelect.selectedIndex];
           if (!selectedOption) {
             showError('Select a plan before starting checkout.');
             return;
           }
 
+          const planMode = selectedOption.getAttribute('data-plan-mode');
           const paypalPlanId = selectedOption.getAttribute('data-paypal-plan-id');
           const planId = selectedOption.value;
+          const planName = selectedOption.getAttribute('data-plan-name') || 'Selected plan';
+
+          if (planMode === 'free') {
+            if (freePlanContainer) {
+              freePlanContainer.style.display = 'block';
+            }
+            if (planModeNote) {
+              planModeNote.textContent = 'Free activates instantly inside ClinicOps and skips PayPal.';
+            }
+            return;
+          }
+
+          if (freePlanContainer) {
+            freePlanContainer.style.display = 'none';
+          }
+          if (planModeNote) {
+            planModeNote.textContent = 'Premium stays on the PayPal subscription flow for recurring billing.';
+          }
+
+          if (!window.paypal || !paypal.Buttons) {
+            showError('PayPal checkout is not configured for Premium yet. Free can still activate locally.');
+            return;
+          }
+
           if (!paypalPlanId) {
-            showError('Selected plan is missing a PayPal plan ID.');
+            showError('Selected Premium plan is missing a PayPal plan ID.');
             return;
           }
 
@@ -506,6 +569,38 @@
               });
             }
           }).render('#paypal-button-container');
+        }
+
+        if (freePlanButton) {
+          freePlanButton.addEventListener('click', function() {
+            clearMessages();
+            const selectedOption = planSelect.options[planSelect.selectedIndex];
+            const planId = selectedOption ? selectedOption.value : '';
+            const planName = selectedOption ? (selectedOption.getAttribute('data-plan-name') || 'Free plan') : 'Free plan';
+            freePlanButton.disabled = true;
+            fetch('{% url "billing-activate" %}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                plan_id: planId
+              })
+            }).then(async function(response) {
+              const text = await response.text();
+              if (!response.ok) {
+                throw new Error(text || 'Failed to activate free plan');
+              }
+              showSuccess(planName + ' activated. Refreshing billing state...');
+              window.location.reload();
+            }).catch(function(err) {
+              showError('Free activation failed: ' + err.message);
+            }).finally(function() {
+              freePlanButton.disabled = false;
+            });
+          });
         }
 
         if (planSelect) {

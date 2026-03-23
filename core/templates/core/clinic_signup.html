@@ -456,7 +456,7 @@
           <p>The signup flow now follows the same focused pattern as sign in: create the clinic owner account first, then switch the action card into subscription activation once the account is ready.</p>
           <div class="hero-meta">
             <span class="pill">Two-step setup</span>
-            <span class="pill">PayPal subscription activation</span>
+            <span class="pill">Free or Premium plans</span>
           </div>
 
           <div class="hero-points">
@@ -465,8 +465,8 @@
               <p>Add the clinic name, timezone, and owner credentials before any payment step becomes available.</p>
             </div>
             <div class="point">
-              <strong>Switch into payment automatically</strong>
-              <p>After account creation, the same card changes into the payment state instead of sending the user to a different-looking layout.</p>
+              <strong>Switch into plan activation automatically</strong>
+              <p>After account creation, the same card changes into the plan step instead of sending the user to a different-looking layout.</p>
             </div>
             <div class="point">
               <strong>Verify email before first login</strong>
@@ -494,7 +494,7 @@
 
             {% if clinic %}
               <h2>Activate subscription</h2>
-              <p>{{ clinic.name }} is created. Choose the clinic plan and finish PayPal activation from this same panel.</p>
+              <p>{{ clinic.name }} is created. Choose a Free or Premium plan from this same panel.</p>
             {% else %}
               <h2>Create clinic account</h2>
               <p>Set up the clinic owner details first. Payment unlocks immediately after the clinic account is created.</p>
@@ -568,6 +568,13 @@
                 <div>The clinic owner is set to <strong>{{ clinic.email }}</strong>. Continue with subscription activation below.</div>
               </div>
 
+              {% if current_subscription and current_subscription.status == 'active' %}
+                <div class="banner success" style="margin-top:16px;">
+                  <strong>{{ current_subscription.plan.name }} is already active</strong>
+                  <div>This clinic now has access. Verify the owner email, then sign in to open the portal.</div>
+                </div>
+              {% endif %}
+
               <div class="summary-grid">
                 <div class="summary-card">
                   <div class="kicker">Clinic</div>
@@ -586,12 +593,7 @@
                 </div>
               {% endif %}
 
-              {% if not paypal_client_id %}
-                <div class="banner warning" style="margin-top:16px;">
-                  <strong>PayPal is not configured yet</strong>
-                  <div>Finish the billing setup before clinic subscriptions can be activated.</div>
-                </div>
-              {% elif not plans %}
+              {% if not plans %}
                 <div class="banner warning" style="margin-top:16px;">
                   <strong>No plans available</strong>
                   <div>Add active plans in admin before taking a clinic subscription live.</div>
@@ -602,7 +604,11 @@
                     <div class="plan-row">
                       <div>
                         <strong>{{ plan.name }}</strong>
-                        <span>{{ plan.interval|title }} subscription</span>
+                        {% if plan.is_free %}
+                          <span>{{ plan.staff_limit }} staff seats · {{ plan.service_limit }} services · {{ plan.monthly_appointment_limit }} appointments / month</span>
+                        {% else %}
+                          <span>Unlimited staff, services, and appointments{% if plan.includes_reminders %} · reminders included{% endif %}</span>
+                        {% endif %}
                       </div>
                       <strong>{{ plan.currency }} {{ plan.price_dollars|floatformat:2 }}</strong>
                     </div>
@@ -616,14 +622,24 @@
                     <label for="plan">Subscription plan</label>
                     <select id="plan">
                       {% for plan in plans %}
-                        <option value="{{ plan.id }}" data-paypal-plan-id="{{ plan.paypal_plan_id }}">
+                        <option
+                          value="{{ plan.id }}"
+                          data-plan-mode="{% if plan.is_free %}free{% else %}premium{% endif %}"
+                          data-plan-name="{{ plan.name }}"
+                          data-paypal-plan-id="{{ plan.paypal_plan_id|default:'' }}"
+                          {% if current_subscription and current_subscription.plan_id == plan.id %}selected{% endif %}
+                        >
                           {{ plan.name }} - {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} / {{ plan.interval }}
                         </option>
                       {% endfor %}
                     </select>
-                    <div class="help">Select the clinic plan, then continue in PayPal to activate recurring billing.</div>
+                    <div id="signup-plan-note" class="help">Select the clinic plan, then continue with instant Free activation or PayPal for Premium billing.</div>
                   </div>
 
+                  <div id="free-plan-container" style="display:none;">
+                    <button id="activate-free-plan" class="submit" type="button">Start With Free Plan</button>
+                    <div class="help">Free activates immediately and keeps the owner on the verify-email path before first sign in.</div>
+                  </div>
                   <div id="paypal-button-container"></div>
                   <p id="signup-error" class="errorlist" style="display:none;"></p>
                   <div id="signup-success" class="banner success" style="display:none;"></div>
@@ -643,11 +659,16 @@
       </section>
     </main>
 
-    {% if clinic and paypal_client_id and plans %}
+    {% if clinic and plans %}
+      {% if paypal_client_id %}
       <script src="{{ paypal_sdk_url }}?client-id={{ paypal_client_id }}&vault=true&intent=subscription"></script>
+      {% endif %}
       <script>
         const planSelect = document.getElementById('plan');
         const container = document.getElementById('paypal-button-container');
+        const freePlanContainer = document.getElementById('free-plan-container');
+        const freePlanButton = document.getElementById('activate-free-plan');
+        const planModeNote = document.getElementById('signup-plan-note');
         const csrfTokenInput = document.querySelector('#csrf-form input[name=csrfmiddlewaretoken]');
         const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
         const clinicId = {{ clinic.id }};
@@ -676,15 +697,43 @@
         }
 
         function renderButtons() {
+          if (!planSelect || !container) return;
           const selectedOption = planSelect.options[planSelect.selectedIndex];
+          container.innerHTML = '';
+          clearMessages();
+          if (!selectedOption) {
+            showError('Select a plan before continuing.');
+            return;
+          }
+
+          const planMode = selectedOption.getAttribute('data-plan-mode');
           const paypalPlanId = selectedOption.getAttribute('data-paypal-plan-id');
           const planId = selectedOption.value;
 
-          container.innerHTML = '';
-          clearMessages();
+          if (planMode === 'free') {
+            if (freePlanContainer) {
+              freePlanContainer.style.display = 'block';
+            }
+            if (planModeNote) {
+              planModeNote.textContent = 'Free activates instantly and keeps the owner on the email verification path before first sign in.';
+            }
+            return;
+          }
+
+          if (freePlanContainer) {
+            freePlanContainer.style.display = 'none';
+          }
+          if (planModeNote) {
+            planModeNote.textContent = 'Premium continues through PayPal so recurring billing can be approved immediately.';
+          }
+
+          if (!window.paypal || !paypal.Buttons) {
+            showError('PayPal is not configured for Premium yet. Free can still activate right now.');
+            return;
+          }
 
           if (!paypalPlanId) {
-            container.innerHTML = '<p class="help">Selected plan is missing a PayPal plan ID.</p>';
+            container.innerHTML = '<p class="help">Selected Premium plan is missing a PayPal plan ID.</p>';
             return;
           }
 
@@ -728,6 +777,44 @@
               console.error(err);
             }
           }).render('#paypal-button-container');
+        }
+
+        if (freePlanButton) {
+          freePlanButton.addEventListener('click', function() {
+            clearMessages();
+            const selectedOption = planSelect.options[planSelect.selectedIndex];
+            const planId = selectedOption ? selectedOption.value : '';
+            const planName = selectedOption ? (selectedOption.getAttribute('data-plan-name') || 'Free plan') : 'Free plan';
+            freePlanButton.disabled = true;
+            fetch('{% url "signup-activate" %}', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'X-CSRFToken': csrfToken
+              },
+              credentials: 'same-origin',
+              body: JSON.stringify({
+                clinic_id: clinicId,
+                plan_id: planId
+              })
+            }).then(async function(response) {
+              const text = await response.text();
+              if (!response.ok) {
+                throw new Error(text || 'Failed to activate free plan');
+              }
+              if (successBox) {
+                successBox.innerHTML = '<strong>' + planName + ' activated.</strong><div>Please verify your email and then <a href="{% url "login" %}">sign in</a>.</div>';
+                successBox.style.display = 'block';
+              }
+              if (freePlanContainer) {
+                freePlanContainer.style.display = 'none';
+              }
+            }).catch(function(err) {
+              showError('Free activation failed: ' + err.message);
+            }).finally(function() {
+              freePlanButton.disabled = false;
+            });
+          });
         }
 
         if (planSelect) {

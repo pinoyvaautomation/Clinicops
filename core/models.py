@@ -194,10 +194,18 @@ class Plan(models.Model):
         YEAR = 'year', 'Yearly'
 
     name = models.CharField(max_length=100)
+    is_free = models.BooleanField(default=False)
     paypal_plan_id = models.CharField(max_length=64, unique=True, blank=True, null=True)
     interval = models.CharField(max_length=10, choices=Interval.choices, default=Interval.MONTH)
     price_cents = models.PositiveIntegerField()
     currency = models.CharField(max_length=10, default='USD')
+    # Plan notes: null limits mean unlimited, which is how Premium is modeled.
+    staff_limit = models.PositiveIntegerField(blank=True, null=True)
+    service_limit = models.PositiveIntegerField(blank=True, null=True)
+    monthly_appointment_limit = models.PositiveIntegerField(blank=True, null=True)
+    includes_reminders = models.BooleanField(default=True)
+    includes_notifications = models.BooleanField(default=True)
+    includes_custom_branding = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     history = HistoricalRecords()
