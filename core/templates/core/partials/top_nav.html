@@ -546,6 +546,7 @@
     padding: 12px;
     border-radius: 0;
     z-index: 1100;
+    overflow: hidden;
   }
   .sidebar-brand {
     display: flex;
@@ -576,6 +577,20 @@
   .nav-drawer .links {
     display: grid;
     gap: 8px;
+    align-content: start;
+  }
+  .portal-sidebar .links {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding-right: 4px;
+  }
+  .portal-sidebar .links::-webkit-scrollbar {
+    width: 8px;
+  }
+  .portal-sidebar .links::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.28);
+    border-radius: 999px;
   }
   .portal-sidebar .links a,
   .nav-drawer .links a {
@@ -600,11 +615,11 @@
   }
   .sidebar-footer,
   .nav-drawer__footer {
-    margin-top: auto;
     display: grid;
     gap: 8px;
     padding-top: 12px;
     border-top: 1px solid rgba(148, 163, 184, 0.14);
+    flex: 0 0 auto;
   }
   .sidebar-footer p {
     margin: 0;
@@ -644,7 +659,7 @@
   }
   .topbar-context {
     display: grid;
-    gap: 3px;
+    gap: 2px;
     min-width: 0;
   }
   .topbar-eyebrow {
@@ -869,7 +884,7 @@
       <span></span>
     </button>
     <div class="topbar-context">
-      <div class="topbar-eyebrow">{% if nav_is_staff %}Clinic workspace{% else %}Patient portal{% endif %}</div>
+      <div class="topbar-eyebrow">{% if nav_is_staff %}Current view{% else %}Patient portal{% endif %}</div>
       <div class="topbar-title">
         {% if current == 'dashboard' %}
           Dashboard
@@ -891,13 +906,18 @@
           Notifications
         {% elif current == 'settings' %}
           Settings
+        {% elif current == 'portal-search' %}
+          Search
+        {% elif current == 'password_change' %}
+          Change password
+        {% elif current == 'password_change_done' %}
+          Password updated
         {% elif current == 'patient-portal' %}
           Patient portal
         {% else %}
           ClinicOps
         {% endif %}
       </div>
-      <div class="topbar-meta">{{ nav_clinic.name|default:"Connected workspace" }}</div>
     </div>
   </div>
 
