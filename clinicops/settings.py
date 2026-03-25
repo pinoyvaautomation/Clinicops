@@ -56,6 +56,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.sites',
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
     'simple_history',
     'secured_fields',
     'django_q',
@@ -69,6 +73,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'allauth.account.middleware.AccountMiddleware',
     'simple_history.middleware.HistoryRequestMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -165,6 +170,11 @@ MEDIA_ROOT = BASE_DIR / 'media'
 LOGIN_REDIRECT_URL = '/post-login/'
 LOGOUT_REDIRECT_URL = '/accounts/login/'
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
+
 DJANGO_SECURE = os.environ.get('DJANGO_SECURE', 'false').lower() == 'true'
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https') if DJANGO_SECURE else None
 SECURE_SSL_REDIRECT = DJANGO_SECURE
@@ -200,6 +210,9 @@ RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 PUBLIC_BRAND_NAME = os.environ.get('PUBLIC_BRAND_NAME', 'ClinicOps')
 PUBLIC_BRAND_COLOR = os.environ.get('PUBLIC_BRAND_COLOR', '#0f5132')
 PUBLIC_LOGO_URL = os.environ.get('PUBLIC_LOGO_URL', '')
+GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
+GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+GOOGLE_OAUTH_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
 
 _secured_keys = os.environ.get('SECURED_FIELDS_KEY')
 if _secured_keys:
@@ -237,6 +250,32 @@ PAYPAL_API_BASE = (
 PAYPAL_SSL_VERIFY = os.environ.get('PAYPAL_SSL_VERIFY', 'true').lower() == 'true'
 PAYPAL_CA_BUNDLE = os.environ.get('PAYPAL_CA_BUNDLE', '')
 ENFORCE_SUBSCRIPTION = os.environ.get('ENFORCE_SUBSCRIPTION', 'false').lower() == 'true'
+
+# Google social sign-in stays in "existing account only" mode for MVP.
+SOCIALACCOUNT_ADAPTER = 'core.social_auth.ClinicSocialAccountAdapter'
+SOCIALACCOUNT_AUTO_SIGNUP = False
+SOCIALACCOUNT_LOGIN_ON_GET = False
+SOCIALACCOUNT_STORE_TOKENS = False
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'EMAIL_AUTHENTICATION': True,
+        'EMAIL_AUTHENTICATION_AUTO_CONNECT': True,
+        'VERIFIED_EMAIL': True,
+        'APPS': [
+            {
+                'client_id': GOOGLE_CLIENT_ID,
+                'secret': GOOGLE_CLIENT_SECRET,
+                'key': '',
+                'settings': {
+                    'scope': ['profile', 'email'],
+                    'auth_params': {'access_type': 'online'},
+                },
+            }
+        ]
+        if GOOGLE_OAUTH_ENABLED
+        else [],
+    }
+}
 
 Q_CLUSTER = {
     'name': 'clinicops',

@@ -1,4 +1,5 @@
 <!doctype html>
+{% load socialaccount %}
 <html lang="en">
   <head>
     <meta charset="utf-8">
@@ -176,6 +177,9 @@
         font-size: 14px;
         font-weight: 600;
       }
+      .flash + .flash {
+        margin-top: 10px;
+      }
       form {
         margin-top: 18px;
         display: grid;
@@ -221,6 +225,53 @@
         font-weight: 700;
         letter-spacing: 0.04em;
         cursor: pointer;
+      }
+      .divider {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin: 16px 0 4px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .divider::before,
+      .divider::after {
+        content: '';
+        flex: 1;
+        height: 1px;
+        background: rgba(148, 163, 184, 0.28);
+      }
+      .social-form {
+        margin-top: 0;
+      }
+      .social-submit {
+        width: 100%;
+        min-height: 52px;
+        border: 1px solid rgba(15, 23, 42, 0.12);
+        border-radius: 16px;
+        background: #fff;
+        color: var(--ink);
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 12px;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+        box-shadow: 0 10px 24px rgba(148, 163, 184, 0.12);
+      }
+      .social-submit:hover {
+        border-color: rgba(15, 81, 50, 0.28);
+        box-shadow: 0 12px 28px rgba(15, 81, 50, 0.12);
+      }
+      .social-mark {
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        background: conic-gradient(from 45deg, #ea4335 0 25%, #fbbc05 25% 50%, #34a853 50% 75%, #4285f4 75% 100%);
       }
       .card-footer {
         margin-top: 18px;
@@ -333,6 +384,12 @@
           </div>
 
           <div class="login-body">
+            {% if messages %}
+              {% for message in messages %}
+                <div class="flash">{{ message }}</div>
+              {% endfor %}
+            {% endif %}
+
             {% if form.non_field_errors %}
               {% for error in form.non_field_errors %}
                 <div class="flash">{{ error }}</div>
@@ -371,9 +428,26 @@
               <button class="submit" type="submit">Log In</button>
             </form>
 
+            {% if google_oauth_enabled %}
+              <div class="divider">or</div>
+              <form class="social-form" method="post" action="{% provider_login_url 'google' process='login' %}">
+                {% csrf_token %}
+                {% if next %}
+                  <input type="hidden" name="next" value="{{ next }}">
+                {% endif %}
+                <button class="social-submit" type="submit">
+                  <span class="social-mark" aria-hidden="true"></span>
+                  Continue with Google
+                </button>
+              </form>
+            {% endif %}
+
             <div class="card-footer">
               <a class="support-link" href="{% url 'password_reset' %}">Forgot your password?</a>
               <a class="support-link" href="{% url 'resend-verification' %}">Resend verification email</a>
+              {% if google_oauth_enabled %}
+                <div class="muted">Google sign-in works only for existing ClinicOps accounts that already use the same email.</div>
+              {% endif %}
               <div class="muted">Need a patient account? Ask your clinic for its booking or signup link.</div>
             </div>
           </div>

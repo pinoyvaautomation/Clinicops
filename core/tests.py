@@ -1,15 +1,20 @@
 import json
 from datetime import timedelta
+from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.contrib.messages import get_messages
+from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core import mail
 from django.core.exceptions import ValidationError
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
+
+from allauth.core.exceptions import ImmediateHttpResponse
 
 from .admin import AppointmentAdmin
 from .booking import build_available_slots
@@ -25,6 +30,7 @@ from .models import (
     Staff,
 )
 from .notifications import create_clinic_notifications
+from .social_auth import ClinicSocialAccountAdapter, find_matching_local_user
 from .tasks import send_upcoming_appointment_reminders
 from .views import _notify_clinic_service_change
 
@@ -773,3 +779,99 @@ class ClinicSignupTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(Clinic.objects.filter(name='Signup Clinic').exists())
         self.assertTrue(User.objects.filter(username='alex@example.com').exists())
+
+
+@override_settings(
+    GOOGLE_OAUTH_ENABLED=True,
+    SOCIALACCOUNT_PROVIDERS={
+        'google': {
+            'EMAIL_AUTHENTICATION': True,
+            'EMAIL_AUTHENTICATION_AUTO_CONNECT': True,
+            'VERIFIED_EMAIL': True,
+            'APPS': [
+                {
+                    'client_id': 'google-client-id',
+                    'secret': 'google-client-secret',
+                    'key': '',
+                }
+            ],
+        }
+    },
+)
+class GoogleSocialAuthTests(TestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+        self.adapter = ClinicSocialAccountAdapter()
+
+    def _request_with_messages(self):
+        request = self.factory.get(reverse('login'))
+        request.session = self.client.session
+        setattr(request, '_messages', FallbackStorage(request))
+        return request
+
+    def test_find_matching_local_user_uses_email_or_username(self):
+        user = User.objects.create_user(
+            username='owner@clinic.com',
+            email='owner@clinic.com',
+            password='password',
+        )
+
+        self.assertEqual(find_matching_local_user('owner@clinic.com'), user)
+        self.assertEqual(find_matching_local_user('OWNER@CLINIC.COM'), user)
+
+    def test_can_authenticate_by_email_requires_active_existing_user(self):
+        active_user = User.objects.create_user(
+            username='active@clinic.com',
+            email='active@clinic.com',
+            password='password',
+        )
+        inactive_user = User.objects.create_user(
+            username='inactive@clinic.com',
+            email='inactive@clinic.com',
+            password='password',
+            is_active=False,
+        )
+
+        self.assertTrue(self.adapter.can_authenticate_by_email(None, active_user.email))
+        self.assertFalse(self.adapter.can_authenticate_by_email(None, inactive_user.email))
+        self.assertFalse(self.adapter.can_authenticate_by_email(None, 'missing@clinic.com'))
+
+    def test_pre_social_login_blocks_missing_local_account(self):
+        request = self._request_with_messages()
+        sociallogin = SimpleNamespace(
+            account=SimpleNamespace(provider='google'),
+            user=SimpleNamespace(email='new-owner@clinic.com', is_active=True),
+            is_existing=False,
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adapter.pre_social_login(request, sociallogin)
+
+        stored_messages = [message.message for message in get_messages(request)]
+        self.assertIn('Google sign-in only works for existing ClinicOps accounts.', stored_messages[0])
+
+    def test_pre_social_login_blocks_inactive_local_account(self):
+        User.objects.create_user(
+            username='inactive-owner@clinic.com',
+            email='inactive-owner@clinic.com',
+            password='password',
+            is_active=False,
+        )
+        request = self._request_with_messages()
+        sociallogin = SimpleNamespace(
+            account=SimpleNamespace(provider='google'),
+            user=SimpleNamespace(email='inactive-owner@clinic.com', is_active=True),
+            is_existing=False,
+        )
+
+        with self.assertRaises(ImmediateHttpResponse):
+            self.adapter.pre_social_login(request, sociallogin)
+
+        stored_messages = [message.message for message in get_messages(request)]
+        self.assertIn('Please verify your email before signing in with Google.', stored_messages[0])
+
+    def test_login_page_renders_google_button_when_enabled(self):
+        response = self.client.get(reverse('login'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Continue with Google')
