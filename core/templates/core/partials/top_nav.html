@@ -503,24 +503,268 @@
     font-size: 18px;
     cursor: pointer;
   }
+  body.portal-shell-page,
+  body.nav-open {
+    overflow-x: hidden;
+  }
+  body.portal-shell-page {
+    --shell-edge: 18px;
+    --shell-sidebar-width: 244px;
+    --shell-topbar-height: 76px;
+  }
+  body.portal-shell-page .wrap {
+    max-width: none;
+    margin: 0;
+    padding: calc(var(--shell-topbar-height) + 40px) 28px 56px calc(var(--shell-sidebar-width) + 46px);
+  }
+  body.portal-shell-page .site-footer {
+    margin: 48px 18px 0 calc(var(--shell-sidebar-width) + 18px);
+    border-radius: 26px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 18px 38px rgba(148, 163, 184, 0.14);
+  }
+  body.portal-shell-page .site-footer__inner {
+    max-width: none;
+  }
+  .portal-sidebar,
+  .nav-drawer,
+  .top-nav {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    backdrop-filter: blur(14px);
+    box-shadow: 0 18px 38px rgba(148, 163, 184, 0.18);
+  }
+  .portal-sidebar {
+    position: fixed;
+    top: var(--shell-edge);
+    left: var(--shell-edge);
+    bottom: var(--shell-edge);
+    width: var(--shell-sidebar-width);
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+    padding: 18px;
+    border-radius: 28px;
+    z-index: 1100;
+  }
+  .sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-height: 56px;
+    padding: 10px 12px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.66);
+    border: 1px solid rgba(148, 163, 184, 0.12);
+  }
+  .brand-title {
+    color: #0f172a;
+    font-family: 'Space Grotesk', Arial, sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+  }
+  .sidebar-heading {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    padding: 0 12px;
+  }
+  .portal-sidebar .links,
+  .nav-drawer .links {
+    display: grid;
+    gap: 8px;
+  }
+  .portal-sidebar .links a,
+  .nav-drawer .links a {
+    display: block;
+    text-decoration: none;
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    transition: background 0.16s ease, color 0.16s ease;
+  }
+  .portal-sidebar .links a:hover,
+  .nav-drawer .links a:hover {
+    background: rgba(15, 23, 42, 0.05);
+  }
+  .portal-sidebar .links a.active,
+  .nav-drawer .links a.active {
+    background: linear-gradient(135deg, rgba(14, 165, 166, 0.14), rgba(255, 255, 255, 0.92));
+    color: #0f766e;
+    box-shadow: inset 0 0 0 1px rgba(14, 165, 166, 0.14);
+  }
+  .sidebar-footer,
+  .nav-drawer__footer {
+    margin-top: auto;
+    display: grid;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(148, 163, 184, 0.14);
+  }
+  .sidebar-footer p {
+    margin: 0;
+    padding: 0 12px;
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.5;
+  }
+  .sidebar-footer a,
+  .nav-drawer__footer a {
+    display: block;
+    text-decoration: none;
+    color: #0f172a;
+    font-weight: 700;
+    padding: 11px 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+  }
+  .top-nav {
+    width: auto;
+    margin: 0;
+    padding: 14px 18px;
+    position: fixed;
+    top: var(--shell-edge);
+    left: calc(var(--shell-sidebar-width) + 32px);
+    right: var(--shell-edge);
+    min-height: var(--shell-topbar-height);
+    z-index: 1200;
+  }
+  .topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+  }
+  .topbar-context {
+    display: grid;
+    gap: 3px;
+    min-width: 0;
+  }
+  .topbar-eyebrow {
+    color: #94a3b8;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .topbar-title {
+    color: #0f172a;
+    font-family: 'Space Grotesk', Arial, sans-serif;
+    font-size: 1.3rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-meta {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .nav-drawer {
+    position: fixed;
+    top: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: min(320px, calc(100vw - 48px));
+    display: none;
+    flex-direction: column;
+    gap: 18px;
+    padding: 16px;
+    border-radius: 28px;
+    transform: translateX(calc(-100% - 16px));
+    transition: transform 0.18s ease;
+    z-index: 1600;
+  }
+  .nav-drawer.open {
+    transform: translateX(0);
+  }
+  .nav-drawer__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .nav-drawer__close {
+    width: 42px;
+    height: 42px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: #ffffff;
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(148, 163, 184, 0.14);
+  }
+  @media (max-width: 899px) {
+    body.portal-shell-page .wrap {
+      padding: calc(var(--shell-topbar-height) + 28px) 16px 44px;
+    }
+    body.portal-shell-page .site-footer {
+      margin: 48px 0 0;
+      border-radius: 0;
+      border-left: none;
+      border-right: none;
+      box-shadow: none;
+    }
+    .portal-sidebar {
+      display: none;
+    }
+    .nav-drawer {
+      display: flex;
+    }
+    .top-nav {
+      left: 12px;
+      right: 12px;
+      padding: 12px 14px;
+      border-radius: 22px;
+      top: 12px;
+    }
+    .topbar-title {
+      font-size: 1rem;
+    }
+    .topbar-meta {
+      font-size: 11px;
+    }
+  }
 </style>
 
-<div class="top-nav">
-  <div class="brand">
+<script>document.body.classList.add('portal-shell-page');</script>
+
+{% with current=request.resolver_match.url_name %}
+<aside class="portal-sidebar" aria-label="ClinicOps navigation">
+  <div class="sidebar-brand">
     {% if nav_clinic and nav_clinic.logo_url %}
       <img class="brand-logo" src="{{ nav_clinic.logo_url }}" alt="{{ nav_clinic.name }}">
     {% else %}
       <div class="brand-logo"></div>
     {% endif %}
     <div class="brand-name">
-      ClinicOps
+      <div class="brand-title">ClinicOps</div>
       {% if nav_clinic %}
         <span>{{ nav_clinic.name }}</span>
+      {% else %}
+        <span>Connected workspace</span>
       {% endif %}
     </div>
   </div>
-  <div class="links" id="nav-links">
-    {% with current=request.resolver_match.url_name %}
+
+  <div class="sidebar-heading">Workspace</div>
+  <div class="links">
     {% if nav_is_staff %}
       <a class="{% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
       <a class="{% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">Calendar</a>
@@ -537,12 +781,53 @@
         <a href="#" id="clinic-switch-btn">Switch clinic</a>
       {% endif %}
     {% endif %}
-    {% endwith %}
   </div>
-  <div class="nav-actions">
-    <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false">
+
+  <div class="sidebar-footer">
+    <p>{% if nav_is_staff %}Clinic workspace{% else %}Patient portal{% endif %}</p>
+    <a href="{% url 'settings' %}">Account settings</a>
+  </div>
+</aside>
+
+<div class="top-nav">
+  <div class="topbar-left">
+    <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
       <span></span>
     </button>
+    <div class="topbar-context">
+      <div class="topbar-eyebrow">{% if nav_is_staff %}Clinic workspace{% else %}Patient portal{% endif %}</div>
+      <div class="topbar-title">
+        {% if current == 'dashboard' %}
+          Dashboard
+        {% elif current == 'calendar' %}
+          Calendar
+        {% elif current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' %}
+          Appointments
+        {% elif current == 'staff-appointment-history' %}
+          Appointment history
+        {% elif current == 'staff-patients' or current == 'staff-patient-edit' %}
+          Patients
+        {% elif current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}
+          Staff
+        {% elif current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}
+          Services
+        {% elif current == 'billing' %}
+          Billing
+        {% elif current == 'notifications' %}
+          Notifications
+        {% elif current == 'settings' %}
+          Settings
+        {% elif current == 'patient-portal' %}
+          Patient portal
+        {% else %}
+          ClinicOps
+        {% endif %}
+      </div>
+      <div class="topbar-meta">{{ nav_clinic.name|default:"Connected workspace" }}</div>
+    </div>
+  </div>
+
+  <div class="nav-actions">
     {% if nav_is_staff and nav_notifications_enabled %}
       <div class="nav-popover">
         <button
@@ -649,6 +934,53 @@
   </div>
 </div>
 
+<aside class="nav-drawer" id="nav-drawer" aria-hidden="true">
+  <div class="nav-drawer__head">
+    <div class="sidebar-brand">
+      {% if nav_clinic and nav_clinic.logo_url %}
+        <img class="brand-logo" src="{{ nav_clinic.logo_url }}" alt="{{ nav_clinic.name }}">
+      {% else %}
+        <div class="brand-logo"></div>
+      {% endif %}
+      <div class="brand-name">
+        <div class="brand-title">ClinicOps</div>
+        {% if nav_clinic %}
+          <span>{{ nav_clinic.name }}</span>
+        {% else %}
+          <span>Connected workspace</span>
+        {% endif %}
+      </div>
+    </div>
+    <button type="button" class="nav-drawer__close" id="nav-drawer-close" aria-label="Close menu">&times;</button>
+  </div>
+
+  <div class="sidebar-heading">Workspace</div>
+  <div class="links" id="nav-links">
+    {% if nav_is_staff %}
+      <a class="{% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
+      <a class="{% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">Calendar</a>
+      <a class="{% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}">Appointments</a>
+      <a class="{% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}">Patients</a>
+      {% if nav_is_admin %}
+        <a class="{% if current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}active{% endif %}" href="{% url 'staff-members' %}">Staff</a>
+        <a class="{% if current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}active{% endif %}" href="{% url 'appointment-types' %}">Services</a>
+        <a class="{% if current == 'billing' %}active{% endif %}" href="{% url 'billing' %}">Billing</a>
+      {% endif %}
+    {% else %}
+      <a class="{% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}">Portal</a>
+      {% if nav_patient_multi %}
+        <a href="#" id="clinic-switch-btn-drawer">Switch clinic</a>
+      {% endif %}
+    {% endif %}
+  </div>
+
+  <div class="nav-drawer__footer">
+    <a href="{% url 'settings' %}">Account settings</a>
+    <a href="{% url 'password_change' %}">Change password</a>
+  </div>
+</aside>
+{% endwith %}
+
 <div class="nav-overlay" id="nav-overlay" aria-hidden="true"></div>
 
 {% include "core/partials/message_toasts.html" %}
@@ -681,6 +1013,8 @@
 
 <script>
   (function() {
+    document.body.classList.add('portal-shell-page');
+
     const avatarBtn = document.getElementById('avatar-btn');
     const avatarMenu = document.getElementById('avatar-menu');
     const notificationBtn = document.getElementById('notification-btn');
@@ -745,11 +1079,12 @@
 
   (function() {
     const trigger = document.getElementById('clinic-switch-btn');
+    const drawerTrigger = document.getElementById('clinic-switch-btn-drawer');
     const modal = document.getElementById('clinic-switch-modal');
     const closeBtn = document.getElementById('clinic-switch-close');
     const input = document.getElementById('clinic-switch-input');
     const form = document.getElementById('clinic-switch-form');
-    if (!trigger || !modal || !input || !form) return;
+    if (!modal || !input || !form) return;
 
     function openModal() {
       modal.classList.add('open');
@@ -760,9 +1095,11 @@
       modal.setAttribute('aria-hidden', 'true');
     }
 
-    trigger.addEventListener('click', function(e) {
-      e.preventDefault();
-      openModal();
+    [trigger, drawerTrigger].forEach(function(button) {
+      button?.addEventListener('click', function(e) {
+        e.preventDefault();
+        openModal();
+      });
     });
     closeBtn?.addEventListener('click', function() {
       closeModal();
@@ -787,19 +1124,23 @@
 <script>
   (function() {
     const toggle = document.getElementById('nav-toggle');
+    const drawer = document.getElementById('nav-drawer');
+    const close = document.getElementById('nav-drawer-close');
     const links = document.getElementById('nav-links');
     const overlay = document.getElementById('nav-overlay');
-    if (!toggle || !links || !overlay) return;
+    if (!toggle || !drawer || !links || !overlay) return;
 
     function openMenu() {
-      links.classList.add('open');
+      drawer.classList.add('open');
+      drawer.setAttribute('aria-hidden', 'false');
       overlay.classList.add('open');
       overlay.setAttribute('aria-hidden', 'false');
       toggle.setAttribute('aria-expanded', 'true');
       document.body.classList.add('nav-open');
     }
     function closeMenu() {
-      links.classList.remove('open');
+      drawer.classList.remove('open');
+      drawer.setAttribute('aria-hidden', 'true');
       overlay.classList.remove('open');
       overlay.setAttribute('aria-hidden', 'true');
       toggle.setAttribute('aria-expanded', 'false');
@@ -807,12 +1148,13 @@
     }
 
     toggle.addEventListener('click', function() {
-      if (links.classList.contains('open')) {
+      if (drawer.classList.contains('open')) {
         closeMenu();
       } else {
         openMenu();
       }
     });
+    close?.addEventListener('click', closeMenu);
     overlay.addEventListener('click', closeMenu);
     links.querySelectorAll('a').forEach(function(link) {
       link.addEventListener('click', closeMenu);
