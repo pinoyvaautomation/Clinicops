@@ -473,6 +473,63 @@ def _limit_reached_message(*, item: dict, resource_label: str, action_label: str
     )
 
 
+def _searchable_appointments_for_staff(staff: Staff):
+    """Portal search notes: keep appointment search scoped to the current clinic and role."""
+    qs = Appointment.objects.filter(clinic=staff.clinic).select_related('patient', 'staff__user', 'appointment_type')
+    if _is_doctor(staff.user) and not _is_admin(staff.user):
+        qs = qs.filter(staff=staff)
+    return qs
+
+
+def _searchable_patients_for_staff(staff: Staff):
+    """Portal search notes: keep patient search aligned with existing patient-list permissions."""
+    qs = Patient.objects.filter(clinic=staff.clinic)
+    if _is_doctor(staff.user) and not _is_admin(staff.user):
+        patient_ids = Appointment.objects.filter(
+            clinic=staff.clinic,
+            staff=staff,
+        ).values_list('patient_id', flat=True)
+        qs = qs.filter(id__in=patient_ids)
+    return qs
+
+
+def _matches_patient_search(patient: Patient, query: str) -> bool:
+    """Portal search notes: encrypted patient fields need application-side matching."""
+    normalized = query.lower()
+    full_name = f'{patient.first_name} {patient.last_name}'.strip().lower()
+    return any(
+        normalized in value
+        for value in [
+            (patient.first_name or '').lower(),
+            (patient.last_name or '').lower(),
+            full_name,
+            (patient.email or '').lower(),
+            (patient.phone or '').lower(),
+        ]
+        if value
+    )
+
+
+def _matches_appointment_search(appointment: Appointment, query: str) -> bool:
+    """Portal search notes: confirmation codes stay exact-friendly while patient fields match in Python."""
+    normalized = query.lower()
+    service_name = (appointment.appointment_type.name if appointment.appointment_type else '').lower()
+    full_name = f'{appointment.patient.first_name} {appointment.patient.last_name}'.strip().lower()
+    return any(
+        normalized in value
+        for value in [
+            (appointment.confirmation_code or '').lower(),
+            (appointment.patient.first_name or '').lower(),
+            (appointment.patient.last_name or '').lower(),
+            full_name,
+            (appointment.patient.email or '').lower(),
+            (appointment.patient.phone or '').lower(),
+            service_name,
+        ]
+        if value
+    )
+
+
 def _sync_subscription_from_paypal(subscription: ClinicSubscription, *, last_event_type: str):
     details = get_subscription(subscription.paypal_subscription_id)
     billing_info = details.get('billing_info') or {}
@@ -1497,6 +1554,81 @@ def settings_view(request):
             'avatar_saved': success,
             'avatar_url': avatar_url,
             'profile_type': profile_type,
+            'current_local_time': timezone.localtime(timezone.now(), tz),
+        },
+    )
+
+
+@login_required
+def portal_search(request):
+    staff, error = _require_staff_portal(request)
+    if error:
+        return error
+
+    if not (_is_admin(request.user) or _is_frontdesk(request.user) or _is_doctor(request.user)):
+        return HttpResponseForbidden('Search is available to Admin, Front Desk, and Doctor roles only.')
+
+    clinic = staff.clinic
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    query = (request.GET.get('q') or '').strip()
+    appointments = []
+    patients = []
+
+    if query:
+        normalized_code = query.replace(' ', '').upper()
+        exact_appointment = _searchable_appointments_for_staff(staff).filter(
+            confirmation_code__iexact=normalized_code
+        ).first()
+        if exact_appointment:
+            return redirect('staff-appointment-edit', appointment_id=exact_appointment.id)
+
+        appointments = [
+            appointment
+            for appointment in _searchable_appointments_for_staff(staff).order_by('-start_at')
+            if _matches_appointment_search(appointment, query)
+        ][:8]
+        patients = [
+            patient
+            for patient in _searchable_patients_for_staff(staff).order_by('id')
+            if _matches_patient_search(patient, query)
+        ][:8]
+
+    appointment_results = []
+    for appointment in appointments:
+        appointment_results.append(
+            {
+                'appointment': appointment,
+                'patient_label': _patient_label(appointment.patient),
+                'local_start': timezone.localtime(appointment.start_at, tz),
+                'local_end': timezone.localtime(appointment.end_at, tz),
+                'service_name': appointment.appointment_type.name if appointment.appointment_type else 'General appointment',
+            }
+        )
+
+    patient_results = []
+    for patient in patients:
+        next_appointment = (
+            _searchable_appointments_for_staff(staff)
+            .filter(patient=patient, start_at__gte=timezone.now())
+            .order_by('start_at')
+            .first()
+        )
+        patient_results.append(
+            {
+                'patient': patient,
+                'next_appointment_local': timezone.localtime(next_appointment.start_at, tz) if next_appointment else None,
+            }
+        )
+
+    return render(
+        request,
+        'core/portal_search.html',
+        {
+            'clinic': clinic,
+            'query': query,
+            'appointment_results': appointment_results,
+            'patient_results': patient_results,
+            'has_results': bool(appointment_results or patient_results),
             'current_local_time': timezone.localtime(timezone.now(), tz),
         },
     )

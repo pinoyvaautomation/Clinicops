@@ -7,6 +7,7 @@ from .models import Notification, Patient, Staff
 from .plan_limits import clinic_can_use_notifications, clinic_usage_summary
 
 ALLOWED_GROUPS = {'Admin', 'Doctor', 'Nurse', 'FrontDesk'}
+SEARCHABLE_GROUPS = {'Admin', 'Doctor', 'FrontDesk'}
 
 
 def user_roles(request):
@@ -22,6 +23,7 @@ def user_roles(request):
 
     is_admin = user.is_superuser or user.groups.filter(name='Admin').exists()
     is_staff_user = user.is_superuser or user.groups.filter(name__in=ALLOWED_GROUPS).exists()
+    can_staff_search = user.is_superuser or user.groups.filter(name__in=SEARCHABLE_GROUPS).exists()
 
     clinic = None
     avatar_url = None
@@ -100,4 +102,5 @@ def user_roles(request):
         'nav_notifications_unread_count': unread_notifications,
         'nav_notification_preview': notification_preview,
         'nav_plan_usage': plan_usage,
+        'nav_can_search': can_staff_search and is_staff_user,
     }

@@ -509,16 +509,16 @@
   }
   body.portal-shell-page {
     --shell-edge: 18px;
-    --shell-sidebar-width: 244px;
+    --shell-sidebar-width: 216px;
     --shell-topbar-height: 76px;
   }
   body.portal-shell-page .wrap {
     max-width: none;
     margin: 0;
-    padding: calc(var(--shell-topbar-height) + 40px) 28px 56px calc(var(--shell-sidebar-width) + 46px);
+    padding: calc(var(--shell-topbar-height) + 40px) 22px 56px calc(var(--shell-sidebar-width) + 34px);
   }
   body.portal-shell-page .site-footer {
-    margin: 48px 18px 0 calc(var(--shell-sidebar-width) + 18px);
+    margin: 48px 12px 0 calc(var(--shell-sidebar-width) + 12px);
     border-radius: 26px;
     border: 1px solid rgba(148, 163, 184, 0.18);
     box-shadow: 0 18px 38px rgba(148, 163, 184, 0.14);
@@ -630,7 +630,7 @@
     padding: 14px 18px;
     position: fixed;
     top: var(--shell-edge);
-    left: calc(var(--shell-sidebar-width) + 32px);
+    left: calc(var(--shell-sidebar-width) + 24px);
     right: var(--shell-edge);
     min-height: var(--shell-topbar-height);
     z-index: 1200;
@@ -671,6 +671,73 @@
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+  }
+  .topbar-search {
+    flex: 1 1 420px;
+    max-width: 540px;
+    margin-left: auto;
+  }
+  .topbar-search form {
+    margin: 0;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    overflow: hidden;
+  }
+  .topbar-search__field {
+    width: 100%;
+    min-width: 0;
+    min-height: 46px;
+    border: none;
+    background: transparent;
+    padding: 0 16px;
+    font: inherit;
+    color: #0f172a;
+  }
+  .topbar-search__field:focus {
+    outline: none;
+  }
+  .topbar-search__button,
+  .topbar-search__shortcut {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 0 16px;
+    border: none;
+    border-left: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.94);
+    color: #0f172a;
+    font: inherit;
+    font-weight: 700;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .topbar-search__shortcut {
+    display: none;
+    min-height: 40px;
+    padding: 0 12px;
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    border-radius: 14px;
+    background: #fff;
+  }
+  .topbar-search__icon {
+    width: 18px;
+    height: 18px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 18px;
+  }
+  .topbar-search__icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
   }
   .nav-drawer {
     position: fixed;
@@ -733,6 +800,12 @@
       padding: 12px 14px;
       border-radius: 22px;
       top: 12px;
+    }
+    .topbar-search {
+      display: none;
+    }
+    .topbar-search__shortcut {
+      display: inline-flex;
     }
     .topbar-title {
       font-size: 1rem;
@@ -827,7 +900,40 @@
     </div>
   </div>
 
+  {% if nav_can_search %}
+    <div class="topbar-search">
+      <form method="get" action="{% url 'portal-search' %}">
+        <input
+          class="topbar-search__field"
+          type="search"
+          name="q"
+          value="{{ request.GET.q|default_if_none:'' }}"
+          placeholder="Search confirmation code, patient, or email"
+          aria-label="Search appointments and patients"
+        >
+        <button class="topbar-search__button" type="submit">
+          <span class="topbar-search__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none">
+              <path d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </span>
+          Search
+        </button>
+      </form>
+    </div>
+  {% endif %}
+
   <div class="nav-actions">
+    {% if nav_can_search %}
+      <a class="topbar-search__shortcut" href="{% url 'portal-search' %}" aria-label="Open search">
+        <span class="topbar-search__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none">
+            <path d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </span>
+        Search
+      </a>
+    {% endif %}
     {% if nav_is_staff and nav_notifications_enabled %}
       <div class="nav-popover">
         <button

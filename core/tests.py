@@ -875,3 +875,95 @@ class GoogleSocialAuthTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Continue with Google')
+
+
+class PortalSearchTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Search Clinic', timezone='UTC')
+        self.service = AppointmentType.objects.create(
+            clinic=self.clinic,
+            name='General checkup',
+            duration_minutes=30,
+        )
+
+        self.frontdesk_user = User.objects.create_user(username='frontdesk-search', password='password')
+        self.doctor_user = User.objects.create_user(username='doctor-search', password='password')
+        self.other_doctor_user = User.objects.create_user(username='doctor-other-search', password='password')
+        self.nurse_user = User.objects.create_user(username='nurse-search', password='password')
+
+        frontdesk_group, _ = Group.objects.get_or_create(name='FrontDesk')
+        doctor_group, _ = Group.objects.get_or_create(name='Doctor')
+        nurse_group, _ = Group.objects.get_or_create(name='Nurse')
+
+        self.frontdesk_user.groups.add(frontdesk_group)
+        self.doctor_user.groups.add(doctor_group)
+        self.other_doctor_user.groups.add(doctor_group)
+        self.nurse_user.groups.add(nurse_group)
+
+        self.frontdesk_staff = Staff.objects.create(user=self.frontdesk_user, clinic=self.clinic)
+        self.doctor_staff = Staff.objects.create(user=self.doctor_user, clinic=self.clinic)
+        self.other_doctor_staff = Staff.objects.create(user=self.other_doctor_user, clinic=self.clinic)
+        Staff.objects.create(user=self.nurse_user, clinic=self.clinic)
+
+        self.patient_visible = Patient.objects.create(
+            clinic=self.clinic,
+            first_name='Jamie',
+            last_name='Visible',
+            email='jamie.visible@example.com',
+            phone='555-1010',
+        )
+        self.patient_hidden = Patient.objects.create(
+            clinic=self.clinic,
+            first_name='Avery',
+            last_name='Hidden',
+            email='avery.hidden@example.com',
+            phone='555-2020',
+        )
+
+        start = timezone.now() + timedelta(days=1)
+        self.visible_appointment = Appointment.objects.create(
+            clinic=self.clinic,
+            staff=self.doctor_staff,
+            patient=self.patient_visible,
+            appointment_type=self.service,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+        )
+        hidden_start = start + timedelta(hours=1)
+        self.hidden_appointment = Appointment.objects.create(
+            clinic=self.clinic,
+            staff=self.other_doctor_staff,
+            patient=self.patient_hidden,
+            appointment_type=self.service,
+            start_at=hidden_start,
+            end_at=hidden_start + timedelta(minutes=30),
+        )
+
+    def test_frontdesk_exact_confirmation_code_redirects_to_appointment(self):
+        self.client.force_login(self.frontdesk_user)
+
+        response = self.client.get(
+            reverse('portal-search'),
+            {'q': self.visible_appointment.confirmation_code.lower()},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('staff-appointment-edit', args=[self.visible_appointment.id]))
+
+    def test_doctor_search_only_returns_assigned_records(self):
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse('portal-search'), {'q': 'Visible'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.patient_visible.email)
+        self.assertNotContains(response, self.patient_hidden.last_name)
+        self.assertContains(response, self.visible_appointment.confirmation_code)
+        self.assertNotContains(response, self.hidden_appointment.confirmation_code)
+
+    def test_nurse_cannot_use_portal_search(self):
+        self.client.force_login(self.nurse_user)
+
+        response = self.client.get(reverse('portal-search'), {'q': 'Jamie'})
+
+        self.assertEqual(response.status_code, 403)

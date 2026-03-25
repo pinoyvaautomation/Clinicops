@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ clinic.name }} Search</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: {{ clinic.brand_color|default:"#0ea5a6" }};
+        --ink: #0f172a;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.18);
+        --panel: rgba(255, 255, 255, 0.94);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 166, 0.12), transparent 28%),
+          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
+      }
+      .wrap {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 22px 24px 48px;
+      }
+      .hero, .section, .result-card {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 26px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 24%),
+          linear-gradient(135deg, #0f172a 0%, #111827 58%, var(--brand) 150%);
+      }
+      .eyebrow, .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(2.1rem, 4.5vw, 3.6rem);
+        line-height: 0.96;
+      }
+      .hero p {
+        margin: 0;
+        max-width: 760px;
+        color: rgba(248, 250, 252, 0.8);
+        line-height: 1.7;
+      }
+      .hero-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 18px;
+      }
+      .section {
+        margin-top: 18px;
+        padding: 22px;
+        background: var(--panel);
+      }
+      .section-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 14px;
+      }
+      .section-head h2 {
+        margin: 0;
+        font-size: 1.4rem;
+      }
+      .section-head p {
+        margin: 0;
+        color: var(--muted);
+      }
+      .result-grid {
+        display: grid;
+        gap: 12px;
+      }
+      .result-card {
+        padding: 18px;
+        background: #fff;
+      }
+      .result-card h3 {
+        margin: 0 0 10px;
+        font-size: 1.12rem;
+      }
+      .result-card p {
+        margin: 0;
+        color: #334155;
+        line-height: 1.65;
+      }
+      .result-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+      }
+      .result-chip {
+        display: inline-flex;
+        align-items: center;
+        min-height: 30px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.06);
+        color: #475569;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .result-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 42px;
+        padding: 0 16px;
+        border-radius: 14px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+        color: var(--ink);
+        text-decoration: none;
+        font-weight: 700;
+      }
+      .button.primary {
+        border-color: transparent;
+        background: linear-gradient(135deg, #0f766e, #0f172a);
+        color: #fff;
+      }
+      .empty-state {
+        display: grid;
+        gap: 10px;
+        padding: 18px;
+        border-radius: 20px;
+        border: 1px dashed rgba(148, 163, 184, 0.32);
+        background: rgba(248, 250, 252, 0.8);
+        color: #475569;
+      }
+      .empty-state strong {
+        color: #0f172a;
+        font-size: 1.05rem;
+      }
+    </style>
+  </head>
+  <body>
+    {% include "core/partials/top_nav.html" %}
+
+    <main class="wrap">
+      <section class="hero">
+        <div class="eyebrow">Portal search</div>
+        <h1>
+          {% if query %}
+            Search results for “{{ query }}”
+          {% else %}
+            Search appointments and patients
+          {% endif %}
+        </h1>
+        <p>Use the top search to jump straight to a booking by confirmation code or scan matching patients and appointments by name, email, phone, or service.</p>
+        <div class="hero-meta">
+          <span class="pill">{{ current_local_time|date:"M d, Y h:i A" }}</span>
+          <span class="pill">{{ clinic.name }}</span>
+          <span class="pill">Confirmation code, patient, email</span>
+        </div>
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>Appointments</h2>
+            <p>{% if query %}Matching bookings inside your clinic access scope.{% else %}Enter a confirmation code or patient details in the top search bar.{% endif %}</p>
+          </div>
+          <a class="button" href="{% url 'staff-appointments' %}">Open appointments</a>
+        </div>
+
+        {% if appointment_results %}
+          <div class="result-grid">
+            {% for result in appointment_results %}
+              <article class="result-card">
+                <h3>{{ result.patient_label }}</h3>
+                <p>{{ result.service_name }} with confirmation {{ result.appointment.confirmation_code }}</p>
+                <div class="result-meta">
+                  <span class="result-chip">{{ result.local_start|date:"M d, Y" }}</span>
+                  <span class="result-chip">{{ result.local_start|date:"h:i A" }} to {{ result.local_end|date:"h:i A" }}</span>
+                  <span class="result-chip">{{ result.appointment.get_status_display }}</span>
+                </div>
+                <div class="result-actions">
+                  <a class="button primary" href="{% url 'staff-appointment-edit' result.appointment.id %}">Open appointment</a>
+                  <a class="button" href="{% url 'staff-appointment-history' result.appointment.id %}">History</a>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <strong>No appointment matches yet.</strong>
+            <span>{% if query %}Try a patient email, service name, or the exact confirmation code.{% else %}The top bar search works best with a confirmation code like `QVWBSBIPBS6Y` or a patient email.{% endif %}</span>
+          </div>
+        {% endif %}
+      </section>
+
+      <section class="section">
+        <div class="section-head">
+          <div>
+            <h2>Patients</h2>
+            <p>Patient matches only include records you can already access in the clinic portal.</p>
+          </div>
+          <a class="button" href="{% url 'staff-patients' %}">Open patients</a>
+        </div>
+
+        {% if patient_results %}
+          <div class="result-grid">
+            {% for result in patient_results %}
+              <article class="result-card">
+                <h3>{{ result.patient.first_name }} {{ result.patient.last_name }}</h3>
+                <p>{{ result.patient.email|default:"No email on file" }}{% if result.patient.phone %} · {{ result.patient.phone }}{% endif %}</p>
+                <div class="result-meta">
+                  {% if result.next_appointment_local %}
+                    <span class="result-chip">Next appointment {{ result.next_appointment_local|date:"M d, h:i A" }}</span>
+                  {% else %}
+                    <span class="result-chip">No upcoming appointment</span>
+                  {% endif %}
+                </div>
+                <div class="result-actions">
+                  <a class="button primary" href="{% url 'staff-patient-edit' result.patient.id %}">Open patient</a>
+                </div>
+              </article>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="empty-state">
+            <strong>No patient matches yet.</strong>
+            <span>{% if query %}Try first name, last name, email, or phone.{% else %}Start with a patient name, email, or phone number to see results here.{% endif %}</span>
+          </div>
+        {% endif %}
+      </section>
+    </main>
+
+    {% include "core/partials/site_footer.html" %}
+  </body>
+</html>
