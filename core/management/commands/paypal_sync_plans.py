@@ -6,7 +6,7 @@ from core.paypal import PayPalError, create_plan, create_product
 
 
 class Command(BaseCommand):
-    help = 'Create PayPal product/plan IDs for local Plan records without paypal_plan_id.'
+    help = 'Create PayPal product/plan IDs for paid Plan records without paypal_plan_id.'
 
     def add_arguments(self, parser):
         parser.add_argument('--product-name', default='ClinicOps Subscription', help='PayPal product name.')
@@ -29,12 +29,15 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f'Created product: {product_id}'))
             self.stdout.write('Set PAYPAL_PRODUCT_ID in your .env to reuse this product.')
 
-        plans = Plan.objects.all().order_by('price_cents')
+        plans = Plan.objects.filter(is_active=True).order_by('price_cents')
         if not plans.exists():
             self.stdout.write('No plans found. Create plans in admin first.')
             return
 
         for plan in plans:
+            if plan.is_free:
+                self.stdout.write(f'Skipping {plan.name} (free plans do not sync to PayPal).')
+                continue
             if plan.paypal_plan_id and not options['force']:
                 self.stdout.write(f'Skipping {plan.name} (already has PayPal plan id).')
                 continue

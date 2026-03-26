@@ -244,9 +244,74 @@ class AppointmentAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
 
 @admin.register(Plan)
 class PlanAdmin(SimpleHistoryAdmin):
-    list_display = ('name', 'paypal_plan_id', 'interval', 'price_cents', 'currency', 'is_active')
-    list_filter = ('interval', 'is_active')
+    list_display = (
+        'name',
+        'plan_mode',
+        'interval',
+        'price_display',
+        'staff_limit_display',
+        'service_limit_display',
+        'monthly_appointment_limit_display',
+        'includes_reminders',
+        'includes_notifications',
+        'includes_custom_branding',
+        'is_active',
+    )
+    list_filter = ('is_free', 'interval', 'is_active', 'includes_reminders', 'includes_notifications')
     search_fields = ('name', 'paypal_plan_id')
+    fieldsets = (
+        (
+            'Plan identity',
+            {
+                'fields': ('name', 'is_active', 'is_free'),
+                'description': 'Use one Free plan and one Premium paid plan for the MVP.',
+            },
+        ),
+        (
+            'Billing',
+            {
+                'fields': ('interval', 'price_cents', 'currency', 'paypal_plan_id'),
+                'description': 'Free plans keep PayPal plan ID empty. Paid plans need the matching PayPal plan ID.',
+            },
+        ),
+        (
+            'Usage limits',
+            {
+                'fields': ('staff_limit', 'service_limit', 'monthly_appointment_limit'),
+                'description': 'Leave limits empty for unlimited usage on paid plans.',
+            },
+        ),
+        (
+            'Included features',
+            {
+                'fields': ('includes_reminders', 'includes_notifications', 'includes_custom_branding'),
+            },
+        ),
+    )
+
+    @admin.display(description='Mode')
+    def plan_mode(self, obj):
+        return 'Free' if obj.is_free else 'Paid'
+
+    @admin.display(description='Price')
+    def price_display(self, obj):
+        return 'Free' if obj.is_free else f'{obj.currency} {obj.price_cents / 100:.2f}'
+
+    @admin.display(description='Staff')
+    def staff_limit_display(self, obj):
+        return obj.staff_limit if obj.staff_limit is not None else 'Unlimited'
+
+    @admin.display(description='Services')
+    def service_limit_display(self, obj):
+        return obj.service_limit if obj.service_limit is not None else 'Unlimited'
+
+    @admin.display(description='Appointments / month')
+    def monthly_appointment_limit_display(self, obj):
+        return (
+            obj.monthly_appointment_limit
+            if obj.monthly_appointment_limit is not None
+            else 'Unlimited'
+        )
 
 
 @admin.register(ClinicSubscription)
