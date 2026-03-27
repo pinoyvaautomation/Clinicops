@@ -689,6 +689,7 @@
     text-overflow: ellipsis;
   }
   .topbar-search {
+    position: relative;
     flex: 1 1 420px;
     max-width: 540px;
     margin-left: auto;
@@ -754,6 +755,92 @@
     width: 100%;
     height: 100%;
     display: block;
+  }
+  .topbar-search__panel {
+    position: absolute;
+    top: calc(100% + 10px);
+    left: 0;
+    right: 0;
+    display: none;
+    max-height: min(440px, calc(100vh - 140px));
+    overflow: auto;
+    background: rgba(255, 255, 255, 0.98);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    box-shadow: 0 20px 44px rgba(15, 23, 42, 0.14);
+    z-index: 1800;
+  }
+  .topbar-search__panel.open {
+    display: grid;
+    grid-template-rows: auto auto;
+  }
+  .topbar-search__section {
+    display: grid;
+    gap: 0;
+  }
+  .topbar-search__section + .topbar-search__section {
+    border-top: 1px solid rgba(226, 232, 240, 0.9);
+  }
+  .topbar-search__section-title {
+    padding: 12px 16px 8px;
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+  .topbar-search__items {
+    display: grid;
+  }
+  .topbar-search__item {
+    display: grid;
+    gap: 4px;
+    padding: 12px 16px;
+    text-decoration: none;
+    color: #0f172a;
+    border-top: 1px solid rgba(241, 245, 249, 0.9);
+    background: #fff;
+  }
+  .topbar-search__item:first-child {
+    border-top: none;
+  }
+  .topbar-search__item:hover {
+    background: rgba(248, 250, 252, 0.96);
+    text-decoration: none;
+  }
+  .topbar-search__item-title {
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.3;
+  }
+  .topbar-search__item-subtitle,
+  .topbar-search__item-meta {
+    color: #64748b;
+    font-size: 12px;
+    line-height: 1.45;
+  }
+  .topbar-search__state,
+  .topbar-search__empty {
+    display: grid;
+    gap: 4px;
+    padding: 14px 16px;
+    color: #64748b;
+    font-size: 13px;
+  }
+  .topbar-search__empty strong {
+    color: #0f172a;
+    font-size: 14px;
+  }
+  .topbar-search__footer {
+    border-top: 1px solid rgba(226, 232, 240, 0.9);
+    background: rgba(248, 250, 252, 0.96);
+  }
+  .topbar-search__footer a {
+    display: block;
+    padding: 12px 16px;
+    color: #0f766e;
+    font-size: 13px;
+    font-weight: 700;
+    text-decoration: none;
   }
   .nav-drawer {
     position: fixed;
@@ -922,7 +1009,11 @@
   </div>
 
   {% if nav_can_search %}
-    <div class="topbar-search">
+    <div
+      class="topbar-search"
+      data-preview-url="{% url 'portal-search-preview' %}"
+      data-search-url="{% url 'portal-search' %}"
+    >
       <form method="get" action="{% url 'portal-search' %}">
         <input
           class="topbar-search__field"
@@ -931,6 +1022,8 @@
           value="{{ request.GET.q|default_if_none:'' }}"
           placeholder="Search confirmation code, patient, or email"
           aria-label="Search appointments and patients"
+          autocomplete="off"
+          spellcheck="false"
         >
         <button class="topbar-search__button" type="submit">
           <span class="topbar-search__icon" aria-hidden="true">
@@ -941,6 +1034,7 @@
           Search
         </button>
       </form>
+      <div class="topbar-search__panel" aria-live="polite"></div>
     </div>
   {% endif %}
 
@@ -1200,6 +1294,165 @@
       if (event.key === 'Escape') {
         closeMenu(avatarBtn, avatarMenu);
         closeMenu(notificationBtn, notificationMenu);
+      }
+    });
+  })();
+
+  (function() {
+    const searchShell = document.querySelector('.topbar-search[data-preview-url]');
+    if (!searchShell) return;
+
+    const form = searchShell.querySelector('form');
+    const input = searchShell.querySelector('.topbar-search__field');
+    const panel = searchShell.querySelector('.topbar-search__panel');
+    const previewUrl = searchShell.dataset.previewUrl;
+    const searchUrl = searchShell.dataset.searchUrl;
+    if (!form || !input || !panel || !previewUrl || !searchUrl) return;
+
+    let debounceTimer = null;
+    let activeController = null;
+    let requestToken = 0;
+
+    function escapeHtml(value) {
+      return (value || '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function closePanel() {
+      panel.classList.remove('open');
+      panel.innerHTML = '';
+    }
+
+    function buildSection(title, items) {
+      if (!items || !items.length) return '';
+      return [
+        '<section class="topbar-search__section">',
+        `<div class="topbar-search__section-title">${escapeHtml(title)}</div>`,
+        '<div class="topbar-search__items">',
+        items.map(function(item) {
+          return [
+            `<a class="topbar-search__item" href="${escapeHtml(item.href)}">`,
+            `<div class="topbar-search__item-title">${escapeHtml(item.title)}</div>`,
+            `<div class="topbar-search__item-subtitle">${escapeHtml(item.subtitle || '')}</div>`,
+            `<div class="topbar-search__item-meta">${escapeHtml(item.meta || '')}</div>`,
+            '</a>',
+          ].join('');
+        }).join(''),
+        '</div>',
+        '</section>',
+      ].join('');
+    }
+
+    function renderPanel(data) {
+      const sections = [
+        buildSection('Appointments', data.appointments || []),
+        buildSection('Patients', data.patients || []),
+      ].filter(Boolean);
+
+      const body = sections.length
+        ? sections.join('')
+        : [
+            '<div class="topbar-search__empty">',
+            '<strong>No quick matches</strong>',
+            '<span>Press Enter to search the full clinic records.</span>',
+            '</div>',
+          ].join('');
+
+      const footer = [
+        '<div class="topbar-search__footer">',
+        `<a href="${escapeHtml(data.search_url || searchUrl)}">View full results</a>`,
+        '</div>',
+      ].join('');
+
+      panel.innerHTML = body + footer;
+      panel.classList.add('open');
+    }
+
+    function requestPreview(query) {
+      if (activeController) {
+        activeController.abort();
+      }
+      activeController = new AbortController();
+      const token = ++requestToken;
+
+      panel.innerHTML = '<div class="topbar-search__state">Searching…</div>';
+      panel.classList.add('open');
+
+      const url = new URL(previewUrl, window.location.origin);
+      url.searchParams.set('q', query);
+
+      fetch(url.toString(), {
+        method: 'GET',
+        credentials: 'same-origin',
+        signal: activeController.signal,
+        headers: {
+          'X-Requested-With': 'XMLHttpRequest',
+        },
+      })
+        .then(function(response) {
+          if (!response.ok) {
+            throw new Error(`Search preview failed (${response.status})`);
+          }
+          return response.json();
+        })
+        .then(function(data) {
+          if (token !== requestToken) return;
+          renderPanel(data);
+        })
+        .catch(function(error) {
+          if (error.name === 'AbortError') return;
+          panel.innerHTML = [
+            '<div class="topbar-search__empty">',
+            '<strong>Quick search unavailable</strong>',
+            '<span>Press Enter to open the full results page.</span>',
+            '</div>',
+            '<div class="topbar-search__footer">',
+            `<a href="${escapeHtml(searchUrl)}">Open search</a>`,
+            '</div>',
+          ].join('');
+          panel.classList.add('open');
+        });
+    }
+
+    function schedulePreview() {
+      window.clearTimeout(debounceTimer);
+      const query = input.value.trim();
+      if (query.length < 2) {
+        if (activeController) {
+          activeController.abort();
+        }
+        closePanel();
+        return;
+      }
+      debounceTimer = window.setTimeout(function() {
+        requestPreview(query);
+      }, 280);
+    }
+
+    input.addEventListener('input', schedulePreview);
+    input.addEventListener('focus', function() {
+      if (input.value.trim().length >= 2) {
+        schedulePreview();
+      }
+    });
+    input.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        closePanel();
+      }
+    });
+    form.addEventListener('submit', function() {
+      if (activeController) {
+        activeController.abort();
+      }
+      closePanel();
+    });
+    document.addEventListener('click', function(event) {
+      if (!searchShell.contains(event.target)) {
+        closePanel();
       }
     });
   })();

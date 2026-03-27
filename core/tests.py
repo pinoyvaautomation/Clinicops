@@ -961,6 +961,51 @@ class PortalSearchTests(TestCase):
         self.assertContains(response, self.visible_appointment.confirmation_code)
         self.assertNotContains(response, self.hidden_appointment.confirmation_code)
 
+    def test_preview_returns_grouped_matches_for_frontdesk(self):
+        self.client.force_login(self.frontdesk_user)
+
+        response = self.client.get(reverse('portal-search-preview'), {'q': 'Visible'})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['appointments']), 1)
+        self.assertEqual(len(payload['patients']), 1)
+        self.assertEqual(payload['appointments'][0]['href'], reverse('staff-appointment-edit', args=[self.visible_appointment.id]))
+        self.assertEqual(payload['patients'][0]['href'], reverse('staff-patient-edit', args=[self.patient_visible.id]))
+
+    def test_preview_exact_confirmation_code_returns_single_appointment_match(self):
+        self.client.force_login(self.frontdesk_user)
+
+        response = self.client.get(
+            reverse('portal-search-preview'),
+            {'q': self.visible_appointment.confirmation_code},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['appointments']), 1)
+        self.assertEqual(payload['appointments'][0]['href'], reverse('staff-appointment-edit', args=[self.visible_appointment.id]))
+        self.assertEqual(payload['patients'], [])
+
+    def test_doctor_preview_only_returns_assigned_records(self):
+        self.client.force_login(self.doctor_user)
+
+        response = self.client.get(reverse('portal-search-preview'), {'q': 'Visible'})
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(len(payload['appointments']), 1)
+        self.assertEqual(len(payload['patients']), 1)
+        self.assertIn(self.visible_appointment.confirmation_code, payload['appointments'][0]['subtitle'])
+        self.assertIn(self.patient_visible.email, payload['patients'][0]['subtitle'])
+
+    def test_preview_requires_allowed_staff_role(self):
+        self.client.force_login(self.nurse_user)
+
+        response = self.client.get(reverse('portal-search-preview'), {'q': 'Jamie'})
+
+        self.assertEqual(response.status_code, 403)
+
     def test_nurse_cannot_use_portal_search(self):
         self.client.force_login(self.nurse_user)
 

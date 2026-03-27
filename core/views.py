@@ -1,5 +1,6 @@
 from datetime import date, datetime, timedelta
 import hashlib
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
 
 import logging
@@ -528,6 +529,58 @@ def _matches_appointment_search(appointment: Appointment, query: str) -> bool:
         ]
         if value
     )
+
+
+def _collect_search_matches(queryset, matcher, query: str, *, limit: int, candidate_limit: int | None = None):
+    """Portal search notes: stop scanning once enough matches are found to keep preview requests lightweight."""
+    matches = []
+    scanned = 0
+    for item in queryset.iterator(chunk_size=100):
+        scanned += 1
+        if matcher(item, query):
+            matches.append(item)
+            if len(matches) >= limit:
+                break
+        if candidate_limit is not None and scanned >= candidate_limit:
+            break
+    return matches
+
+
+def _perform_portal_search(
+    *,
+    staff: Staff,
+    query: str,
+    appointment_limit: int,
+    patient_limit: int,
+    candidate_limit: int | None = None,
+):
+    """Portal search notes: share the same scoped matching rules between the page results and the live preview."""
+    normalized_query = (query or '').strip()
+    if not normalized_query:
+        return None, [], []
+
+    normalized_code = normalized_query.replace(' ', '').upper()
+    exact_appointment = _searchable_appointments_for_staff(staff).filter(
+        confirmation_code__iexact=normalized_code
+    ).first()
+    if exact_appointment:
+        return exact_appointment, [exact_appointment], []
+
+    appointments = _collect_search_matches(
+        _searchable_appointments_for_staff(staff).order_by('-start_at'),
+        _matches_appointment_search,
+        normalized_query,
+        limit=appointment_limit,
+        candidate_limit=candidate_limit,
+    )
+    patients = _collect_search_matches(
+        _searchable_patients_for_staff(staff).order_by('-id'),
+        _matches_patient_search,
+        normalized_query,
+        limit=patient_limit,
+        candidate_limit=candidate_limit,
+    )
+    return None, appointments, patients
 
 
 def _sync_subscription_from_paypal(subscription: ClinicSubscription, *, last_event_type: str):
@@ -1575,23 +1628,14 @@ def portal_search(request):
     patients = []
 
     if query:
-        normalized_code = query.replace(' ', '').upper()
-        exact_appointment = _searchable_appointments_for_staff(staff).filter(
-            confirmation_code__iexact=normalized_code
-        ).first()
+        exact_appointment, appointments, patients = _perform_portal_search(
+            staff=staff,
+            query=query,
+            appointment_limit=8,
+            patient_limit=8,
+        )
         if exact_appointment:
             return redirect('staff-appointment-edit', appointment_id=exact_appointment.id)
-
-        appointments = [
-            appointment
-            for appointment in _searchable_appointments_for_staff(staff).order_by('-start_at')
-            if _matches_appointment_search(appointment, query)
-        ][:8]
-        patients = [
-            patient
-            for patient in _searchable_patients_for_staff(staff).order_by('id')
-            if _matches_patient_search(patient, query)
-        ][:8]
 
     appointment_results = []
     for appointment in appointments:
@@ -1631,6 +1675,87 @@ def portal_search(request):
             'has_results': bool(appointment_results or patient_results),
             'current_local_time': timezone.localtime(timezone.now(), tz),
         },
+    )
+
+
+@login_required
+def portal_search_preview(request):
+    staff, error = _require_staff_portal(request)
+    if error:
+        return error
+
+    if not (_is_admin(request.user) or _is_frontdesk(request.user) or _is_doctor(request.user)):
+        return HttpResponseForbidden('Search is available to Admin, Front Desk, and Doctor roles only.')
+
+    clinic = staff.clinic
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    query = (request.GET.get('q') or '').strip()
+    search_url = f"{reverse('portal-search')}?{urlencode({'q': query})}" if query else reverse('portal-search')
+
+    if len(query) < 2:
+        return JsonResponse(
+            {
+                'ok': True,
+                'query': query,
+                'appointments': [],
+                'patients': [],
+                'search_url': search_url,
+            }
+        )
+
+    _, appointments, patients = _perform_portal_search(
+        staff=staff,
+        query=query,
+        appointment_limit=5,
+        patient_limit=5,
+        candidate_limit=200,
+    )
+
+    appointment_results = []
+    for appointment in appointments:
+        local_start = timezone.localtime(appointment.start_at, tz)
+        appointment_results.append(
+            {
+                'title': _patient_label(appointment.patient),
+                'subtitle': f'Confirmation {appointment.confirmation_code}',
+                'meta': (
+                    f'{local_start:%b %d, %Y %I:%M %p} · '
+                    f'{appointment.appointment_type.name if appointment.appointment_type else "General appointment"}'
+                ),
+                'href': reverse('staff-appointment-edit', args=[appointment.id]),
+            }
+        )
+
+    patient_results = []
+    for patient in patients:
+        next_appointment = (
+            _searchable_appointments_for_staff(staff)
+            .filter(patient=patient, start_at__gte=timezone.now())
+            .order_by('start_at')
+            .first()
+        )
+        if next_appointment:
+            next_label = timezone.localtime(next_appointment.start_at, tz).strftime('%b %d, %Y %I:%M %p')
+            meta = f'Next appointment {next_label}'
+        else:
+            meta = 'Patient record'
+        patient_results.append(
+            {
+                'title': _patient_label(patient),
+                'subtitle': patient.email or patient.phone or f'Patient {patient.id}',
+                'meta': meta,
+                'href': reverse('staff-patient-edit', args=[patient.id]),
+            }
+        )
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'query': query,
+            'appointments': appointment_results,
+            'patients': patient_results,
+            'search_url': search_url,
+        }
     )
 
 
