@@ -23,13 +23,18 @@
     </div>
   </div>
 {% endblock %}
-{% block panel_title %}Book appointment{% endblock %}
+{% block panel_title %}{% if embed_mode %}Book with {{ clinic.name }}{% else %}Book appointment{% endif %}{% endblock %}
 {% block panel_intro %}
   <p class="panel-copy">
-    Want a patient account?
-    <a class="inline-link" href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
-    Already have one?
-    <a class="inline-link" href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
+    {% if embed_mode %}
+      Booking is running inside your clinic website. Need the full page instead?
+      <a class="inline-link" href="{{ booking_public_url }}" target="_blank" rel="noopener">Open booking in a new tab</a>.
+    {% else %}
+      Want a patient account?
+      <a class="inline-link" href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
+      Already have one?
+      <a class="inline-link" href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
+    {% endif %}
   </p>
 {% endblock %}
 {% block panel_body %}
@@ -38,6 +43,9 @@
       <h3>Choose appointment type</h3>
       <p>Update the service first so the available slot list stays accurate.</p>
       <form method="get" class="stack-form" style="margin-top: 14px;">
+        {% if embed_mode %}
+          <input type="hidden" name="embed" value="1">
+        {% endif %}
         <div class="field">
           <label for="type">Appointment type</label>
           <select id="type" name="type" onchange="this.form.submit()">
@@ -67,6 +75,9 @@
   {% if appointment_types and slot_count != 0 %}
     <form method="post" class="stack-form" style="margin-top: 14px;">
       {% csrf_token %}
+      {% if embed_mode %}
+        <input type="hidden" name="embed" value="1">
+      {% endif %}
       {{ form.non_field_errors }}
       {{ form.appointment_type_id }}
 

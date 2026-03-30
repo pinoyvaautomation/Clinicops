@@ -37,6 +37,12 @@
           radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 28%),
           linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
       }
+      body.embed-mode {
+        min-height: auto;
+        background:
+          radial-gradient(circle at top left, rgba(15, 81, 50, 0.08), transparent 32%),
+          linear-gradient(180deg, #f8fbff 0%, #f3f8f6 100%);
+      }
       h1, h2, h3, strong {
         font-family: 'Space Grotesk', Arial, sans-serif;
         letter-spacing: -0.03em;
@@ -54,6 +60,11 @@
         margin: 0 auto;
         padding: 34px 0 56px;
       }
+      .page--embed {
+        width: 100%;
+        max-width: none;
+        padding: 0;
+      }
       .shell {
         display: grid;
         gap: 18px;
@@ -62,6 +73,11 @@
       }
       .shell--wide {
         grid-template-columns: minmax(0, 1fr) minmax(420px, 560px);
+      }
+      .shell--embed,
+      .shell--embed.shell--wide {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 0;
       }
       .hero,
       .panel {
@@ -148,6 +164,13 @@
       .panel {
         background: var(--panel);
         overflow: hidden;
+      }
+      .panel--embed {
+        border-radius: 0;
+        border-left: none;
+        border-right: none;
+        box-shadow: none;
+        background: rgba(255, 255, 255, 0.97);
       }
       .panel-head,
       .panel-body {
@@ -460,19 +483,23 @@
       }
     </style>
   </head>
-  <body>
-    {% include "core/partials/public_nav.html" %}
-    <main class="page {% block page_class %}{% endblock %}">
-      <section class="shell {% block shell_class %}{% endblock %}">
-        <article class="hero {% block hero_class %}{% endblock %}">
-          <div class="eyebrow">{% block hero_eyebrow %}Clinic access{% endblock %}</div>
-          <h1>{% block hero_title %}{{ public_brand_name|default:"ClinicOps" }}{% endblock %}</h1>
-          <p class="hero-copy">{% block hero_text %}{% endblock %}</p>
-          {% block hero_meta %}{% endblock %}
-          {% block hero_points %}{% endblock %}
-        </article>
+  <body{% if embed_mode %} class="embed-mode"{% endif %}>
+    {% if not embed_mode %}
+      {% include "core/partials/public_nav.html" %}
+    {% endif %}
+    <main class="page {% if embed_mode %}page--embed {% endif %}{% block page_class %}{% endblock %}">
+      <section class="shell {% if embed_mode %}shell--embed {% endif %}{% block shell_class %}{% endblock %}">
+        {% if not embed_mode %}
+          <article class="hero {% block hero_class %}{% endblock %}">
+            <div class="eyebrow">{% block hero_eyebrow %}Clinic access{% endblock %}</div>
+            <h1>{% block hero_title %}{{ public_brand_name|default:"ClinicOps" }}{% endblock %}</h1>
+            <p class="hero-copy">{% block hero_text %}{% endblock %}</p>
+            {% block hero_meta %}{% endblock %}
+            {% block hero_points %}{% endblock %}
+          </article>
+        {% endif %}
 
-        <article class="panel {% block panel_class %}{% endblock %}">
+        <article class="panel {% if embed_mode %}panel--embed {% endif %}{% block panel_class %}{% endblock %}">
           <div class="panel-head">
             <div class="brand-row{% if public_logo_url %}{% else %} logo-broken{% endif %}">
               {% if public_logo_url %}
@@ -493,6 +520,8 @@
         </article>
       </section>
     </main>
-    {% include "core/partials/site_footer.html" %}
+    {% if not embed_mode %}
+      {% include "core/partials/site_footer.html" %}
+    {% endif %}
   </body>
 </html>

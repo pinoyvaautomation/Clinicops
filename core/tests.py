@@ -230,10 +230,35 @@ class BookingViewTests(TestCase):
         response = self.client.get(reverse('clinic-booking-slug', args=[clinic.slug]))
         self.assertEqual(response.status_code, 200)
 
+    def test_booking_embed_route_is_frame_allowed(self):
+        clinic = Clinic.objects.create(name='Embed Clinic', timezone='UTC')
+        response = self.client.get(f"{reverse('clinic-booking-slug', args=[clinic.slug])}?embed=1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, f'Book with {clinic.name}')
+        self.assertNotIn('X-Frame-Options', response.headers)
+
     def test_patient_signup_slug_route(self):
         clinic = Clinic.objects.create(name='Signup Slug Clinic', timezone='UTC')
         response = self.client.get(reverse('patient-signup-slug', args=[clinic.slug]))
         self.assertEqual(response.status_code, 200)
+
+
+class SettingsEmbedTests(TestCase):
+    def test_admin_settings_shows_booking_embed_snippet(self):
+        clinic = Clinic.objects.create(name='Embed Settings Clinic', timezone='UTC')
+        admin_user = User.objects.create_user(username='embedadmin', password='password')
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        admin_user.groups.add(admin_group)
+        Staff.objects.create(user=admin_user, clinic=clinic)
+        self.client.force_login(admin_user)
+
+        response = self.client.get(reverse('settings'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Website embed')
+        self.assertContains(response, '?embed=1')
+        self.assertContains(response, '&lt;iframe', html=False)
 
 
 class AppointmentLookupTests(TestCase):

@@ -197,15 +197,34 @@
       .link-box {
         word-break: break-all;
       }
+      .code-box {
+        margin-top: 10px;
+        width: 100%;
+        min-height: 132px;
+        padding: 12px 14px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 14px;
+        background: #f8fafc;
+        color: var(--ink);
+        font: 13px/1.6 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        resize: vertical;
+      }
+      .inline-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 12px;
+      }
       @media (max-width: 980px) {
         .hero-grid, .content-grid { grid-template-columns: 1fr; }
       }
       @media (max-width: 560px) {
         .wrap { padding: 18px 16px 44px; }
         .hero, .panel, .card { border-radius: 22px; }
-        .actions, .hero-actions { flex-direction: column; align-items: stretch; }
+        .actions, .hero-actions, .inline-actions { flex-direction: column; align-items: stretch; }
         .actions .btn-brand,
         .actions .btn-ghost,
+        .inline-actions .btn-ghost,
         .hero-actions .btn,
         .hero-actions .btn-secondary {
           width: 100%;
@@ -318,10 +337,21 @@
           {% if clinic and clinic.slug and profile_type == 'staff' %}
             <div class="profile-line link-box">
               <span class="label">Public booking link</span>
-              <a href="{% url 'clinic-booking-slug' clinic.slug %}">
-                {{ request.scheme }}://{{ request.get_host }}{% url 'clinic-booking-slug' clinic.slug %}
-              </a>
+              <a href="{{ booking_public_url }}" target="_blank" rel="noopener">{{ booking_public_url }}</a>
               <p class="note" style="margin-top: 10px;">Share this link with patients when they need direct booking or account creation access.</p>
+            </div>
+          {% endif %}
+
+          {% if can_manage_booking_embed %}
+            <div class="profile-line link-box">
+              <span class="label">Website embed</span>
+              <a href="{{ booking_embed_url }}" target="_blank" rel="noopener">{{ booking_embed_url }}</a>
+              <p class="note" style="margin-top: 10px;">Use this iframe on WordPress or a custom website so the ClinicOps booking form appears inside the clinic website.</p>
+              <textarea class="code-box" id="booking-embed-code" readonly>{{ booking_embed_code }}</textarea>
+              <div class="inline-actions">
+                <button class="btn-ghost" type="button" id="copy-booking-embed">Copy embed code</button>
+                <a class="btn-ghost" href="{{ booking_embed_url }}" target="_blank" rel="noopener">Preview embed</a>
+              </div>
             </div>
           {% endif %}
 
@@ -337,5 +367,25 @@
       </section>
     </main>
     {% include "core/partials/site_footer.html" %}
+    <script>
+      (function() {
+        const copyButton = document.getElementById('copy-booking-embed');
+        const codeField = document.getElementById('booking-embed-code');
+        if (!copyButton || !codeField) return;
+
+        copyButton.addEventListener('click', async function() {
+          try {
+            await navigator.clipboard.writeText(codeField.value);
+            copyButton.textContent = 'Copied';
+            window.setTimeout(function() {
+              copyButton.textContent = 'Copy embed code';
+            }, 1600);
+          } catch (error) {
+            codeField.focus();
+            codeField.select();
+          }
+        });
+      })();
+    </script>
   </body>
 </html>

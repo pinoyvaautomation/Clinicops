@@ -24,6 +24,7 @@ from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode, urlsafe_base64_encode
 from django.views.decorators.cache import never_cache
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
@@ -117,6 +118,38 @@ def _appointment_time_label(appointment: Appointment) -> str:
 
 def _notification_link(path_name: str, *args) -> str:
     return reverse(path_name, args=args) if args else reverse(path_name)
+
+
+def _clinic_booking_path(clinic: Clinic) -> str:
+    """Embed notes: keep the public booking URL consistent anywhere we expose a share or embed link."""
+    if clinic.slug:
+        return reverse('clinic-booking-slug', args=[clinic.slug])
+    return reverse('clinic-booking', args=[clinic.id])
+
+
+def _clinic_booking_public_url(request, clinic: Clinic) -> str:
+    """Embed notes: build the shareable public booking URL from the current host."""
+    return request.build_absolute_uri(_clinic_booking_path(clinic))
+
+
+def _clinic_booking_embed_url(request, clinic: Clinic) -> str:
+    """Embed notes: iframe integrations use the same booking page in stripped embed mode."""
+    return request.build_absolute_uri(f'{_clinic_booking_path(clinic)}?embed=1')
+
+
+def _clinic_booking_embed_code(request, clinic: Clinic) -> str:
+    """Embed notes: provide a copy-paste iframe snippet for WordPress or custom websites."""
+    return (
+        '<iframe '
+        f'src="{_clinic_booking_embed_url(request, clinic)}" '
+        'width="100%" '
+        'height="840" '
+        'style="border:0;max-width:100%;" '
+        'loading="lazy" '
+        'referrerpolicy="strict-origin-when-cross-origin" '
+        'title="ClinicOps booking">'
+        '</iframe>'
+    )
 
 
 def _appointment_notification_recipients(appointment: Appointment):
@@ -1280,19 +1313,22 @@ def dashboard_view(request):
         return render(request, 'core/dashboard.html', context)
 
 
+@xframe_options_exempt
 def clinic_booking(request, clinic_id: int):
     clinic = get_object_or_404(Clinic, pk=clinic_id, is_active=True)
     return _clinic_booking(request, clinic)
 
 
+@xframe_options_exempt
 def clinic_booking_slug(request, clinic_slug: str):
     clinic = get_object_or_404(Clinic, slug=clinic_slug, is_active=True)
     return _clinic_booking(request, clinic)
 
 
 def _clinic_booking(request, clinic: Clinic):
+    embed_mode = str(request.GET.get('embed') or request.POST.get('embed') or '').lower() in {'1', 'true', 'yes'}
     if settings.ENFORCE_SUBSCRIPTION and not clinic_has_active_subscription(clinic):
-        return render(request, 'core/subscription_required.html', {'clinic': clinic})
+        return render(request, 'core/subscription_required.html', {'clinic': clinic, 'embed_mode': embed_mode})
     plan_usage = clinic_usage_summary(clinic)
     clinic_tz = ZoneInfo(clinic.timezone or 'UTC')
     staff_list = (
@@ -1437,6 +1473,8 @@ def _clinic_booking(request, clinic: Clinic):
                                     'clinic': clinic,
                                     'appointment': appointment,
                                     'appointment_local': start_at_local,
+                                    'embed_mode': embed_mode,
+                                    'booking_public_url': _clinic_booking_public_url(request, clinic),
                                 },
                             )
     else:
@@ -1456,6 +1494,8 @@ def _clinic_booking(request, clinic: Clinic):
             'form': form,
             'plan_usage': plan_usage,
             'slot_count': len(slot_choices),
+            'embed_mode': embed_mode,
+            'booking_public_url': _clinic_booking_public_url(request, clinic),
         },
     )
 
@@ -1596,6 +1636,13 @@ def settings_view(request):
         form = AvatarUploadForm()
 
     groups = list(request.user.groups.values_list('name', flat=True))
+    booking_public_url = _clinic_booking_public_url(request, clinic) if clinic and profile_type == 'staff' else ''
+    booking_embed_url = ''
+    booking_embed_code = ''
+    can_manage_booking_embed = bool(clinic and profile_type == 'staff' and _is_admin(request.user))
+    if can_manage_booking_embed:
+        booking_embed_url = _clinic_booking_embed_url(request, clinic)
+        booking_embed_code = _clinic_booking_embed_code(request, clinic)
     tz = ZoneInfo(clinic.timezone or 'UTC') if clinic else timezone.get_current_timezone()
     return render(
         request,
@@ -1607,6 +1654,10 @@ def settings_view(request):
             'avatar_saved': success,
             'avatar_url': avatar_url,
             'profile_type': profile_type,
+            'can_manage_booking_embed': can_manage_booking_embed,
+            'booking_public_url': booking_public_url,
+            'booking_embed_url': booking_embed_url,
+            'booking_embed_code': booking_embed_code,
             'current_local_time': timezone.localtime(timezone.now(), tz),
         },
     )

@@ -12,7 +12,14 @@
 {% endblock %}
 {% block panel_title %}Booking details{% endblock %}
 {% block panel_intro %}
-  <p class="panel-copy">Use the confirmation code on the appointment lookup page if you need to confirm the details later.</p>
+  <p class="panel-copy">
+    {% if embed_mode %}
+      The appointment was booked inside your clinic website. Use the confirmation code below or
+      <a class="inline-link" href="{{ booking_public_url }}" target="_blank" rel="noopener">open the full booking page</a>.
+    {% else %}
+      Use the confirmation code on the appointment lookup page if you need to confirm the details later.
+    {% endif %}
+  </p>
 {% endblock %}
 {% block panel_body %}
   <div class="detail-list">
@@ -42,8 +49,11 @@
 
   <div class="action-row">
     <a class="button button--primary" href="{% url 'appointment-lookup' %}">Look up appointment</a>
+    {% if embed_mode %}
+      <a class="button button--secondary" href="{{ booking_public_url }}" target="_blank" rel="noopener">Open full booking page</a>
+    {% endif %}
     {% if clinic.slug %}
-      <a class="button button--secondary" href="{% url 'patient-signup-slug' clinic.slug %}">Create patient account</a>
+      <a class="button button--secondary" href="{% url 'patient-signup-slug' clinic.slug %}"{% if embed_mode %} target="_blank" rel="noopener"{% endif %}>Create patient account</a>
     {% endif %}
   </div>
 {% endblock %}
