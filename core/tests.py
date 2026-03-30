@@ -10,6 +10,7 @@ from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core import mail
 from django.core.exceptions import ValidationError
+from django.test import Client
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
@@ -237,6 +238,45 @@ class BookingViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, f'Book with {clinic.name}')
         self.assertNotIn('X-Frame-Options', response.headers)
+
+    def test_booking_embed_post_succeeds_with_csrf_checks_enabled(self):
+        clinic = Clinic.objects.create(name='Embed Submit Clinic', timezone='UTC')
+        user = User.objects.create_user(username='embedstaff', password='password')
+        staff = Staff.objects.create(user=user, clinic=clinic)
+        appointment_type = AppointmentType.objects.create(
+            clinic=clinic,
+            name='Embed Consult',
+            duration_minutes=30,
+        )
+
+        csrf_client = Client(enforce_csrf_checks=True)
+        get_response = csrf_client.get(f"{reverse('clinic-booking-slug', args=[clinic.slug])}?embed=1")
+        self.assertEqual(get_response.status_code, 200)
+        form = get_response.context['form']
+        slot_choices = form.fields['slot'].choices
+        self.assertTrue(slot_choices)
+        slot_value = slot_choices[-1][0]
+        appointment_type_id = form.fields['appointment_type_id'].initial or appointment_type.id
+
+        post_response = csrf_client.post(
+            f"{reverse('clinic-booking-slug', args=[clinic.slug])}?embed=1",
+            data={
+                'embed': '1',
+                'first_name': 'Jamie',
+                'last_name': 'Embed',
+                'email': 'jamie.embed@example.com',
+                'phone': '555-0111',
+                'appointment_type_id': appointment_type_id,
+                'slot': slot_value,
+                'notes': 'Embed booking',
+            },
+        )
+
+        self.assertEqual(post_response.status_code, 200)
+        template_names = [template.name for template in post_response.templates]
+        self.assertIn('core/booking_success.html', template_names, template_names)
+        self.assertEqual(Appointment.objects.filter(clinic=clinic).count(), 1)
+        self.assertNotIn('X-Frame-Options', post_response.headers)
 
     def test_patient_signup_slug_route(self):
         clinic = Clinic.objects.create(name='Signup Slug Clinic', timezone='UTC')

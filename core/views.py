@@ -1313,12 +1313,14 @@ def dashboard_view(request):
         return render(request, 'core/dashboard.html', context)
 
 
+@csrf_exempt
 @xframe_options_exempt
 def clinic_booking(request, clinic_id: int):
     clinic = get_object_or_404(Clinic, pk=clinic_id, is_active=True)
     return _clinic_booking(request, clinic)
 
 
+@csrf_exempt
 @xframe_options_exempt
 def clinic_booking_slug(request, clinic_slug: str):
     clinic = get_object_or_404(Clinic, slug=clinic_slug, is_active=True)
