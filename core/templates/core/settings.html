@@ -221,8 +221,66 @@
         flex-wrap: wrap;
         margin-top: 12px;
       }
+      .security-grid {
+        margin-top: 18px;
+        display: grid;
+        gap: 16px;
+        grid-template-columns: minmax(0, 1fr) minmax(280px, 1fr);
+      }
+      .security-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 18px;
+      }
+      .security-item {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      .security-row,
+      .security-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+      .security-row {
+        justify-content: space-between;
+      }
+      .security-meta {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 14px;
+      }
+      .event-pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 28px;
+        padding: 5px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+      }
+      .event-pill.login-success {
+        background: rgba(14, 165, 166, 0.12);
+        color: #0f766e;
+      }
+      .event-pill.login-failed {
+        background: rgba(185, 28, 28, 0.12);
+        color: #b91c1c;
+      }
+      .event-pill.logout {
+        background: rgba(15, 23, 42, 0.08);
+        color: var(--ink-soft);
+      }
+      .event-pill.password-changed {
+        background: rgba(37, 99, 235, 0.12);
+        color: #1d4ed8;
+      }
       @media (max-width: 980px) {
-        .hero-grid, .content-grid { grid-template-columns: 1fr; }
+        .hero-grid, .content-grid, .security-grid { grid-template-columns: 1fr; }
       }
       @media (max-width: 560px) {
         .wrap { padding: 18px 16px 44px; }
@@ -376,6 +434,66 @@
             <button class="btn-ghost" type="submit" style="width: 100%;">Log out</button>
           </form>
         </aside>
+      </section>
+
+      <section class="security-grid">
+        <article class="card">
+          <h2>Recent sign-ins</h2>
+          <p class="note">This account keeps a short access trail with time, IP address, and browser details.</p>
+
+          <div class="security-list">
+            {% for event in recent_user_security_events %}
+              <div class="security-item">
+                <div class="security-row">
+                  <strong>{{ event.get_event_type_display }}</strong>
+                  <span class="event-pill {{ event.event_type|slugify }}">{{ event.get_event_type_display }}</span>
+                </div>
+                <div class="security-meta">
+                  <span>{{ event.created_local|date:"M j, g:i A" }}</span>
+                  {% if event.ip_address %}<span>IP {{ event.ip_address }}</span>{% endif %}
+                </div>
+                {% if event.user_agent %}
+                  <p class="note" style="margin-top: 8px;">{{ event.user_agent|truncatechars:96 }}</p>
+                {% endif %}
+              </div>
+            {% empty %}
+              <div class="security-item">
+                <strong>No recent access events yet</strong>
+                <p class="note" style="margin-top: 8px;">Successful sign-ins, failed attempts, logouts, and password changes will appear here.</p>
+              </div>
+            {% endfor %}
+          </div>
+        </article>
+
+        {% if can_view_clinic_security_activity %}
+          <aside class="panel">
+            <h2>Clinic access activity</h2>
+            <p class="note">Clinic admins can review the latest team login activity without leaving the portal.</p>
+
+            <div class="security-list">
+              {% for event in recent_clinic_security_events %}
+                <div class="security-item">
+                  <div class="security-row">
+                    <strong>{{ event.user.get_full_name|default:event.user.username|default:event.identifier|default:"Unknown account" }}</strong>
+                    <span class="event-pill {{ event.event_type|slugify }}">{{ event.get_event_type_display }}</span>
+                  </div>
+                  <div class="security-meta">
+                    <span>{{ event.created_local|date:"M j, g:i A" }}</span>
+                    {% if event.ip_address %}<span>IP {{ event.ip_address }}</span>{% endif %}
+                  </div>
+                  {% if event.user_agent %}
+                    <p class="note" style="margin-top: 8px;">{{ event.user_agent|truncatechars:88 }}</p>
+                  {% endif %}
+                </div>
+              {% empty %}
+                <div class="security-item">
+                  <strong>No clinic activity yet</strong>
+                  <p class="note" style="margin-top: 8px;">Team sign-ins and password changes will appear here once the portal is in use.</p>
+                </div>
+              {% endfor %}
+            </div>
+          </aside>
+        {% endif %}
       </section>
     </main>
     {% include "core/partials/site_footer.html" %}

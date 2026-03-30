@@ -8,7 +8,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.views import LoginView
+from django.contrib.auth.views import LoginView, PasswordChangeView
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.auth.tokens import default_token_generator
@@ -19,7 +19,7 @@ from django.db import transaction
 from django.http import HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils import timezone
 from django.utils.encoding import force_bytes, force_str
 from django.utils.http import url_has_allowed_host_and_scheme, urlsafe_base64_decode, urlsafe_base64_encode
@@ -54,6 +54,7 @@ from .models import (
     PayPalWebhookEvent,
     Patient,
     Plan,
+    SecurityEvent,
     Staff,
 )
 from .notifications import create_clinic_notifications
@@ -67,6 +68,7 @@ from .plan_limits import (
     get_current_subscription,
 )
 from .paypal import PayPalError, get_subscription, verify_webhook_signature
+from .security import find_user_for_security_identifier, log_security_event
 from .subscriptions import clinic_has_active_subscription, map_paypal_status, parse_paypal_datetime
 
 User = get_user_model()
@@ -79,6 +81,35 @@ _UNSET = object()
 class ClinicLoginView(LoginView):
     authentication_form = ClinicAuthenticationForm
     template_name = 'registration/login.html'
+
+    def form_invalid(self, form):
+        identifier = (self.request.POST.get('username') or '').strip()
+        if identifier:
+            matched_user = find_user_for_security_identifier(identifier)
+            log_security_event(
+                event_type=SecurityEvent.EventType.LOGIN_FAILED,
+                request=self.request,
+                user=matched_user,
+                identifier=identifier.lower() if '@' in identifier else identifier,
+                metadata={'error_fields': sorted(form.errors.keys())},
+            )
+        return super().form_invalid(form)
+
+
+class ClinicPasswordChangeView(PasswordChangeView):
+    template_name = 'registration/password_change_form.html'
+    success_url = reverse_lazy('password_change_done')
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        log_security_event(
+            event_type=SecurityEvent.EventType.PASSWORD_CHANGED,
+            request=self.request,
+            user=self.request.user,
+            identifier=self.request.user.email or self.request.user.username,
+            metadata={'source': 'password_change'},
+        )
+        return response
 
 
 def page_not_found(request, exception=None):
@@ -1642,10 +1673,26 @@ def settings_view(request):
     booking_embed_url = ''
     booking_embed_code = ''
     can_manage_booking_embed = bool(clinic and profile_type == 'staff' and _is_admin(request.user))
+    can_view_clinic_security_activity = bool(clinic and profile_type == 'staff' and _is_admin(request.user))
     if can_manage_booking_embed:
         booking_embed_url = _clinic_booking_embed_url(request, clinic)
         booking_embed_code = _clinic_booking_embed_code(request, clinic)
     tz = ZoneInfo(clinic.timezone or 'UTC') if clinic else timezone.get_current_timezone()
+    recent_user_security_events = list(
+        SecurityEvent.objects.filter(user=request.user)
+        .order_by('-created_at')[:6]
+    )
+    for event in recent_user_security_events:
+        event.created_local = timezone.localtime(event.created_at, tz)
+    recent_clinic_security_events = []
+    if can_view_clinic_security_activity:
+        recent_clinic_security_events = list(
+            SecurityEvent.objects.filter(clinic=clinic)
+            .select_related('user')
+            .order_by('-created_at')[:10]
+        )
+        for event in recent_clinic_security_events:
+            event.created_local = timezone.localtime(event.created_at, tz)
     return render(
         request,
         'core/settings.html',
@@ -1657,9 +1704,12 @@ def settings_view(request):
             'avatar_url': avatar_url,
             'profile_type': profile_type,
             'can_manage_booking_embed': can_manage_booking_embed,
+            'can_view_clinic_security_activity': can_view_clinic_security_activity,
             'booking_public_url': booking_public_url,
             'booking_embed_url': booking_embed_url,
             'booking_embed_code': booking_embed_code,
+            'recent_user_security_events': recent_user_security_events,
+            'recent_clinic_security_events': recent_clinic_security_events,
             'current_local_time': timezone.localtime(timezone.now(), tz),
         },
     )

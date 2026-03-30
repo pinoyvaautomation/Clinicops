@@ -34,6 +34,7 @@ from .models import (
     PayPalWebhookEvent,
     Patient,
     Plan,
+    SecurityEvent,
     Staff,
 )
 from .notifications import create_clinic_notifications
@@ -305,6 +306,91 @@ class SettingsEmbedTests(TestCase):
         self.assertContains(response, 'Website embed')
         self.assertContains(response, '?embed=1')
         self.assertContains(response, '&lt;iframe', html=False)
+
+
+class SecurityEventTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Security Clinic', timezone='UTC')
+        self.user = User.objects.create_user(
+            username='security-admin@example.com',
+            email='security-admin@example.com',
+            password='password',
+            first_name='Security',
+            last_name='Admin',
+        )
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.user.groups.add(admin_group)
+        self.staff = Staff.objects.create(user=self.user, clinic=self.clinic)
+        self.client = Client()
+
+    def test_login_success_creates_security_event(self):
+        response = self.client.post(
+            reverse('login'),
+            {'username': self.user.username, 'password': 'password'},
+            HTTP_USER_AGENT='ClinicOps Browser',
+            REMOTE_ADDR='203.0.113.10',
+        )
+
+        self.assertEqual(response.status_code, 302)
+        event = SecurityEvent.objects.get(event_type=SecurityEvent.EventType.LOGIN_SUCCESS)
+        self.assertEqual(event.user, self.user)
+        self.assertEqual(event.clinic, self.clinic)
+        self.assertEqual(event.ip_address, '203.0.113.10')
+        self.assertEqual(event.identifier, self.user.email)
+
+    def test_failed_login_creates_security_event(self):
+        response = self.client.post(
+            reverse('login'),
+            {'username': self.user.username, 'password': 'wrong-password'},
+            HTTP_USER_AGENT='ClinicOps Browser',
+            REMOTE_ADDR='203.0.113.11',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = SecurityEvent.objects.get(event_type=SecurityEvent.EventType.LOGIN_FAILED)
+        self.assertEqual(event.user, self.user)
+        self.assertEqual(event.clinic, self.clinic)
+        self.assertEqual(event.ip_address, '203.0.113.11')
+        self.assertEqual(event.identifier, self.user.username)
+
+    def test_password_change_creates_security_event(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('password_change'),
+            {
+                'old_password': 'password',
+                'new_password1': 'SaferPass123!',
+                'new_password2': 'SaferPass123!',
+            },
+            HTTP_USER_AGENT='ClinicOps Browser',
+            REMOTE_ADDR='203.0.113.12',
+        )
+
+        self.assertEqual(response.status_code, 302)
+        event = SecurityEvent.objects.get(event_type=SecurityEvent.EventType.PASSWORD_CHANGED)
+        self.assertEqual(event.user, self.user)
+        self.assertEqual(event.clinic, self.clinic)
+        self.assertEqual(event.ip_address, '203.0.113.12')
+
+    def test_admin_settings_shows_recent_clinic_security_activity(self):
+        SecurityEvent.objects.create(
+            clinic=self.clinic,
+            user=self.user,
+            event_type=SecurityEvent.EventType.LOGIN_SUCCESS,
+            identifier=self.user.email,
+            ip_address='203.0.113.13',
+            user_agent='ClinicOps Browser',
+            path='/accounts/login/',
+        )
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('settings'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Clinic access activity')
+        self.assertContains(response, '203.0.113.13')
+        self.assertContains(response, 'Login success')
 
 
 class AvatarUploadTests(TestCase):

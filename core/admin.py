@@ -14,6 +14,7 @@ from .models import (
     ClinicSubscription,
     Patient,
     Plan,
+    SecurityEvent,
     Staff,
 )
 
@@ -324,6 +325,20 @@ class ClinicSubscriptionAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
 @admin.register(AdminBranding)
 class AdminBrandingAdmin(admin.ModelAdmin):
     list_display = ('site_header', 'site_title', 'index_title', 'updated_at')
+
+
+@admin.register(SecurityEvent)
+class SecurityEventAdmin(admin.ModelAdmin):
+    list_display = ('event_type', 'user', 'identifier', 'clinic', 'ip_address', 'created_at')
+    list_filter = ('event_type', 'clinic')
+    search_fields = ('user__username', 'user__email', 'identifier', 'ip_address', 'user_agent')
+    readonly_fields = ('clinic', 'user', 'event_type', 'identifier', 'ip_address', 'user_agent', 'path', 'metadata', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
     def has_add_permission(self, request):
         return not AdminBranding.objects.exists()

@@ -356,3 +356,45 @@ class PayPalWebhookEvent(models.Model):
 
     def __str__(self) -> str:
         return f'{self.event_type or "PayPal event"} ({self.event_id})'
+
+
+class SecurityEvent(models.Model):
+    class EventType(models.TextChoices):
+        LOGIN_SUCCESS = 'login_success', 'Login success'
+        LOGIN_FAILED = 'login_failed', 'Login failed'
+        LOGOUT = 'logout', 'Logout'
+        PASSWORD_CHANGED = 'password_changed', 'Password changed'
+
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.SET_NULL,
+        related_name='security_events',
+        blank=True,
+        null=True,
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='security_events',
+        blank=True,
+        null=True,
+    )
+    event_type = models.CharField(max_length=64, choices=EventType.choices)
+    identifier = models.CharField(max_length=254, blank=True)
+    ip_address = models.GenericIPAddressField(blank=True, null=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    path = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['clinic', '-created_at']),
+            models.Index(fields=['user', '-created_at']),
+            models.Index(fields=['event_type', '-created_at']),
+        ]
+
+    def __str__(self) -> str:
+        target = self.user or self.identifier or 'unknown user'
+        return f'{self.get_event_type_display()} ({target})'
