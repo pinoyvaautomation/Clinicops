@@ -187,6 +187,12 @@
         border-radius: 14px;
         background: #fff;
       }
+      .field-errors {
+        margin-top: 10px;
+        color: #b91c1c;
+        font-size: 14px;
+        line-height: 1.5;
+      }
       .chip-list {
         margin-top: 12px;
       }
@@ -302,15 +308,21 @@
                   {% endwith %}
                 </div>
               {% endif %}
-              <div style="flex: 1; min-width: 220px;">
-                <form method="post" enctype="multipart/form-data">
-                  {% csrf_token %}
-                  {{ avatar_form.avatar.label_tag }}
-                  <div style="margin-top: 8px;">{{ avatar_form.avatar }}</div>
-                  <div class="actions" style="margin-top: 12px;">
-                    <button class="btn-brand" type="submit">Upload avatar</button>
-                  </div>
-                </form>
+                <div style="flex: 1; min-width: 220px;">
+                  <form method="post" enctype="multipart/form-data">
+                    {% csrf_token %}
+                    {{ avatar_form.avatar.label_tag }}
+                    <div style="margin-top: 8px;">{{ avatar_form.avatar }}</div>
+                    {% if avatar_form.avatar.help_text %}
+                      <p class="note" style="margin-top: 10px;">{{ avatar_form.avatar.help_text }}</p>
+                    {% endif %}
+                    {% if avatar_form.avatar.errors %}
+                      <div class="field-errors">{{ avatar_form.avatar.errors }}</div>
+                    {% endif %}
+                    <div class="actions" style="margin-top: 12px;">
+                      <button class="btn-brand" type="submit">Upload avatar</button>
+                    </div>
+                  </form>
                 {% if avatar_saved %}
                   <p class="note" style="margin-top: 10px;">Avatar updated successfully.</p>
                 {% endif %}

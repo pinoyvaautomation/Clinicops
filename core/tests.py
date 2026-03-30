@@ -1,5 +1,8 @@
 import json
+import shutil
+import tempfile
 from datetime import timedelta
+from io import BytesIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
@@ -10,15 +13,18 @@ from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core import mail
 from django.core.exceptions import ValidationError
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import Client
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
 
 from allauth.core.exceptions import ImmediateHttpResponse
+from PIL import Image
 
 from .admin import AppointmentAdmin
 from .booking import build_available_slots
+from .image_uploads import AVATAR_MAX_DIMENSION, MAX_AVATAR_UPLOAD_BYTES
 from .models import (
     Appointment,
     AppointmentType,
@@ -299,6 +305,80 @@ class SettingsEmbedTests(TestCase):
         self.assertContains(response, 'Website embed')
         self.assertContains(response, '?embed=1')
         self.assertContains(response, '&lt;iframe', html=False)
+
+
+class AvatarUploadTests(TestCase):
+    def setUp(self):
+        self.media_root = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.media_root, ignore_errors=True)
+        self.client = Client()
+        self.clinic = Clinic.objects.create(name='Avatar Clinic', timezone='UTC')
+        self.user = User.objects.create_user(
+            username='avatar-admin@example.com',
+            email='avatar-admin@example.com',
+            password='password',
+            first_name='Avatar',
+            last_name='Admin',
+        )
+        self.staff = Staff.objects.create(user=self.user, clinic=self.clinic)
+        self.client.force_login(self.user)
+
+    def _build_image_upload(self, *, size=(800, 800), format='JPEG', noisy=False, filename='avatar.jpg'):
+        if noisy:
+            image = Image.effect_noise(size, 100).convert('RGB')
+        else:
+            image = Image.new('RGB', size, '#1d4ed8')
+
+        buffer = BytesIO()
+        save_kwargs = {}
+        if format == 'JPEG':
+            save_kwargs['quality'] = 95
+        image.save(buffer, format=format, **save_kwargs)
+        return SimpleUploadedFile(filename, buffer.getvalue(), content_type=f'image/{format.lower()}')
+
+    def _build_oversized_avatar(self):
+        dimension = 1200
+        upload = self._build_image_upload(
+            size=(dimension, dimension),
+            format='PNG',
+            noisy=True,
+            filename='too-large.png',
+        )
+        while upload.size <= MAX_AVATAR_UPLOAD_BYTES:
+            dimension += 200
+            upload = self._build_image_upload(
+                size=(dimension, dimension),
+                format='PNG',
+                noisy=True,
+                filename='too-large.png',
+            )
+        return upload
+
+    def test_settings_resizes_avatar_before_save(self):
+        upload = self._build_image_upload(size=(1024, 1024), format='JPEG', filename='portrait.jpg')
+
+        with self.settings(MEDIA_ROOT=self.media_root):
+            response = self.client.post(reverse('settings'), {'avatar': upload})
+            self.staff.refresh_from_db()
+
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, 'Avatar updated successfully.')
+            self.assertTrue(self.staff.avatar.name)
+            with self.staff.avatar.open('rb') as stored_file:
+                with Image.open(stored_file) as stored_image:
+                    self.assertLessEqual(stored_image.width, AVATAR_MAX_DIMENSION)
+                    self.assertLessEqual(stored_image.height, AVATAR_MAX_DIMENSION)
+
+    def test_settings_rejects_oversized_avatar(self):
+        upload = self._build_oversized_avatar()
+
+        with self.settings(MEDIA_ROOT=self.media_root):
+            response = self.client.post(reverse('settings'), {'avatar': upload})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Avatar images must be 1 MB or smaller.')
+        self.staff.refresh_from_db()
+        self.assertFalse(bool(self.staff.avatar))
 
 
 class AppointmentLookupTests(TestCase):

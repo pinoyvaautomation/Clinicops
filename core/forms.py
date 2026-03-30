@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.conf import settings
 from django.utils import timezone
 
+from .image_uploads import prepare_avatar_upload
 from .models import Appointment, AppointmentType, Patient, Staff
 
 
@@ -251,6 +252,24 @@ class ResendVerificationForm(forms.Form):
 
 class AvatarUploadForm(forms.Form):
     avatar = forms.ImageField(required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['avatar'].widget.attrs.update(
+            {
+                'accept': 'image/jpeg,image/png,image/webp',
+            }
+        )
+        self.fields['avatar'].help_text = (
+            'Upload JPG, PNG, or WebP up to 1 MB. Avatars are resized automatically.'
+        )
+
+    def clean_avatar(self):
+        """Normalize avatar uploads so the settings view can save them directly."""
+        avatar = self.cleaned_data.get('avatar')
+        if not avatar:
+            return avatar
+        return prepare_avatar_upload(avatar)
 
 
 class AppointmentTypeForm(forms.Form):
