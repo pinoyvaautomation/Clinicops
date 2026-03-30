@@ -16,6 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import send_mail
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
@@ -1708,9 +1709,98 @@ def settings_view(request):
             'booking_public_url': booking_public_url,
             'booking_embed_url': booking_embed_url,
             'booking_embed_code': booking_embed_code,
+            'security_audit_url': reverse('security-audit') if can_view_clinic_security_activity else '',
             'recent_user_security_events': recent_user_security_events,
             'recent_clinic_security_events': recent_clinic_security_events,
             'current_local_time': timezone.localtime(timezone.now(), tz),
+        },
+    )
+
+
+@login_required
+def security_audit_view(request):
+    staff, error = _require_staff_portal(request)
+    if error:
+        return error
+    if not _is_admin(request.user):
+        return HttpResponseForbidden('Only clinic admins can view the security audit trail.')
+
+    clinic = staff.clinic
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    query = (request.GET.get('q') or '').strip()
+    role = (request.GET.get('role') or '').strip()
+    event_type = (request.GET.get('event_type') or '').strip()
+    sort = (request.GET.get('sort') or 'newest').strip()
+    date_from = (request.GET.get('date_from') or '').strip()
+    date_to = (request.GET.get('date_to') or '').strip()
+
+    events = SecurityEvent.objects.filter(clinic=clinic).select_related('user')
+
+    if query:
+        events = events.filter(
+            Q(identifier__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__email__icontains=query)
+            | Q(user__first_name__icontains=query)
+            | Q(user__last_name__icontains=query)
+        )
+
+    valid_roles = ['Admin', 'Doctor', 'Nurse', 'FrontDesk']
+    if role in valid_roles:
+        events = events.filter(user__groups__name=role)
+
+    valid_event_types = {choice[0] for choice in SecurityEvent.EventType.choices}
+    if event_type in valid_event_types:
+        events = events.filter(event_type=event_type)
+
+    if date_from:
+        try:
+            events = events.filter(created_at__date__gte=date.fromisoformat(date_from))
+        except ValueError:
+            date_from = ''
+    if date_to:
+        try:
+            events = events.filter(created_at__date__lte=date.fromisoformat(date_to))
+        except ValueError:
+            date_to = ''
+
+    if sort == 'oldest':
+        events = events.order_by('created_at').distinct()
+    else:
+        sort = 'newest'
+        events = events.order_by('-created_at').distinct()
+
+    audit_rows = list(events[:150])
+    for event in audit_rows:
+        event.created_local = timezone.localtime(event.created_at, tz)
+        event.role_label = _staff_role_for_user(event.user) if event.user else ''
+
+    recent_scope = SecurityEvent.objects.filter(clinic=clinic)
+    summary = {
+        'total_events': recent_scope.count(),
+        'login_success_count': recent_scope.filter(event_type=SecurityEvent.EventType.LOGIN_SUCCESS).count(),
+        'login_failed_count': recent_scope.filter(event_type=SecurityEvent.EventType.LOGIN_FAILED).count(),
+        'password_changed_count': recent_scope.filter(event_type=SecurityEvent.EventType.PASSWORD_CHANGED).count(),
+    }
+
+    return render(
+        request,
+        'core/security_audit.html',
+        {
+            'clinic': clinic,
+            'current_local_time': timezone.localtime(timezone.now(), tz),
+            'audit_rows': audit_rows,
+            'summary': summary,
+            'filters': {
+                'q': query,
+                'role': role,
+                'event_type': event_type,
+                'sort': sort,
+                'date_from': date_from,
+                'date_to': date_to,
+            },
+            'role_choices': valid_roles,
+            'event_type_choices': SecurityEvent.EventType.choices,
         },
     )
 

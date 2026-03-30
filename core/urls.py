@@ -27,6 +27,7 @@ urlpatterns = [
     path('verify-email/<uidb64>/<token>/', views.verify_email, name='verify-email'),
     path('resend-verification/', views.resend_verification, name='resend-verification'),
     path('settings/', views.settings_view, name='settings'),
+    path('settings/security-audit/', views.security_audit_view, name='security-audit'),
     path('search/preview/', views.portal_search_preview, name='portal-search-preview'),
     path('search/', views.portal_search, name='portal-search'),
     path('post-login/', views.post_login_redirect, name='post-login'),

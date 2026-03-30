@@ -469,6 +469,9 @@
           <aside class="panel">
             <h2>Clinic access activity</h2>
             <p class="note">Clinic admins can review the latest team login activity without leaving the portal.</p>
+            <div class="inline-actions">
+              <a class="btn-ghost" href="{{ security_audit_url }}">Open full audit trail</a>
+            </div>
 
             <div class="security-list">
               {% for event in recent_clinic_security_events %}

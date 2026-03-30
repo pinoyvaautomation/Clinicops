@@ -392,6 +392,69 @@ class SecurityEventTests(TestCase):
         self.assertContains(response, '203.0.113.13')
         self.assertContains(response, 'Login success')
 
+    def test_admin_can_filter_security_audit_trail(self):
+        doctor_user = User.objects.create_user(
+            username='doctor@example.com',
+            email='doctor@example.com',
+            password='password',
+            first_name='Doctor',
+            last_name='User',
+        )
+        doctor_group, _ = Group.objects.get_or_create(name='Doctor')
+        doctor_user.groups.add(doctor_group)
+        Staff.objects.create(user=doctor_user, clinic=self.clinic)
+
+        SecurityEvent.objects.create(
+            clinic=self.clinic,
+            user=self.user,
+            event_type=SecurityEvent.EventType.LOGIN_SUCCESS,
+            identifier=self.user.email,
+            ip_address='203.0.113.20',
+            user_agent='ClinicOps Browser',
+            path='/accounts/login/',
+        )
+        SecurityEvent.objects.create(
+            clinic=self.clinic,
+            user=doctor_user,
+            event_type=SecurityEvent.EventType.LOGIN_FAILED,
+            identifier=doctor_user.email,
+            ip_address='203.0.113.21',
+            user_agent='ClinicOps Browser',
+            path='/accounts/login/',
+        )
+
+        self.client.force_login(self.user)
+        response = self.client.get(
+            reverse('security-audit'),
+            {
+                'q': 'doctor',
+                'role': 'Doctor',
+                'event_type': SecurityEvent.EventType.LOGIN_FAILED,
+                'sort': 'oldest',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Security audit trail')
+        self.assertContains(response, 'doctor@example.com')
+        self.assertContains(response, '203.0.113.21')
+        self.assertNotContains(response, '203.0.113.20')
+
+    def test_frontdesk_cannot_open_security_audit_trail(self):
+        frontdesk_user = User.objects.create_user(
+            username='frontdesk@example.com',
+            email='frontdesk@example.com',
+            password='password',
+        )
+        frontdesk_group, _ = Group.objects.get_or_create(name='FrontDesk')
+        frontdesk_user.groups.add(frontdesk_group)
+        Staff.objects.create(user=frontdesk_user, clinic=self.clinic)
+        self.client.force_login(frontdesk_user)
+
+        response = self.client.get(reverse('security-audit'))
+
+        self.assertEqual(response.status_code, 403)
+
 
 class AvatarUploadTests(TestCase):
     def setUp(self):

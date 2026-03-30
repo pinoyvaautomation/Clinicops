@@ -962,6 +962,9 @@
   <div class="sidebar-footer">
     <p>{% if nav_is_staff %}Clinic workspace{% else %}Patient portal{% endif %}</p>
     <a href="{% url 'settings' %}">Account settings</a>
+    {% if nav_is_admin %}
+      <a href="{% url 'security-audit' %}">Security audit</a>
+    {% endif %}
   </div>
 </aside>
 
@@ -993,6 +996,8 @@
           Notifications
         {% elif current == 'settings' %}
           Settings
+        {% elif current == 'security-audit' %}
+          Security audit
         {% elif current == 'portal-search' %}
           Search
         {% elif current == 'password_change' %}
@@ -1144,6 +1149,9 @@
         </div>
         <div class="avatar-actions">
           <a class="primary" href="{% url 'settings' %}">Account settings</a>
+          {% if nav_is_admin %}
+            <a href="{% url 'security-audit' %}">Security audit</a>
+          {% endif %}
           <a href="{% url 'password_change' %}">Change password</a>
           <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}
@@ -1197,6 +1205,9 @@
 
   <div class="nav-drawer__footer">
     <a href="{% url 'settings' %}">Account settings</a>
+    {% if nav_is_admin %}
+      <a href="{% url 'security-audit' %}">Security audit</a>
+    {% endif %}
     <a href="{% url 'password_change' %}">Change password</a>
   </div>
 </aside>
