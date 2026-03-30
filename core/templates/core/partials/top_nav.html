@@ -509,19 +509,26 @@
   }
   body.portal-shell-page {
     --shell-edge: 0px;
-    --shell-sidebar-width: 204px;
+    --shell-sidebar-width-expanded: 204px;
+    --shell-sidebar-width-collapsed: 78px;
+    --shell-sidebar-width: var(--shell-sidebar-width-expanded);
     --shell-topbar-height: 76px;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed {
+    --shell-sidebar-width: var(--shell-sidebar-width-collapsed);
   }
   body.portal-shell-page .wrap {
     max-width: none;
     margin: 0;
     padding: calc(var(--shell-topbar-height) + 18px) 16px 44px calc(var(--shell-sidebar-width) + 18px);
+    transition: padding 0.2s ease;
   }
   body.portal-shell-page .site-footer {
     margin: 36px 0 0 var(--shell-sidebar-width);
     border-radius: 0;
     border: 1px solid rgba(148, 163, 184, 0.18);
     box-shadow: none;
+    transition: margin 0.2s ease;
   }
   body.portal-shell-page .site-footer__inner {
     max-width: none;
@@ -547,6 +554,32 @@
     border-radius: 0;
     z-index: 1100;
     overflow: hidden;
+    transition: width 0.2s ease, padding 0.2s ease;
+  }
+  .sidebar-toolbar {
+    display: flex;
+    justify-content: flex-end;
+  }
+  .sidebar-toggle {
+    width: 38px;
+    height: 38px;
+    border-radius: 14px;
+    border: 1px solid rgba(148, 163, 184, 0.22);
+    background: rgba(255, 255, 255, 0.9);
+    color: #0f172a;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(148, 163, 184, 0.14);
+  }
+  .sidebar-toggle svg {
+    width: 18px;
+    height: 18px;
+    transition: transform 0.18s ease;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-toggle svg {
+    transform: rotate(180deg);
   }
   .sidebar-brand {
     display: flex;
@@ -557,6 +590,10 @@
     border-radius: 20px;
     background: rgba(255, 255, 255, 0.66);
     border: 1px solid rgba(148, 163, 184, 0.12);
+    transition: padding 0.2s ease, justify-content 0.2s ease;
+  }
+  .brand-name {
+    transition: opacity 0.18s ease;
   }
   .brand-title {
     color: #0f172a;
@@ -572,6 +609,7 @@
     letter-spacing: 0.16em;
     text-transform: uppercase;
     padding: 0 12px;
+    transition: opacity 0.18s ease;
   }
   .portal-sidebar .links,
   .nav-drawer .links {
@@ -592,7 +630,44 @@
     background: rgba(148, 163, 184, 0.28);
     border-radius: 999px;
   }
-  .portal-sidebar .links a,
+  .nav-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    min-width: 0;
+  }
+  .nav-link__icon {
+    width: 20px;
+    height: 20px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 20px;
+  }
+  .nav-link__icon svg {
+    width: 100%;
+    height: 100%;
+    display: block;
+  }
+  .nav-link__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: opacity 0.18s ease;
+  }
+  .portal-sidebar .links a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: #0f172a;
+    font-weight: 700;
+    font-size: 14px;
+    padding: 12px 14px;
+    border-radius: 18px;
+    transition: background 0.16s ease, color 0.16s ease;
+  }
   .nav-drawer .links a {
     display: block;
     text-decoration: none;
@@ -627,8 +702,25 @@
     color: #64748b;
     font-size: 12px;
     line-height: 1.5;
+    transition: opacity 0.18s ease;
   }
-  .sidebar-footer a,
+  .sidebar-footer a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    text-decoration: none;
+    color: #0f172a;
+    font-weight: 700;
+    padding: 11px 14px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.72);
+    border: 1px solid rgba(148, 163, 184, 0.18);
+  }
+  .sidebar-footer a.active {
+    background: linear-gradient(135deg, rgba(14, 165, 166, 0.14), rgba(255, 255, 255, 0.92));
+    color: #0f766e;
+    box-shadow: inset 0 0 0 1px rgba(14, 165, 166, 0.14);
+  }
   .nav-drawer__footer a {
     display: block;
     text-decoration: none;
@@ -650,6 +742,32 @@
     min-height: var(--shell-topbar-height);
     border-radius: 0;
     z-index: 1200;
+    transition: left 0.2s ease;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar {
+    padding: 12px 10px;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-toolbar {
+    justify-content: center;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-brand {
+    justify-content: center;
+    padding: 10px;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-heading,
+  body.portal-shell-page.portal-sidebar-collapsed .brand-name,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer p,
+  body.portal-shell-page.portal-sidebar-collapsed .nav-link__label {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a {
+    justify-content: center;
+    padding-inline: 12px;
   }
   .topbar-left {
     display: flex;
@@ -919,10 +1037,33 @@
   }
 </style>
 
-<script>document.body.classList.add('portal-shell-page');</script>
+<script>
+  (function() {
+    document.body.classList.add('portal-shell-page');
+    try {
+      if (window.innerWidth > 899 && window.localStorage.getItem('clinicops-sidebar-collapsed') === '1') {
+        document.body.classList.add('portal-sidebar-collapsed');
+      }
+    } catch (error) {}
+  })();
+</script>
 
 {% with current=request.resolver_match.url_name %}
 <aside class="portal-sidebar" aria-label="ClinicOps navigation">
+  <div class="sidebar-toolbar">
+    <button
+      type="button"
+      class="sidebar-toggle"
+      id="sidebar-toggle"
+      aria-label="Collapse sidebar"
+      aria-pressed="false"
+      title="Collapse sidebar"
+    >
+      <svg viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path d="M15 6 9 12l6 6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </button>
+  </div>
   <div class="sidebar-brand">
     {% if nav_clinic and nav_clinic.logo_url %}
       <img class="brand-logo" src="{{ nav_clinic.logo_url }}" alt="{{ nav_clinic.name }}">
@@ -942,28 +1083,83 @@
   <div class="sidebar-heading">Workspace</div>
   <div class="links">
     {% if nav_is_staff %}
-      <a class="{% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
-      <a class="{% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">Calendar</a>
-      <a class="{% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}">Appointments</a>
-      <a class="{% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}">Patients</a>
+      <a class="nav-link {% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}" title="Dashboard">
+        <span class="nav-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4.75 12.25 12 5l7.25 7.25V19a1.75 1.75 0 0 1-1.75 1.75h-11A1.75 1.75 0 0 1 4.75 19v-6.75Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 20.75v-5.5h5v5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="nav-link__label">Dashboard</span>
+      </a>
+      <a class="nav-link {% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}" title="Calendar">
+        <span class="nav-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><rect x="4.75" y="6.75" width="14.5" height="12.5" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 4.75v4M16 4.75v4M4.75 10.25h14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="nav-link__label">Calendar</span>
+      </a>
+      <a class="nav-link {% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}" title="Appointments">
+        <span class="nav-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M7 4.75h10a2.25 2.25 0 0 1 2.25 2.25v10A2.25 2.25 0 0 1 17 19.25H7A2.25 2.25 0 0 1 4.75 17V7A2.25 2.25 0 0 1 7 4.75Z" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 9.25h7M8.5 12h7M8.5 14.75h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="nav-link__label">Appointments</span>
+      </a>
+      <a class="nav-link {% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}" title="Patients">
+        <span class="nav-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 12.25a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/><path d="M5.75 19.25a6.25 6.25 0 0 1 12.5 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="nav-link__label">Patients</span>
+      </a>
       {% if nav_is_admin %}
-        <a class="{% if current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}active{% endif %}" href="{% url 'staff-members' %}">Staff</a>
-        <a class="{% if current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}active{% endif %}" href="{% url 'appointment-types' %}">Services</a>
-        <a class="{% if current == 'billing' %}active{% endif %}" href="{% url 'billing' %}">Billing</a>
+        <a class="nav-link {% if current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}active{% endif %}" href="{% url 'staff-members' %}" title="Staff">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 11a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5ZM15.75 12.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" stroke="currentColor" stroke-width="1.8"/><path d="M4.75 18.75a4.25 4.25 0 0 1 7.73-2.42M13.25 18.75a3.5 3.5 0 0 1 6 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="nav-link__label">Staff</span>
+        </a>
+        <a class="nav-link {% if current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}active{% endif %}" href="{% url 'appointment-types' %}" title="Services">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M5 7.75h14M5 12h14M5 16.25h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.75 14.25 19.5 17l-2.75 2.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="nav-link__label">Services</span>
+        </a>
+        <a class="nav-link {% if current == 'billing' %}active{% endif %}" href="{% url 'billing' %}" title="Billing">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><rect x="4.75" y="6.75" width="14.5" height="10.5" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M4.75 10.25h14.5M8.5 14.25h2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="nav-link__label">Billing</span>
+        </a>
       {% endif %}
     {% else %}
-      <a class="{% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}">Portal</a>
+      <a class="nav-link {% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}" title="Portal">
+        <span class="nav-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4.75 12.25 12 5l7.25 7.25V19a1.75 1.75 0 0 1-1.75 1.75h-11A1.75 1.75 0 0 1 4.75 19v-6.75Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 20.75v-5.5h5v5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="nav-link__label">Portal</span>
+      </a>
       {% if nav_patient_multi %}
-        <a href="#" id="clinic-switch-btn">Switch clinic</a>
+        <a class="nav-link" href="#" id="clinic-switch-btn" title="Switch clinic">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M7.75 7.75h10.5v10.5H7.75z" stroke="currentColor" stroke-width="1.8"/><path d="m9.5 5.75-2 2 2 2M14.5 18.25l2-2-2-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+          </span>
+          <span class="nav-link__label">Switch clinic</span>
+        </a>
       {% endif %}
     {% endif %}
   </div>
 
   <div class="sidebar-footer">
     <p>{% if nav_is_staff %}Clinic workspace{% else %}Patient portal{% endif %}</p>
-    <a href="{% url 'settings' %}">Account settings</a>
+    <a class="nav-link {% if current == 'settings' or current == 'password_change' or current == 'password_change_done' %}active{% endif %}" href="{% url 'settings' %}" title="Account settings">
+      <span class="nav-link__icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 9.25a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z" stroke="currentColor" stroke-width="1.8"/><path d="M19.25 12a7.25 7.25 0 0 0-.08-1.02l1.58-1.23-1.5-2.6-1.92.61a7.3 7.3 0 0 0-1.77-1.02l-.28-2.02h-3l-.28 2.02a7.3 7.3 0 0 0-1.77 1.02l-1.92-.61-1.5 2.6 1.58 1.23A7.25 7.25 0 0 0 4.75 12c0 .34.03.68.08 1.02l-1.58 1.23 1.5 2.6 1.92-.61c.54.43 1.14.77 1.77 1.02l.28 2.02h3l.28-2.02a7.3 7.3 0 0 0 1.77-1.02l1.92.61 1.5-2.6-1.58-1.23c.05-.34.08-.68.08-1.02Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      </span>
+      <span class="nav-link__label">Account settings</span>
+    </a>
     {% if nav_is_admin %}
-      <a href="{% url 'security-audit' %}">Security audit</a>
+      <a class="nav-link {% if current == 'security-audit' %}active{% endif %}" href="{% url 'security-audit' %}" title="Security audit">
+        <span class="nav-link__icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.75 18.25 7v5.32c0 3.12-2.14 6.03-6.25 6.93-4.11-.9-6.25-3.8-6.25-6.93V7L12 4.75Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9v4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 16.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="nav-link__label">Security audit</span>
+      </a>
     {% endif %}
   </div>
 </aside>
@@ -1559,6 +1755,60 @@
       if (window.innerWidth > 900) {
         closeMenu();
       }
+    });
+  })();
+</script>
+
+<script>
+  (function() {
+    const body = document.body;
+    const sidebarToggle = document.getElementById('sidebar-toggle');
+    const storageKey = 'clinicops-sidebar-collapsed';
+    if (!sidebarToggle) return;
+
+    function isDesktop() {
+      return window.innerWidth > 899;
+    }
+
+    function updateSidebarButton(collapsed) {
+      sidebarToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+      sidebarToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+      sidebarToggle.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    }
+
+    function applySidebarState(collapsed) {
+      if (isDesktop() && collapsed) {
+        body.classList.add('portal-sidebar-collapsed');
+      } else {
+        body.classList.remove('portal-sidebar-collapsed');
+      }
+      updateSidebarButton(body.classList.contains('portal-sidebar-collapsed'));
+    }
+
+    function readStoredState() {
+      try {
+        return window.localStorage.getItem(storageKey) === '1';
+      } catch (error) {
+        return false;
+      }
+    }
+
+    function writeStoredState(collapsed) {
+      try {
+        window.localStorage.setItem(storageKey, collapsed ? '1' : '0');
+      } catch (error) {}
+    }
+
+    applySidebarState(readStoredState());
+
+    sidebarToggle.addEventListener('click', function() {
+      const nextCollapsed = !body.classList.contains('portal-sidebar-collapsed');
+      writeStoredState(nextCollapsed);
+      applySidebarState(nextCollapsed);
+    });
+
+    window.addEventListener('resize', function() {
+      applySidebarState(readStoredState());
     });
   })();
 </script>
