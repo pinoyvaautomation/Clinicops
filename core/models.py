@@ -7,6 +7,8 @@ from django.core.exceptions import ValidationError
 from django.db import models
 from simple_history.models import HistoricalRecords
 
+from .timezones import timezone_display_label
+
 User = get_user_model()
 
 
@@ -24,6 +26,10 @@ class Clinic(models.Model):
 
     def __str__(self) -> str:
         return self.name
+
+    @property
+    def timezone_label(self) -> str:
+        return timezone_display_label(self.timezone)
 
     def save(self, *args, **kwargs) -> None:
         if not self.slug:

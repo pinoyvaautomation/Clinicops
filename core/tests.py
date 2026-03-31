@@ -24,6 +24,7 @@ from PIL import Image
 
 from .admin import AppointmentAdmin
 from .booking import build_available_slots
+from .forms import ClinicSignupForm
 from .image_uploads import AVATAR_MAX_DIMENSION, MAX_AVATAR_UPLOAD_BYTES
 from .models import (
     Appointment,
@@ -101,6 +102,21 @@ class AppointmentModelTests(TestCase):
         patient.first_name = 'Updated'
         patient.save()
         self.assertGreaterEqual(patient.history.count(), 1)
+
+    def test_clinic_timezone_label_is_human_friendly(self):
+        clinic = Clinic.objects.create(name='Timezone Clinic', timezone='Asia/Manila')
+
+        self.assertIn('Philippines', clinic.timezone_label)
+        self.assertIn('Asia/Manila', clinic.timezone_label)
+
+
+class ClinicSignupFormTests(TestCase):
+    def test_timezone_field_uses_friendly_labels(self):
+        form = ClinicSignupForm()
+
+        choices = dict(form.fields['timezone'].choices)
+        self.assertIn('Asia/Manila', choices)
+        self.assertIn('Philippines', choices['Asia/Manila'])
 
 
 class ReminderTaskTests(TestCase):

@@ -10,6 +10,7 @@ from django.utils import timezone
 
 from .image_uploads import prepare_avatar_upload
 from .models import Appointment, AppointmentType, Patient, Staff
+from .timezones import get_timezone_choices
 
 
 class BookingForm(forms.Form):
@@ -109,7 +110,7 @@ class AppointmentLookupForm(forms.Form):
 
 class ClinicSignupForm(forms.Form):
     clinic_name = forms.CharField(max_length=255)
-    timezone = forms.CharField(max_length=64, required=False, initial='UTC')
+    timezone = forms.ChoiceField(choices=(), required=False, initial='UTC')
     admin_first_name = forms.CharField(max_length=100)
     admin_last_name = forms.CharField(max_length=100)
     admin_email = forms.EmailField()
@@ -118,6 +119,7 @@ class ClinicSignupForm(forms.Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['timezone'].choices = get_timezone_choices()
         self.fields['clinic_name'].widget.attrs.update(
             {
                 'placeholder': 'Clinica JMC',
@@ -126,7 +128,6 @@ class ClinicSignupForm(forms.Form):
         )
         self.fields['timezone'].widget.attrs.update(
             {
-                'placeholder': 'UTC',
                 'autocomplete': 'off',
             }
         )
@@ -164,6 +165,9 @@ class ClinicSignupForm(forms.Form):
     def clean_admin_email(self):
         email = self.cleaned_data['admin_email'].strip().lower()
         return email
+
+    def clean_timezone(self):
+        return self.cleaned_data.get('timezone') or 'UTC'
 
     def clean(self):
         cleaned = super().clean()

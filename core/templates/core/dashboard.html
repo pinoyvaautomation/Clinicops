@@ -356,7 +356,7 @@
             <p>Track bookings, workload, and billing from a single operating view. This dashboard stays tied to the selected date range so the team can scan demand quickly.</p>
             <div class="hero-meta">
               <span class="pill">Local time {{ current_local_time|date:"g:i A" }}</span>
-              <span class="pill">{{ clinic.timezone }}</span>
+              <span class="pill">{{ clinic.timezone_label }}</span>
               <span class="pill">{{ start_date|date:"M j" }} to {{ end_date|date:"M j, Y" }}</span>
               {% if plan_usage.has_plan %}
                 <span class="pill">{{ plan_usage.plan_name }}</span>
