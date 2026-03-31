@@ -13,7 +13,8 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
-from django.core.mail import EmailMultiAlternatives, send_mail
+from django.core.mail import EmailMultiAlternatives
+from django.core import signing
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
@@ -32,6 +33,9 @@ from django.views.decorators.http import require_POST
 from .booking import build_available_slots, parse_slot_value
 from .forms import (
     AppointmentLookupForm,
+    AppointmentSelfServiceCancelForm,
+    AppointmentSelfServiceIntakeForm,
+    AppointmentSelfServiceRescheduleForm,
     AppointmentUpdateForm,
     AppointmentFrontDeskUpdateForm,
     PatientUpdateForm,
@@ -46,6 +50,7 @@ from .forms import (
     AppointmentTypeForm,
     ClinicAuthenticationForm,
     TwoFactorTokenForm,
+    WaitlistEntryForm,
 )
 from .models import (
     Appointment,
@@ -58,6 +63,7 @@ from .models import (
     Plan,
     SecurityEvent,
     Staff,
+    WaitlistEntry,
 )
 from .notifications import create_clinic_notifications
 from .plan_limits import (
@@ -493,6 +499,102 @@ def _clinic_booking_embed_code(request, clinic: Clinic) -> str:
     )
 
 
+def _appointment_duration_minutes(appointment: Appointment) -> int:
+    if appointment.appointment_type_id:
+        return appointment.appointment_type.duration_minutes
+    return max(int((appointment.end_at - appointment.start_at).total_seconds() // 60), 1)
+
+
+def _appointment_manage_token(appointment: Appointment) -> str:
+    payload = {
+        'appointment_id': appointment.id,
+        'email': (appointment.patient.email or '').strip().lower(),
+        'confirmation_code': appointment.confirmation_code,
+    }
+    return signing.dumps(payload, salt='appointment-manage')
+
+
+def _appointment_manage_path(appointment: Appointment) -> str:
+    return reverse('appointment-manage', args=[_appointment_manage_token(appointment)])
+
+
+def _appointment_manage_url(request, appointment: Appointment) -> str:
+    return request.build_absolute_uri(_appointment_manage_path(appointment))
+
+
+def _appointment_lookup_url(request) -> str:
+    return request.build_absolute_uri(reverse('appointment-lookup'))
+
+
+def _resolve_manage_appointment(token: str) -> tuple[Appointment | None, str | None]:
+    max_age = getattr(settings, 'APPOINTMENT_MANAGE_LINK_MAX_AGE', 60 * 60 * 24 * 60)
+    try:
+        payload = signing.loads(token, salt='appointment-manage', max_age=max_age)
+    except signing.SignatureExpired:
+        return None, 'This self-service appointment link has expired. Use appointment lookup with your email and confirmation code instead.'
+    except signing.BadSignature:
+        return None, 'This self-service appointment link is invalid. Use appointment lookup with your email and confirmation code instead.'
+
+    appointment = (
+        Appointment.objects.filter(pk=payload.get('appointment_id'))
+        .select_related('clinic', 'staff', 'patient', 'appointment_type')
+        .first()
+    )
+    if not appointment:
+        return None, 'This appointment could not be found anymore.'
+
+    patient_email = (appointment.patient.email or '').strip().lower()
+    if patient_email != payload.get('email') or appointment.confirmation_code != payload.get('confirmation_code'):
+        return None, 'This appointment link no longer matches the booking record.'
+
+    return appointment, None
+
+
+def _appointment_email_context(request, appointment: Appointment, *, headline: str, detail_copy: str = '') -> dict:
+    clinic_tz = ZoneInfo(appointment.clinic.timezone or 'UTC')
+    start_at_local = timezone.localtime(appointment.start_at, clinic_tz)
+    end_at_local = timezone.localtime(appointment.end_at, clinic_tz)
+    return {
+        'appointment': appointment,
+        'clinic': appointment.clinic,
+        'patient': appointment.patient,
+        'staff': appointment.staff,
+        'appointment_type': appointment.appointment_type,
+        'headline': headline,
+        'detail_copy': detail_copy,
+        'start_at_local': start_at_local,
+        'end_at_local': end_at_local,
+        'manage_url': _appointment_manage_url(request, appointment),
+        'lookup_url': _appointment_lookup_url(request),
+    }
+
+
+def _send_appointment_email(
+    request,
+    appointment: Appointment,
+    *,
+    subject_label: str,
+    headline: str,
+    detail_copy: str = '',
+) -> bool:
+    if not getattr(settings, 'SEND_BOOKING_CONFIRMATION', True) or not appointment.patient.email:
+        return False
+    context = _appointment_email_context(
+        request,
+        appointment,
+        headline=headline,
+        detail_copy=detail_copy,
+    )
+    context['subject_label'] = subject_label
+    return _send_rendered_email(
+        subject_template='core/appointment_confirmation_subject.txt',
+        text_template='core/appointment_confirmation.txt',
+        html_template='core/appointment_confirmation.html',
+        context=context,
+        recipients=[appointment.patient.email],
+    )
+
+
 def _appointment_notification_recipients(appointment: Appointment):
     recipients = list(
         User.objects.filter(
@@ -549,6 +651,24 @@ def _notify_clinic_appointment_updated(*, appointment: Appointment, actor=None):
     )
 
 
+def _notify_clinic_appointment_cancelled(*, appointment: Appointment, actor=None):
+    service_name = appointment.appointment_type.name if appointment.appointment_type else 'General appointment'
+    create_clinic_notifications(
+        appointment.clinic,
+        actor=actor,
+        recipients=_appointment_notification_recipients(appointment),
+        event_type=Notification.EventType.APPOINTMENT_UPDATED,
+        level=Notification.Level.WARNING,
+        title='Appointment cancelled',
+        body=(
+            f'{_patient_label(appointment.patient)} cancelled {service_name} with '
+            f'{_user_label(appointment.staff.user)} that was scheduled for {_appointment_time_label(appointment)}.'
+        ),
+        link=_notification_link('staff-appointment-edit', appointment.id),
+        metadata={'appointment_id': appointment.id},
+    )
+
+
 def _notify_clinic_staff_change(*, clinic: Clinic, member: Staff, actor=None, created=False):
     create_clinic_notifications(
         clinic,
@@ -594,6 +714,22 @@ def _notify_clinic_patient_signup(*, clinic: Clinic, patient: Patient):
         body=f'{_patient_label(patient)} created a patient account for {clinic.name}.',
         link=_notification_link('staff-patient-edit', patient.id),
         metadata={'patient_id': patient.id},
+    )
+
+
+def _notify_clinic_waitlist_entry(*, waitlist_entry: WaitlistEntry):
+    service_name = waitlist_entry.appointment_type.name if waitlist_entry.appointment_type else 'General booking'
+    create_clinic_notifications(
+        waitlist_entry.clinic,
+        role_names=['Admin', 'FrontDesk'],
+        event_type=Notification.EventType.GENERIC,
+        level=Notification.Level.INFO,
+        title='New waitlist request',
+        body=(
+            f'{waitlist_entry.first_name} {waitlist_entry.last_name} joined the waitlist for {service_name}.'
+        ),
+        link=_notification_link('staff-waitlist'),
+        metadata={'waitlist_entry_id': waitlist_entry.id},
     )
 
 
@@ -1727,7 +1863,11 @@ def _clinic_booking(request, clinic: Clinic):
         .order_by('name')
     )
 
-    selected_type_id = request.GET.get('type') or request.POST.get('appointment_type_id')
+    selected_type_id = (
+        request.GET.get('type')
+        or request.POST.get('appointment_type_id')
+        or request.POST.get('type')
+    )
     try:
         selected_type_id = int(selected_type_id) if selected_type_id else None
     except (TypeError, ValueError):
@@ -1745,123 +1885,147 @@ def _clinic_booking(request, clinic: Clinic):
 
     slots = build_available_slots(clinic, staff_list, duration_minutes=duration_minutes)
     slot_choices = [(slot.value, slot.label) for slot in slots]
+    waitlist_form = WaitlistEntryForm(
+        prefix='waitlist',
+        initial={
+            'preferred_start_date': timezone.localdate(timezone.now(), clinic_tz),
+        },
+    )
+    waitlist_success = request.GET.get('waitlist') == 'joined'
 
     if request.method == 'POST':
-        form = BookingForm(
-            request.POST,
-            slot_choices=slot_choices,
-            appointment_type_id=selected_type.id if selected_type else None,
-        )
-        if form.is_valid():
-            if not clinic_can_accept_appointment(clinic, usage=plan_usage):
-                form.add_error(
-                    None,
-                    _limit_reached_message(
-                        item=plan_usage['appointments'],
-                        resource_label='appointments',
-                        action_label='booking new appointments',
-                    ),
-                )
-            else:
-                try:
-                    staff_id, start_at = parse_slot_value(form.cleaned_data['slot'])
-                except ValueError:
-                    form.add_error('slot', 'Selected slot is invalid. Please choose another.')
-                else:
-                    staff = staff_list.filter(id=staff_id).first()
-                    if not staff:
-                        form.add_error('slot', 'Selected staff is not available.')
-                    elif appointment_types.exists() and not selected_type:
-                        form.add_error('appointment_type_id', 'Please choose an appointment type.')
-                    else:
-                        duration = timedelta(minutes=duration_minutes)
-                        end_at = start_at + duration
-                        start_at_local = timezone.localtime(start_at, clinic_tz)
-                        end_at_local = timezone.localtime(end_at, clinic_tz)
-                        email = form.cleaned_data['email'].strip().lower()
-                        patient = None
-                        patient_created = False
+        action = request.POST.get('form_action') or 'booking'
+        if action == 'waitlist':
+            waitlist_form = WaitlistEntryForm(request.POST, prefix='waitlist')
+            form = BookingForm(
+                slot_choices=slot_choices,
+                appointment_type_id=selected_type.id if selected_type else None,
+            )
+            if waitlist_form.is_valid():
+                email = waitlist_form.cleaned_data['email']
+                waitlist_entry = waitlist_form.save(commit=False)
+                waitlist_entry.clinic = clinic
+                waitlist_entry.appointment_type = selected_type
+                waitlist_entry.patient = Patient.objects.filter(clinic=clinic, email=email).first()
+                waitlist_entry.save()
+                _notify_clinic_waitlist_entry(waitlist_entry=waitlist_entry)
 
-                        if request.user.is_authenticated:
-                            patient = Patient.objects.filter(
-                                user=request.user,
-                                clinic=clinic,
-                            ).first()
-                            if not patient:
+                query = {}
+                if selected_type:
+                    query['type'] = selected_type.id
+                if embed_mode:
+                    query['embed'] = '1'
+                query['waitlist'] = 'joined'
+                return redirect(f"{_clinic_booking_path(clinic)}?{urlencode(query)}")
+        else:
+            form = BookingForm(
+                request.POST,
+                slot_choices=slot_choices,
+                appointment_type_id=selected_type.id if selected_type else None,
+            )
+            if form.is_valid():
+                if not clinic_can_accept_appointment(clinic, usage=plan_usage):
+                    form.add_error(
+                        None,
+                        _limit_reached_message(
+                            item=plan_usage['appointments'],
+                            resource_label='appointments',
+                            action_label='booking new appointments',
+                        ),
+                    )
+                else:
+                    try:
+                        staff_id, start_at = parse_slot_value(form.cleaned_data['slot'])
+                    except ValueError:
+                        form.add_error('slot', 'Selected slot is invalid. Please choose another.')
+                    else:
+                        staff = staff_list.filter(id=staff_id).first()
+                        if not staff:
+                            form.add_error('slot', 'Selected staff is not available.')
+                        elif appointment_types.exists() and not selected_type:
+                            form.add_error('appointment_type_id', 'Please choose an appointment type.')
+                        else:
+                            duration = timedelta(minutes=duration_minutes)
+                            end_at = start_at + duration
+                            start_at_local = timezone.localtime(start_at, clinic_tz)
+                            email = form.cleaned_data['email'].strip().lower()
+                            patient = None
+                            patient_created = False
+
+                            if request.user.is_authenticated:
+                                patient = Patient.objects.filter(
+                                    user=request.user,
+                                    clinic=clinic,
+                                ).first()
+                                if not patient:
+                                    patient = Patient.objects.filter(
+                                        clinic=clinic,
+                                        email=email,
+                                    ).first()
+                                    if patient and patient.user is None:
+                                        patient.user = request.user
+                                        patient.save(update_fields=['user'])
+                            else:
                                 patient = Patient.objects.filter(
                                     clinic=clinic,
                                     email=email,
                                 ).first()
-                                if patient and patient.user is None:
-                                    patient.user = request.user
-                                    patient.save(update_fields=['user'])
-                        else:
-                            patient = Patient.objects.filter(
-                                clinic=clinic,
-                                email=email,
-                            ).first()
 
-                        if not patient:
-                            patient = Patient.objects.create(
-                                user=request.user if request.user.is_authenticated else None,
-                                clinic=clinic,
-                                first_name=form.cleaned_data['first_name'],
-                                last_name=form.cleaned_data['last_name'],
-                                email=email,
-                                phone=form.cleaned_data['phone'],
-                                dob=form.cleaned_data.get('dob'),
-                            )
-                            patient_created = True
-
-                        appointment = Appointment(
-                            clinic=clinic,
-                            appointment_type=selected_type,
-                            staff=staff,
-                            patient=patient,
-                            start_at=start_at,
-                            end_at=end_at,
-                            notes=form.cleaned_data.get('notes'),
-                        )
-                        try:
-                            appointment.save()
-                        except ValidationError:
-                            if patient_created:
-                                patient.delete()
-                            form.add_error('slot', 'That time was just booked. Please choose another slot.')
-                        else:
-                            if getattr(settings, 'SEND_BOOKING_CONFIRMATION', True) and patient.email:
-                                send_mail(
-                                    f'Appointment confirmed - {clinic.name}',
-                                    (
-                                        f'Hello {patient.first_name},\n\n'
-                                        f'Your appointment at {clinic.name} is confirmed.\n'
-                                        f'Time: {start_at_local:%b %d, %Y %I:%M %p} - {end_at_local:%I:%M %p} ({clinic.timezone_label})\n'
-                                        f'Staff: {staff}\n'
-                                        f'Confirmation code: {appointment.confirmation_code}\n\n'
-                                        'Thank you.'
-                                    ),
-                                    settings.DEFAULT_FROM_EMAIL,
-                                    [patient.email],
-                                    fail_silently=True,
+                            if not patient:
+                                patient = Patient.objects.create(
+                                    user=request.user if request.user.is_authenticated else None,
+                                    clinic=clinic,
+                                    first_name=form.cleaned_data['first_name'],
+                                    last_name=form.cleaned_data['last_name'],
+                                    email=email,
+                                    phone=form.cleaned_data['phone'],
+                                    dob=form.cleaned_data.get('dob'),
                                 )
-                            _notify_clinic_appointment_created(
-                                appointment=appointment,
-                                actor=request.user if request.user.is_authenticated else None,
-                                event_type=Notification.EventType.ONLINE_BOOKING_CREATED,
-                                title='Online booking received',
+                                patient_created = True
+
+                            appointment = Appointment(
+                                clinic=clinic,
+                                appointment_type=selected_type,
+                                staff=staff,
+                                patient=patient,
+                                start_at=start_at,
+                                end_at=end_at,
+                                notes=form.cleaned_data.get('notes'),
+                                intake_reason=form.cleaned_data.get('intake_reason'),
                             )
-                            messages.success(request, 'Your appointment is booked.')
-                            return render(
-                                request,
-                                'core/booking_success.html',
-                                {
-                                    'clinic': clinic,
-                                    'appointment': appointment,
-                                    'appointment_local': start_at_local,
-                                    'embed_mode': embed_mode,
-                                    'booking_public_url': _clinic_booking_public_url(request, clinic),
-                                },
-                            )
+                            try:
+                                appointment.save()
+                            except ValidationError:
+                                if patient_created:
+                                    patient.delete()
+                                form.add_error('slot', 'That time was just booked. Please choose another slot.')
+                            else:
+                                _send_appointment_email(
+                                    request,
+                                    appointment,
+                                    subject_label='Appointment confirmed',
+                                    headline='Your appointment is confirmed.',
+                                    detail_copy='Use the self-service link below if you need to add intake details, cancel, or reschedule without calling the clinic.',
+                                )
+                                _notify_clinic_appointment_created(
+                                    appointment=appointment,
+                                    actor=request.user if request.user.is_authenticated else None,
+                                    event_type=Notification.EventType.ONLINE_BOOKING_CREATED,
+                                    title='Online booking received',
+                                )
+                                messages.success(request, 'Your appointment is booked.')
+                                return render(
+                                    request,
+                                    'core/booking_success.html',
+                                    {
+                                        'clinic': clinic,
+                                        'appointment': appointment,
+                                        'appointment_local': start_at_local,
+                                        'embed_mode': embed_mode,
+                                        'booking_public_url': _clinic_booking_public_url(request, clinic),
+                                        'manage_url': _appointment_manage_url(request, appointment),
+                                    },
+                                )
     else:
         form = BookingForm(
             slot_choices=slot_choices,
@@ -1881,6 +2045,207 @@ def _clinic_booking(request, clinic: Clinic):
             'slot_count': len(slot_choices),
             'embed_mode': embed_mode,
             'booking_public_url': _clinic_booking_public_url(request, clinic),
+            'waitlist_form': waitlist_form,
+            'waitlist_success': waitlist_success,
+        },
+    )
+
+
+def _self_service_slot_choices(appointment: Appointment) -> list[tuple[str, str]]:
+    staff_list = (
+        Staff.objects.filter(clinic=appointment.clinic, is_active=True)
+        .select_related('user')
+        .order_by('user__last_name', 'user__first_name')
+    )
+    slots = build_available_slots(
+        appointment.clinic,
+        staff_list,
+        duration_minutes=_appointment_duration_minutes(appointment),
+        exclude_appointment_id=appointment.id,
+    )
+    return [(slot.value, f'{slot.label} • {slot.staff}') for slot in slots]
+
+
+def _appointment_manage_status_message(status: str | None) -> tuple[str, str] | None:
+    messages_map = {
+        'intake-saved': ('flash--success', 'Your intake form and consent details were saved.'),
+        'rescheduled': ('flash--success', 'Your appointment was rescheduled successfully.'),
+        'cancelled': ('flash--success', 'Your appointment was cancelled.'),
+    }
+    return messages_map.get(status or '')
+
+
+def appointment_manage(request, token: str):
+    appointment, token_error = _resolve_manage_appointment(token)
+    if not appointment:
+        return render(
+            request,
+            'core/appointment_manage.html',
+            {
+                'invalid_link': True,
+                'error_message': token_error,
+            },
+            status=400,
+        )
+
+    clinic = appointment.clinic
+    clinic_tz = ZoneInfo(clinic.timezone or 'UTC')
+    appointment_local = timezone.localtime(appointment.start_at, clinic_tz)
+    appointment_end_local = timezone.localtime(appointment.end_at, clinic_tz)
+    can_modify = (
+        appointment.status == Appointment.Status.SCHEDULED
+        and appointment.start_at > timezone.now()
+    )
+    slot_choices = _self_service_slot_choices(appointment) if can_modify else []
+
+    intake_initial = {
+        'intake_reason': appointment.intake_reason or '',
+        'intake_details': appointment.intake_details or '',
+        'consent_to_treatment': appointment.consent_to_treatment,
+        'consent_to_privacy': appointment.consent_to_privacy,
+        'consent_signature_name': appointment.consent_signature_name or '',
+    }
+    intake_form = AppointmentSelfServiceIntakeForm(initial=intake_initial)
+    reschedule_form = AppointmentSelfServiceRescheduleForm(slot_choices=slot_choices)
+    cancel_form = AppointmentSelfServiceCancelForm(
+        initial={'cancel_reason': appointment.cancel_reason or ''},
+    )
+
+    if request.method == 'POST':
+        action = request.POST.get('action') or ''
+        if action == 'intake':
+            intake_form = AppointmentSelfServiceIntakeForm(request.POST)
+            if intake_form.is_valid():
+                cleaned = intake_form.cleaned_data
+                has_updates = any(
+                    cleaned.get(field)
+                    for field in (
+                        'intake_reason',
+                        'intake_details',
+                        'consent_signature_name',
+                        'consent_to_treatment',
+                        'consent_to_privacy',
+                    )
+                )
+                if not has_updates:
+                    intake_form.add_error(None, 'Add intake details or consent selections before saving.')
+                else:
+                    appointment.intake_reason = cleaned.get('intake_reason')
+                    appointment.intake_details = cleaned.get('intake_details')
+                    appointment.consent_to_treatment = cleaned.get('consent_to_treatment')
+                    appointment.consent_to_privacy = cleaned.get('consent_to_privacy')
+                    appointment.consent_signature_name = cleaned.get('consent_signature_name')
+                    appointment.consent_signed_at = timezone.now()
+                    appointment.save(
+                        update_fields=[
+                            'intake_reason',
+                            'intake_details',
+                            'consent_to_treatment',
+                            'consent_to_privacy',
+                            'consent_signature_name',
+                            'consent_signed_at',
+                        ]
+                    )
+                    return redirect(f"{_appointment_manage_path(appointment)}?status=intake-saved")
+        elif action == 'reschedule':
+            if not can_modify:
+                return render(
+                    request,
+                    'core/appointment_manage.html',
+                    {
+                        'appointment': appointment,
+                        'appointment_local': appointment_local,
+                        'appointment_end_local': appointment_end_local,
+                        'can_modify': can_modify,
+                        'status_banner': ('flash--danger', 'This appointment can no longer be rescheduled online.'),
+                        'intake_form': intake_form,
+                        'reschedule_form': reschedule_form,
+                        'cancel_form': cancel_form,
+                        'manage_url': _appointment_manage_url(request, appointment),
+                    },
+                )
+            reschedule_form = AppointmentSelfServiceRescheduleForm(request.POST, slot_choices=slot_choices)
+            if reschedule_form.is_valid():
+                try:
+                    staff_id, start_at = parse_slot_value(reschedule_form.cleaned_data['slot'])
+                except ValueError:
+                    reschedule_form.add_error('slot', 'Choose one of the current available slots.')
+                else:
+                    staff = (
+                        Staff.objects.filter(
+                            clinic=clinic,
+                            is_active=True,
+                            pk=staff_id,
+                        )
+                        .select_related('user')
+                        .first()
+                    )
+                    if not staff:
+                        reschedule_form.add_error('slot', 'That slot is no longer available.')
+                    else:
+                        duration_minutes = _appointment_duration_minutes(appointment)
+                        appointment.staff = staff
+                        appointment.start_at = start_at
+                        appointment.end_at = start_at + timedelta(minutes=duration_minutes)
+                        try:
+                            appointment.save()
+                        except ValidationError:
+                            reschedule_form.add_error('slot', 'That slot was just booked. Choose another option.')
+                        else:
+                            _notify_clinic_appointment_updated(appointment=appointment)
+                            _send_appointment_email(
+                                request,
+                                appointment,
+                                subject_label='Appointment updated',
+                                headline='Your appointment was rescheduled.',
+                                detail_copy='Use the self-service link below if you need to make another change before the visit.',
+                            )
+                            return redirect(f"{_appointment_manage_path(appointment)}?status=rescheduled")
+        elif action == 'cancel':
+            if not can_modify:
+                return render(
+                    request,
+                    'core/appointment_manage.html',
+                    {
+                        'appointment': appointment,
+                        'appointment_local': appointment_local,
+                        'appointment_end_local': appointment_end_local,
+                        'can_modify': can_modify,
+                        'status_banner': ('flash--danger', 'This appointment can no longer be cancelled online.'),
+                        'intake_form': intake_form,
+                        'reschedule_form': reschedule_form,
+                        'cancel_form': cancel_form,
+                        'manage_url': _appointment_manage_url(request, appointment),
+                    },
+                )
+            cancel_form = AppointmentSelfServiceCancelForm(request.POST)
+            if cancel_form.is_valid():
+                appointment.status = Appointment.Status.CANCELLED
+                appointment.cancel_reason = cancel_form.cleaned_data.get('cancel_reason')
+                appointment.save(update_fields=['status', 'cancel_reason'])
+                _notify_clinic_appointment_cancelled(appointment=appointment)
+                _send_appointment_email(
+                    request,
+                    appointment,
+                    subject_label='Appointment cancelled',
+                    headline='Your appointment was cancelled.',
+                    detail_copy='If you still need an appointment, you can return to the clinic booking page to choose a new slot.',
+                )
+                return redirect(f"{_appointment_manage_path(appointment)}?status=cancelled")
+
+    return render(
+        request,
+        'core/appointment_manage.html',
+        {
+            'appointment': appointment,
+            'appointment_local': appointment_local,
+            'appointment_end_local': appointment_end_local,
+            'can_modify': can_modify,
+            'status_banner': _appointment_manage_status_message(request.GET.get('status')),
+            'intake_form': intake_form,
+            'reschedule_form': reschedule_form,
+            'cancel_form': cancel_form,
+            'manage_url': _appointment_manage_url(request, appointment),
         },
     )
 
@@ -1889,6 +2254,7 @@ def appointment_lookup(request):
     appointment = None
     appointment_local = None
     error_message = None
+    manage_url = ''
 
     if request.method == 'POST':
         form = AppointmentLookupForm(request.POST)
@@ -1912,6 +2278,7 @@ def appointment_lookup(request):
                     appointment.start_at,
                     ZoneInfo(appointment.clinic.timezone or 'UTC'),
                 )
+                manage_url = _appointment_manage_url(request, appointment)
     else:
         form = AppointmentLookupForm()
 
@@ -1923,6 +2290,7 @@ def appointment_lookup(request):
             'appointment': appointment,
             'appointment_local': appointment_local,
             'error_message': error_message,
+            'manage_url': manage_url,
         },
     )
 
@@ -2969,6 +3337,80 @@ def staff_appointment_history(request, appointment_id: int):
             'deleted_count': deleted_count,
             'current_local_time': timezone.localtime(timezone.now(), tz),
             'limited_history': is_frontdesk,
+        },
+    )
+
+
+@login_required
+def staff_waitlist(request):
+    staff, error = _require_staff_portal(request)
+    if error:
+        return error
+
+    if not (_is_admin(request.user) or _is_frontdesk(request.user)):
+        return HttpResponseForbidden('Only Admin or Front Desk can review the waitlist.')
+
+    clinic = staff.clinic
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    valid_statuses = {choice[0] for choice in WaitlistEntry.Status.choices}
+
+    if request.method == 'POST':
+        entry = get_object_or_404(WaitlistEntry, pk=request.POST.get('entry_id'), clinic=clinic)
+        next_url = request.POST.get('next') or reverse('staff-waitlist')
+        new_status = request.POST.get('status', '').strip()
+        if new_status not in valid_statuses:
+            messages.error(request, 'Choose a valid waitlist status.')
+            return redirect(next_url)
+        entry.status = new_status
+        entry.save(update_fields=['status'])
+        messages.success(request, f'Waitlist updated: {entry.first_name} {entry.last_name} is now {entry.get_status_display().lower()}.')
+        return redirect(next_url)
+
+    status_filter = request.GET.get('status', '').strip()
+    appointment_type_filter = request.GET.get('type', '').strip()
+
+    waitlist_qs = (
+        WaitlistEntry.objects.filter(clinic=clinic)
+        .select_related('patient', 'appointment_type')
+        .order_by('status', 'preferred_start_date', 'created_at')
+    )
+    if status_filter in valid_statuses:
+        waitlist_qs = waitlist_qs.filter(status=status_filter)
+    else:
+        status_filter = ''
+
+    selected_type_id = ''
+    if appointment_type_filter:
+        try:
+            selected_type_id = str(int(appointment_type_filter))
+        except (TypeError, ValueError):
+            selected_type_id = ''
+    if selected_type_id:
+        waitlist_qs = waitlist_qs.filter(appointment_type_id=selected_type_id)
+
+    waitlist_entries = list(waitlist_qs)
+    status_counts = {
+        status_value: WaitlistEntry.objects.filter(clinic=clinic, status=status_value).count()
+        for status_value, _ in WaitlistEntry.Status.choices
+    }
+    appointment_types = list(AppointmentType.objects.filter(clinic=clinic).order_by('name'))
+
+    return render(
+        request,
+        'core/staff_waitlist.html',
+        {
+            'clinic': clinic,
+            'waitlist_entries': waitlist_entries,
+            'status_choices': WaitlistEntry.Status.choices,
+            'status_filter': status_filter,
+            'status_counts': status_counts,
+            'appointment_types': appointment_types,
+            'selected_type_id': selected_type_id,
+            'current_local_time': timezone.localtime(timezone.now(), tz),
+            'active_total': status_counts.get(WaitlistEntry.Status.ACTIVE, 0),
+            'contacted_total': status_counts.get(WaitlistEntry.Status.CONTACTED, 0),
+            'booked_total': status_counts.get(WaitlistEntry.Status.BOOKED, 0),
+            'closed_total': status_counts.get(WaitlistEntry.Status.CLOSED, 0),
         },
     )
 

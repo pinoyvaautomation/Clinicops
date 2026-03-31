@@ -24,6 +24,7 @@ def user_roles(request):
     is_admin = user.is_superuser or user.groups.filter(name='Admin').exists()
     is_staff_user = user.is_superuser or user.groups.filter(name__in=ALLOWED_GROUPS).exists()
     can_staff_search = user.is_superuser or user.groups.filter(name__in=SEARCHABLE_GROUPS).exists()
+    can_manage_waitlist = user.is_superuser or user.groups.filter(name__in={'Admin', 'FrontDesk'}).exists()
 
     clinic = None
     avatar_url = None
@@ -103,4 +104,5 @@ def user_roles(request):
         'nav_notification_preview': notification_preview,
         'nav_plan_usage': plan_usage,
         'nav_can_search': can_staff_search and is_staff_user,
+        'nav_can_manage_waitlist': can_manage_waitlist and is_staff_user,
     }

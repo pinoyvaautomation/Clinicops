@@ -9,7 +9,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .image_uploads import prepare_avatar_upload
-from .models import Appointment, AppointmentType, Patient, Staff
+from .models import Appointment, AppointmentType, Patient, Staff, WaitlistEntry
 from .timezones import get_timezone_choices
 
 
@@ -22,6 +22,7 @@ class BookingForm(forms.Form):
     appointment_type_id = forms.IntegerField(required=False, widget=forms.HiddenInput())
     slot = forms.ChoiceField(choices=[])
     notes = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 3}))
+    intake_reason = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 2}))
 
     def __init__(self, *args, slot_choices=None, appointment_type_id=None, **kwargs):
         super().__init__(*args, **kwargs)
@@ -56,6 +57,11 @@ class BookingForm(forms.Form):
         self.fields['notes'].widget.attrs.update(
             {
                 'placeholder': 'Optional booking notes',
+            }
+        )
+        self.fields['intake_reason'].widget.attrs.update(
+            {
+                'placeholder': 'What would you like help with during this appointment?',
             }
         )
 
@@ -106,6 +112,152 @@ class AppointmentLookupForm(forms.Form):
                 'style': 'text-transform: uppercase;',
             }
         )
+
+
+class AppointmentSelfServiceIntakeForm(forms.Form):
+    intake_reason = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 2}),
+    )
+    intake_details = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 4}),
+    )
+    consent_to_treatment = forms.BooleanField(required=False)
+    consent_to_privacy = forms.BooleanField(required=False)
+    consent_signature_name = forms.CharField(max_length=150, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['intake_reason'].widget.attrs.update(
+            {
+                'placeholder': 'Main reason for the visit',
+            }
+        )
+        self.fields['intake_details'].widget.attrs.update(
+            {
+                'placeholder': 'Add medical history, symptoms, medications, allergies, or anything the clinic should know before the visit.',
+            }
+        )
+        self.fields['consent_signature_name'].widget.attrs.update(
+            {
+                'placeholder': 'Type your full name as consent signature',
+                'autocomplete': 'name',
+            }
+        )
+
+    def clean(self):
+        cleaned = super().clean()
+        if any(
+            cleaned.get(field)
+            for field in (
+                'intake_reason',
+                'intake_details',
+                'consent_signature_name',
+                'consent_to_treatment',
+                'consent_to_privacy',
+            )
+        ):
+            if not cleaned.get('consent_to_treatment'):
+                self.add_error('consent_to_treatment', 'Treatment consent is required to submit the intake form.')
+            if not cleaned.get('consent_to_privacy'):
+                self.add_error('consent_to_privacy', 'Privacy/contact consent is required to submit the intake form.')
+            if not (cleaned.get('consent_signature_name') or '').strip():
+                self.add_error('consent_signature_name', 'Type your full name to sign the consent.')
+        return cleaned
+
+
+class AppointmentSelfServiceRescheduleForm(forms.Form):
+    slot = forms.ChoiceField(choices=[])
+
+    def __init__(self, *args, slot_choices=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        if slot_choices is not None:
+            self.fields['slot'].choices = slot_choices
+        self.fields['slot'].widget.attrs.update(
+            {
+                'aria-label': 'Choose a new appointment slot',
+            }
+        )
+
+
+class AppointmentSelfServiceCancelForm(forms.Form):
+    cancel_reason = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={'rows': 3}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['cancel_reason'].widget.attrs.update(
+            {
+                'placeholder': 'Optional: tell the clinic why you need to cancel.',
+            }
+        )
+
+
+class WaitlistEntryForm(forms.ModelForm):
+    class Meta:
+        model = WaitlistEntry
+        fields = (
+            'first_name',
+            'last_name',
+            'email',
+            'phone',
+            'preferred_start_date',
+            'preferred_end_date',
+            'notes',
+            'consent_to_contact',
+        )
+        widgets = {
+            'preferred_start_date': forms.DateInput(attrs={'type': 'date'}),
+            'preferred_end_date': forms.DateInput(attrs={'type': 'date'}),
+            'notes': forms.Textarea(attrs={'rows': 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['first_name'].widget.attrs.update(
+            {
+                'placeholder': 'Jamie',
+                'autocomplete': 'given-name',
+            }
+        )
+        self.fields['last_name'].widget.attrs.update(
+            {
+                'placeholder': 'Patient',
+                'autocomplete': 'family-name',
+            }
+        )
+        self.fields['email'].widget.attrs.update(
+            {
+                'placeholder': 'patient@email.com',
+                'autocomplete': 'email',
+            }
+        )
+        self.fields['phone'].widget.attrs.update(
+            {
+                'placeholder': '+63 912 345 6789',
+                'autocomplete': 'tel',
+            }
+        )
+        self.fields['notes'].widget.attrs.update(
+            {
+                'placeholder': 'Tell the clinic which days or times work best, or any intake details to note.',
+            }
+        )
+        self.fields['consent_to_contact'].label = 'The clinic can contact me if a matching slot becomes available.'
+
+    def clean_email(self):
+        return self.cleaned_data['email'].strip().lower()
+
+    def clean(self):
+        cleaned = super().clean()
+        start = cleaned.get('preferred_start_date')
+        end = cleaned.get('preferred_end_date')
+        if start and end and end < start:
+            self.add_error('preferred_end_date', 'Preferred end date must be on or after the start date.')
+        return cleaned
 
 
 class ClinicSignupForm(forms.Form):

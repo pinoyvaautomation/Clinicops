@@ -72,9 +72,14 @@
     <div class="flash flash--danger">No appointment slots are available right now. Please check back later.</div>
   {% endif %}
 
+  {% if waitlist_success %}
+    <div class="flash flash--success">You were added to the clinic waitlist. The team can contact you if a matching slot becomes available.</div>
+  {% endif %}
+
   {% if appointment_types and slot_count != 0 %}
     <form method="post" class="stack-form" style="margin-top: 14px;">
       {% csrf_token %}
+      <input type="hidden" name="form_action" value="booking">
       {% if embed_mode %}
         <input type="hidden" name="embed" value="1">
       {% endif %}
@@ -117,9 +122,78 @@
           {{ form.notes }}
           {{ form.notes.errors }}
         </div>
+        <div class="field field--wide">
+          <label for="id_intake_reason">Main reason for visit (optional)</label>
+          {{ form.intake_reason }}
+          {{ form.intake_reason.errors }}
+          <div class="field-help">You can add more intake details and consent later from the self-service booking link.</div>
+        </div>
       </div>
 
       <button class="submit" type="submit">Book appointment</button>
     </form>
+  {% endif %}
+
+  {% if appointment_types and slot_count == 0 and waitlist_form %}
+    <div class="section-card" style="margin-top: 16px;">
+      <h3>Join the waitlist</h3>
+      <p>If the schedule is full, leave your contact details and preferred dates so the clinic can reach out if a slot opens.</p>
+      <form method="post" class="stack-form" style="margin-top: 14px;">
+        {% csrf_token %}
+        <input type="hidden" name="form_action" value="waitlist">
+        {% if embed_mode %}
+          <input type="hidden" name="embed" value="1">
+        {% endif %}
+        {% if selected_type %}
+          <input type="hidden" name="type" value="{{ selected_type.id }}">
+        {% endif %}
+        {{ waitlist_form.non_field_errors }}
+        <div class="field-grid">
+          <div class="field">
+            <label for="{{ waitlist_form.first_name.id_for_label }}">First name</label>
+            {{ waitlist_form.first_name }}
+            {{ waitlist_form.first_name.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ waitlist_form.last_name.id_for_label }}">Last name</label>
+            {{ waitlist_form.last_name }}
+            {{ waitlist_form.last_name.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ waitlist_form.email.id_for_label }}">Email</label>
+            {{ waitlist_form.email }}
+            {{ waitlist_form.email.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ waitlist_form.phone.id_for_label }}">Phone</label>
+            {{ waitlist_form.phone }}
+            {{ waitlist_form.phone.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ waitlist_form.preferred_start_date.id_for_label }}">Preferred start date</label>
+            {{ waitlist_form.preferred_start_date }}
+            {{ waitlist_form.preferred_start_date.errors }}
+          </div>
+          <div class="field">
+            <label for="{{ waitlist_form.preferred_end_date.id_for_label }}">Preferred end date</label>
+            {{ waitlist_form.preferred_end_date }}
+            {{ waitlist_form.preferred_end_date.errors }}
+          </div>
+          <div class="field field--wide">
+            <label for="{{ waitlist_form.notes.id_for_label }}">Notes (optional)</label>
+            {{ waitlist_form.notes }}
+            {{ waitlist_form.notes.errors }}
+          </div>
+          <div class="field field--wide">
+            <label style="display:flex;gap:10px;align-items:flex-start;">
+              {{ waitlist_form.consent_to_contact }}
+              <span>{{ waitlist_form.consent_to_contact.label }}</span>
+            </label>
+            {{ waitlist_form.consent_to_contact.errors }}
+          </div>
+        </div>
+        <button class="submit" type="submit">Join waitlist</button>
+      </form>
+    </div>
   {% endif %}
 {% endblock %}

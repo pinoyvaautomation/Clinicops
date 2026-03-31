@@ -17,6 +17,7 @@ from .models import (
     SecurityEvent,
     Staff,
     TwoFactorRecoveryCode,
+    WaitlistEntry,
 )
 
 User = get_user_model()
@@ -242,6 +243,22 @@ class AppointmentAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
     list_display = ('clinic', 'appointment_type', 'staff', 'patient', 'start_at', 'end_at', 'status')
     list_filter = ('clinic', 'status', 'staff')
     search_fields = ('staff__user__username', 'patient__id')
+
+
+@admin.register(WaitlistEntry)
+class WaitlistEntryAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
+    list_display = (
+        'first_name',
+        'last_name',
+        'clinic',
+        'appointment_type',
+        'preferred_start_date',
+        'preferred_end_date',
+        'status',
+        'created_at',
+    )
+    list_filter = ('clinic', 'status', 'appointment_type')
+    search_fields = ('id',)
 
 
 @admin.register(Plan)

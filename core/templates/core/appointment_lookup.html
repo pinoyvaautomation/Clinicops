@@ -58,6 +58,11 @@
           </div>
         {% endif %}
       </div>
+      {% if manage_url %}
+        <div class="action-row" style="margin-top: 16px;">
+          <a class="button button--primary" href="{{ manage_url }}">Manage appointment</a>
+        </div>
+      {% endif %}
     </div>
   {% endif %}
 {% endblock %}

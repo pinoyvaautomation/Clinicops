@@ -319,6 +319,40 @@
           </article>
 
           <article class="panel">
+            <h2>Intake and consent</h2>
+            <div class="snapshot">
+              {% if appointment.intake_reason %}
+                <div class="meta" style="margin-bottom: 12px;">
+                  <strong style="font-size: 0.96rem;">Visit reason</strong><br>
+                  {{ appointment.intake_reason }}
+                </div>
+              {% endif %}
+              {% if appointment.intake_details %}
+                <div class="meta" style="margin-bottom: 12px;">
+                  <strong style="font-size: 0.96rem;">Patient details</strong><br>
+                  {{ appointment.intake_details }}
+                </div>
+              {% endif %}
+              {% if appointment.consent_signature_name %}
+                <div class="meta" style="margin-bottom: 12px;">
+                  <strong style="font-size: 0.96rem;">Consent signed by</strong><br>
+                  {{ appointment.consent_signature_name }}
+                  {% if appointment.consent_signed_at %}
+                    on {{ appointment.consent_signed_at|date:"M j, Y g:i A" }}
+                  {% endif %}
+                </div>
+              {% endif %}
+              <div class="meta">
+                Treatment consent: <strong>{% if appointment.consent_to_treatment %}Yes{% else %}No{% endif %}</strong><br>
+                Privacy consent: <strong>{% if appointment.consent_to_privacy %}Yes{% else %}No{% endif %}</strong>
+              </div>
+              {% if not appointment.intake_reason and not appointment.intake_details and not appointment.consent_signature_name %}
+                <div class="meta" style="margin-top: 12px;">No patient intake form has been submitted yet.</div>
+              {% endif %}
+            </div>
+          </article>
+
+          <article class="panel">
             <h2>Editing notes</h2>
             <div class="meta">
               Use history if you need a timeline of previous changes.<br><br>

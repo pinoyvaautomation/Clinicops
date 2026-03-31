@@ -48,6 +48,9 @@
   </div>
 
   <div class="action-row">
+    {% if manage_url %}
+      <a class="button button--primary" href="{{ manage_url }}"{% if embed_mode %} target="_blank" rel="noopener"{% endif %}>Manage appointment</a>
+    {% endif %}
     <a class="button button--primary" href="{% url 'appointment-lookup' %}">Look up appointment</a>
     {% if embed_mode %}
       <a class="button button--secondary" href="{{ booking_public_url }}" target="_blank" rel="noopener">Open full booking page</a>

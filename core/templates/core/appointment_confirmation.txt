@@ -1,0 +1,17 @@
+Hello {{ patient.first_name }},
+
+{{ headline }}
+
+Clinic: {{ clinic.name }}
+Staff: {{ staff }}
+{% if appointment_type %}Service: {{ appointment_type.name }}
+{% endif %}Time: {{ start_at_local|date:"M j, Y g:i A" }} - {{ end_at_local|date:"g:i A" }} ({{ clinic.timezone_label }})
+Confirmation code: {{ appointment.confirmation_code }}
+
+{% if detail_copy %}{{ detail_copy }}
+
+{% endif %}Manage appointment: {{ manage_url }}
+Lookup page: {{ lookup_url }}
+
+Thank you,
+{{ clinic.name }}

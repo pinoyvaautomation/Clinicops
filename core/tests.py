@@ -44,12 +44,13 @@ from .models import (
     SecurityEvent,
     Staff,
     TwoFactorRecoveryCode,
+    WaitlistEntry,
 )
 from .notifications import create_clinic_notifications
 from .social_auth import ClinicSocialAccountAdapter, find_matching_local_user
 from .tasks import send_upcoming_appointment_reminders
 from .two_factor import generate_recovery_codes
-from .views import _notify_clinic_service_change
+from .views import _appointment_manage_token, _notify_clinic_service_change
 
 User = get_user_model()
 
@@ -1112,6 +1113,203 @@ class AppointmentLookupTests(TestCase):
         )
 
         self.assertContains(response, 'Appointment details')
+        self.assertContains(response, reverse('appointment-manage', args=[_appointment_manage_token(appointment)]))
+
+
+class AppointmentSelfServiceTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Self Service Clinic', timezone='UTC')
+        self.staff_user = User.objects.create_user(username='selfstaff', password='password')
+        self.staff = Staff.objects.create(user=self.staff_user, clinic=self.clinic)
+        self.appointment_type = AppointmentType.objects.create(
+            clinic=self.clinic,
+            name='Consult',
+            duration_minutes=30,
+        )
+        self.patient = Patient.objects.create(
+            clinic=self.clinic,
+            first_name='Manage',
+            last_name='Patient',
+            email='manage@example.com',
+            phone='555-0777',
+        )
+        start = timezone.now() + timedelta(days=1)
+        self.appointment = Appointment.objects.create(
+            clinic=self.clinic,
+            appointment_type=self.appointment_type,
+            staff=self.staff,
+            patient=self.patient,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+        )
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_manage_route_saves_intake_and_consent(self):
+        response = self.client.post(
+            reverse('appointment-manage', args=[_appointment_manage_token(self.appointment)]),
+            data={
+                'action': 'intake',
+                'intake_reason': 'Annual checkup',
+                'intake_details': 'Patient has mild allergies.',
+                'consent_to_treatment': 'on',
+                'consent_to_privacy': 'on',
+                'consent_signature_name': 'Manage Patient',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.appointment.refresh_from_db()
+        self.assertEqual(self.appointment.intake_reason, 'Annual checkup')
+        self.assertEqual(self.appointment.intake_details, 'Patient has mild allergies.')
+        self.assertTrue(self.appointment.consent_to_treatment)
+        self.assertTrue(self.appointment.consent_to_privacy)
+        self.assertEqual(self.appointment.consent_signature_name, 'Manage Patient')
+        self.assertIsNotNone(self.appointment.consent_signed_at)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_manage_route_reschedules_appointment(self):
+        original_start = self.appointment.start_at
+
+        get_response = self.client.get(reverse('appointment-manage', args=[_appointment_manage_token(self.appointment)]))
+        self.assertEqual(get_response.status_code, 200)
+        choices = get_response.context['reschedule_form'].fields['slot'].choices
+        self.assertTrue(choices)
+
+        post_response = self.client.post(
+            reverse('appointment-manage', args=[_appointment_manage_token(self.appointment)]),
+            data={
+                'action': 'reschedule',
+                'slot': choices[0][0],
+            },
+        )
+
+        self.assertEqual(post_response.status_code, 302)
+        self.appointment.refresh_from_db()
+        self.assertNotEqual(self.appointment.start_at, original_start)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Appointment updated', mail.outbox[0].subject)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_manage_route_cancels_appointment(self):
+        response = self.client.post(
+            reverse('appointment-manage', args=[_appointment_manage_token(self.appointment)]),
+            data={
+                'action': 'cancel',
+                'cancel_reason': 'Schedule conflict',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.appointment.refresh_from_db()
+        self.assertEqual(self.appointment.status, Appointment.Status.CANCELLED)
+        self.assertEqual(self.appointment.cancel_reason, 'Schedule conflict')
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('Appointment cancelled', mail.outbox[0].subject)
+
+
+class WaitlistFlowTests(TestCase):
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_public_booking_waitlist_join_creates_entry(self):
+        clinic = Clinic.objects.create(name='Waitlist Clinic', timezone='UTC')
+        user = User.objects.create_user(username='waitstaff', password='password')
+        frontdesk_group, _ = Group.objects.get_or_create(name='FrontDesk')
+        user.groups.add(frontdesk_group)
+        staff = Staff.objects.create(user=user, clinic=clinic)
+        appointment_type = AppointmentType.objects.create(
+            clinic=clinic,
+            name='Fully booked consult',
+            duration_minutes=30,
+        )
+
+        now = timezone.now()
+        next_slot = now.replace(second=0, microsecond=0)
+        if next_slot.minute < 30:
+            next_slot = next_slot.replace(minute=30)
+        else:
+            next_slot = next_slot.replace(minute=0) + timedelta(hours=1)
+        day_end = next_slot.replace(hour=23, minute=0, second=0, microsecond=0)
+
+        current = next_slot
+        patient_counter = 0
+        with self.settings(APPOINTMENT_DAY_START=0, APPOINTMENT_DAY_END=23, APPOINTMENT_DAYS_AHEAD=0):
+            while current + timedelta(minutes=30) <= day_end:
+                patient_counter += 1
+                patient = Patient.objects.create(
+                    clinic=clinic,
+                    first_name=f'Booked{patient_counter}',
+                    last_name='Patient',
+                    email=f'booked{patient_counter}@example.com',
+                    phone=f'555-{patient_counter:04d}',
+                )
+                Appointment.objects.create(
+                    clinic=clinic,
+                    appointment_type=appointment_type,
+                    staff=staff,
+                    patient=patient,
+                    start_at=current,
+                    end_at=current + timedelta(minutes=30),
+                )
+                current += timedelta(minutes=30)
+
+            response = self.client.post(
+                reverse('clinic-booking', args=[clinic.id]),
+                data={
+                    'form_action': 'waitlist',
+                    'type': appointment_type.id,
+                    'waitlist-first_name': 'Waiting',
+                    'waitlist-last_name': 'Patient',
+                    'waitlist-email': 'waiting@example.com',
+                    'waitlist-phone': '555-9999',
+                    'waitlist-preferred_start_date': timezone.localdate().isoformat(),
+                    'waitlist-preferred_end_date': timezone.localdate().isoformat(),
+                    'waitlist-notes': 'Any afternoon slot works.',
+                    'waitlist-consent_to_contact': 'on',
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response['Location'].endswith('waitlist=joined'))
+        self.assertEqual(WaitlistEntry.objects.count(), 1)
+        entry = WaitlistEntry.objects.get()
+        self.assertEqual(entry.email, 'waiting@example.com')
+        self.assertEqual(Notification.objects.filter(recipient=user).count(), 1)
+
+    def test_admin_can_review_and_update_waitlist(self):
+        clinic = Clinic.objects.create(name='Waitlist Portal Clinic', timezone='UTC')
+        admin_user = User.objects.create_user(
+            username='waitlist-admin@example.com',
+            email='waitlist-admin@example.com',
+            password='password',
+        )
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        admin_user.groups.add(admin_group)
+        Staff.objects.create(user=admin_user, clinic=clinic)
+
+        entry = WaitlistEntry.objects.create(
+            clinic=clinic,
+            first_name='Queue',
+            last_name='Patient',
+            email='queue@example.com',
+            phone='555-0202',
+        )
+
+        self.client.force_login(admin_user)
+        response = self.client.get(reverse('staff-waitlist'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Queue Patient')
+
+        update = self.client.post(
+            reverse('staff-waitlist'),
+            data={
+                'entry_id': entry.id,
+                'status': WaitlistEntry.Status.CONTACTED,
+                'next': reverse('staff-waitlist'),
+            },
+            follow=True,
+        )
+        self.assertEqual(update.status_code, 200)
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, WaitlistEntry.Status.CONTACTED)
 
 
 class SubscriptionGateTests(TestCase):

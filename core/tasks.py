@@ -48,7 +48,7 @@ def send_upcoming_appointment_reminders() -> int:
             f'{appointment_type_line}'
             f'Time: {start_local:%b %d, %Y %I:%M %p} - {end_local:%I:%M %p} ({appt.clinic.timezone})\n\n'
             f'Confirmation code: {appt.confirmation_code}\n\n'
-            'If you need to reschedule, please contact the clinic.\n'
+            'If you need to reschedule or cancel, use the self-service booking link from your confirmation email or the appointment lookup page.\n'
         )
 
         send_mail(

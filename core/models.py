@@ -135,6 +135,12 @@ class Appointment(models.Model):
     end_at = models.DateTimeField()
     status = models.CharField(max_length=16, choices=Status.choices, default=Status.SCHEDULED)
     notes = secured_fields.EncryptedTextField(blank=True, null=True)
+    intake_reason = secured_fields.EncryptedTextField(blank=True, null=True)
+    intake_details = secured_fields.EncryptedTextField(blank=True, null=True)
+    consent_to_treatment = models.BooleanField(default=False)
+    consent_to_privacy = models.BooleanField(default=False)
+    consent_signature_name = secured_fields.EncryptedCharField(max_length=150, blank=True, null=True)
+    consent_signed_at = models.DateTimeField(blank=True, null=True)
     cancel_reason = secured_fields.EncryptedTextField(blank=True, null=True)
     confirmation_code = models.CharField(max_length=12, blank=True, null=True, unique=True)
     reminder_sent_at = models.DateTimeField(blank=True, null=True)
@@ -193,6 +199,51 @@ class Appointment(models.Model):
                     break
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class WaitlistEntry(models.Model):
+    class Status(models.TextChoices):
+        ACTIVE = 'active', 'Active'
+        CONTACTED = 'contacted', 'Contacted'
+        BOOKED = 'booked', 'Booked'
+        CLOSED = 'closed', 'Closed'
+
+    clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='waitlist_entries')
+    appointment_type = models.ForeignKey(
+        AppointmentType,
+        on_delete=models.SET_NULL,
+        related_name='waitlist_entries',
+        blank=True,
+        null=True,
+    )
+    patient = models.ForeignKey(
+        Patient,
+        on_delete=models.SET_NULL,
+        related_name='waitlist_entries',
+        blank=True,
+        null=True,
+    )
+    first_name = secured_fields.EncryptedCharField(max_length=100)
+    last_name = secured_fields.EncryptedCharField(max_length=100)
+    email = secured_fields.EncryptedCharField(max_length=254, searchable=True)
+    phone = secured_fields.EncryptedCharField(max_length=32, searchable=True)
+    preferred_start_date = models.DateField(blank=True, null=True)
+    preferred_end_date = models.DateField(blank=True, null=True)
+    notes = secured_fields.EncryptedTextField(blank=True, null=True)
+    consent_to_contact = models.BooleanField(default=True)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.ACTIVE)
+    created_at = models.DateTimeField(auto_now_add=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ['status', 'preferred_start_date', 'created_at']
+        indexes = [
+            models.Index(fields=['clinic', 'status', 'created_at']),
+        ]
+
+    def __str__(self) -> str:
+        service = self.appointment_type.name if self.appointment_type else 'General booking'
+        return f'{self.first_name} {self.last_name} - {service} ({self.status})'
 
 
 class Plan(models.Model):

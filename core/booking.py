@@ -30,6 +30,7 @@ def build_available_slots(
     staff_list,
     duration_minutes: int | None = None,
     now: datetime | None = None,
+    exclude_appointment_id: int | None = None,
 ) -> list[Slot]:
     tz = ZoneInfo(clinic.timezone or 'UTC')
     slot_minutes = duration_minutes or getattr(settings, 'APPOINTMENT_SLOT_MINUTES', 30)
@@ -51,6 +52,7 @@ def build_available_slots(
             start_at__gte=range_start,
             start_at__lte=range_end,
         )
+        .exclude(pk=exclude_appointment_id)
         .order_by('start_at')
         .only('id', 'staff_id', 'start_at', 'end_at')
     )

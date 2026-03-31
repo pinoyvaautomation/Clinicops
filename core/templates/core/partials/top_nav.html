@@ -1130,6 +1130,14 @@
         </span>
         <span class="nav-link__label">Appointments</span>
       </a>
+      {% if nav_can_manage_waitlist %}
+        <a class="nav-link {% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}" title="Waitlist">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6.75 7.75h10.5M6.75 12h7.5M6.75 16.25h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17 13.75a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" stroke="currentColor" stroke-width="1.8"/><path d="m18.9 18.15 1.35 1.35" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="nav-link__label">Waitlist</span>
+        </a>
+      {% endif %}
       <a class="nav-link {% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}" title="Patients">
         <span class="nav-link__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 12.25a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/><path d="M5.75 19.25a6.25 6.25 0 0 1 12.5 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -1216,6 +1224,8 @@
           Appointments
         {% elif current == 'staff-appointment-history' %}
           Appointment history
+        {% elif current == 'staff-waitlist' %}
+          Waitlist
         {% elif current == 'staff-patients' or current == 'staff-patient-edit' %}
           Patients
         {% elif current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}
@@ -1421,6 +1431,9 @@
       <a class="{% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
       <a class="{% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">Calendar</a>
       <a class="{% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}">Appointments</a>
+      {% if nav_can_manage_waitlist %}
+        <a class="{% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}">Waitlist</a>
+      {% endif %}
       <a class="{% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}">Patients</a>
       {% if nav_is_admin %}
         <a class="{% if current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}active{% endif %}" href="{% url 'staff-members' %}">Staff</a>

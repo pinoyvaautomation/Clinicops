@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <body style="margin:0;padding:24px;background:#f3f8f6;font-family:Arial,sans-serif;color:#0f172a;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border-radius:20px;overflow:hidden;border:1px solid #dbe4ef;">
+            <tr>
+              <td style="padding:28px;background:linear-gradient(135deg,#0f5132,#0f172a);color:#ffffff;">
+                <div style="display:inline-block;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,0.14);font-size:12px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;">ClinicOps Booking</div>
+                <h1 style="margin:16px 0 8px;font-size:30px;line-height:1.05;font-family:Arial,sans-serif;">{{ headline }}</h1>
+                <p style="margin:0;font-size:15px;line-height:1.7;color:rgba(255,255,255,0.82);">{{ clinic.name }} is ready with your booking details and self-service manage link.</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:28px;">
+                <p style="margin:0 0 16px;font-size:15px;line-height:1.7;">Hello {{ patient.first_name }},</p>
+                {% if detail_copy %}
+                  <p style="margin:0 0 18px;font-size:15px;line-height:1.7;color:#475569;">{{ detail_copy }}</p>
+                {% endif %}
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border-collapse:separate;border-spacing:0 10px;">
+                  <tr>
+                    <td style="padding:14px 16px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;font-size:14px;">
+                      <strong>Clinic</strong><br>{{ clinic.name }}
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:14px 16px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;font-size:14px;">
+                      <strong>Staff</strong><br>{{ staff }}
+                    </td>
+                  </tr>
+                  {% if appointment_type %}
+                    <tr>
+                      <td style="padding:14px 16px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;font-size:14px;">
+                        <strong>Service</strong><br>{{ appointment_type.name }}
+                      </td>
+                    </tr>
+                  {% endif %}
+                  <tr>
+                    <td style="padding:14px 16px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;font-size:14px;">
+                      <strong>Time</strong><br>{{ start_at_local|date:"M j, Y g:i A" }} - {{ end_at_local|date:"g:i A" }} ({{ clinic.timezone_label }})
+                    </td>
+                  </tr>
+                  <tr>
+                    <td style="padding:14px 16px;border-radius:16px;background:#f8fafc;border:1px solid #e2e8f0;font-size:14px;">
+                      <strong>Confirmation code</strong><br>{{ appointment.confirmation_code }}
+                    </td>
+                  </tr>
+                </table>
+
+                <div style="margin-top:22px;">
+                  <a href="{{ manage_url }}" style="display:inline-block;padding:14px 20px;border-radius:16px;background:linear-gradient(135deg,#0f5132,#0f172a);color:#ffffff;font-weight:700;text-decoration:none;">Manage appointment</a>
+                </div>
+                <p style="margin:18px 0 0;font-size:14px;line-height:1.7;color:#64748b;">Need the lookup page instead? <a href="{{ lookup_url }}" style="color:#0f5132;font-weight:700;text-decoration:none;">Open appointment lookup</a>.</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

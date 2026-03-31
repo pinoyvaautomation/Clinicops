@@ -1,0 +1,179 @@
+{% extends "public_shell.html" %}
+
+{% block title %}Manage Appointment{% endblock %}
+{% block hero_eyebrow %}Self-service booking{% endblock %}
+{% block hero_title %}
+  {% if invalid_link %}
+    This appointment link is no longer valid
+  {% else %}
+    Manage your appointment without calling the clinic
+  {% endif %}
+{% endblock %}
+{% block hero_text %}
+  {% if invalid_link %}
+    The booking management link may have expired or changed. You can still use the appointment lookup page with your confirmation code and booking email.
+  {% else %}
+    Review the booking, add intake details and consent, or cancel/reschedule the visit from this secure link.
+  {% endif %}
+{% endblock %}
+{% block hero_meta %}
+  {% if appointment %}
+    <div class="hero-meta">
+      <span class="pill">{{ appointment.clinic.name }}</span>
+      <span class="pill">{{ appointment_local|date:"M j, Y g:i A" }}</span>
+      <span class="pill">{{ appointment.get_status_display }}</span>
+    </div>
+  {% endif %}
+{% endblock %}
+{% block hero_points %}
+  {% if not invalid_link %}
+    <div class="hero-points">
+      <div class="point">
+        <strong>Complete intake before arrival</strong>
+        <p>Share the main reason for the visit, background details, and consent information ahead of time so the clinic can prepare.</p>
+      </div>
+      <div class="point">
+        <strong>Change plans in one place</strong>
+        <p>Use this same secure page to move the appointment to another available slot or cancel it when needed.</p>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
+{% block panel_title %}
+  {% if invalid_link %}
+    Appointment link unavailable
+  {% else %}
+    Appointment details
+  {% endif %}
+{% endblock %}
+{% block panel_intro %}
+  {% if invalid_link %}
+    <p class="panel-copy">Open the appointment lookup page, enter your email and confirmation code, and ClinicOps will regenerate a safe manage link.</p>
+  {% else %}
+    <p class="panel-copy">Use the sections below to complete intake and consent, choose a different slot, or cancel the booking if the time no longer works.</p>
+  {% endif %}
+{% endblock %}
+{% block panel_body %}
+  {% if invalid_link %}
+    <div class="flash flash--danger">{{ error_message }}</div>
+    <div class="action-row">
+      <a class="button button--primary" href="{% url 'appointment-lookup' %}">Open appointment lookup</a>
+    </div>
+  {% else %}
+    {% if status_banner %}
+      <div class="flash {{ status_banner.0 }}">{{ status_banner.1 }}</div>
+    {% endif %}
+
+    <div class="detail-list">
+      <div class="detail-row">
+        <span class="detail-label">Clinic</span>
+        <span class="detail-value">{{ appointment.clinic.name }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Service</span>
+        <span class="detail-value">{% if appointment.appointment_type %}{{ appointment.appointment_type.name }}{% else %}General appointment{% endif %}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Staff</span>
+        <span class="detail-value">{{ appointment.staff }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Time</span>
+        <span class="detail-value">{{ appointment_local|date:"M j, Y g:i A" }} to {{ appointment_end_local|date:"g:i A" }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Confirmation code</span>
+        <span class="code-chip">{{ appointment.confirmation_code }}</span>
+      </div>
+      <div class="detail-row">
+        <span class="detail-label">Status</span>
+        <span class="status-badge">{{ appointment.get_status_display }}</span>
+      </div>
+    </div>
+
+    <div class="section-card" style="margin-top: 16px;">
+      <h3>Intake form and consent</h3>
+      <p>Submit your visit reason, background details, and treatment/privacy consent before the appointment.</p>
+      <form method="post" class="stack-form" style="margin-top: 14px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="intake">
+        {{ intake_form.non_field_errors }}
+        <div class="field">
+          <label for="{{ intake_form.intake_reason.id_for_label }}">Main reason for visit</label>
+          {{ intake_form.intake_reason }}
+          {{ intake_form.intake_reason.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ intake_form.intake_details.id_for_label }}">Details for the clinic</label>
+          {{ intake_form.intake_details }}
+          {{ intake_form.intake_details.errors }}
+        </div>
+        <div class="field">
+          <label style="display:flex;gap:10px;align-items:flex-start;">
+            {{ intake_form.consent_to_treatment }}
+            <span>I consent to treatment for this appointment.</span>
+          </label>
+          {{ intake_form.consent_to_treatment.errors }}
+        </div>
+        <div class="field">
+          <label style="display:flex;gap:10px;align-items:flex-start;">
+            {{ intake_form.consent_to_privacy }}
+            <span>I consent to ClinicOps and the clinic using these details for appointment and care coordination.</span>
+          </label>
+          {{ intake_form.consent_to_privacy.errors }}
+        </div>
+        <div class="field">
+          <label for="{{ intake_form.consent_signature_name.id_for_label }}">Consent signature</label>
+          {{ intake_form.consent_signature_name }}
+          {{ intake_form.consent_signature_name.errors }}
+        </div>
+        <button class="submit" type="submit">Save intake and consent</button>
+      </form>
+    </div>
+
+    {% if can_modify %}
+      <div class="section-card" style="margin-top: 16px;">
+        <h3>Reschedule this appointment</h3>
+        <p>Select a new available slot and ClinicOps will update the booking immediately.</p>
+        {% if reschedule_form.fields.slot.choices %}
+          <form method="post" class="stack-form" style="margin-top: 14px;">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="reschedule">
+            {{ reschedule_form.non_field_errors }}
+            <div class="field">
+              <label for="{{ reschedule_form.slot.id_for_label }}">Available slots</label>
+              {{ reschedule_form.slot }}
+              {{ reschedule_form.slot.errors }}
+            </div>
+            <button class="submit" type="submit">Reschedule appointment</button>
+          </form>
+        {% else %}
+          <div class="flash flash--info" style="margin-top: 14px;">No alternate slots are open right now. Keep the current booking or contact the clinic directly.</div>
+        {% endif %}
+      </div>
+
+      <div class="section-card" style="margin-top: 16px;">
+        <h3>Cancel appointment</h3>
+        <p>If you no longer need this visit, cancel it here so the clinic can reopen the slot.</p>
+        <form method="post" class="stack-form" style="margin-top: 14px;">
+          {% csrf_token %}
+          <input type="hidden" name="action" value="cancel">
+          {{ cancel_form.non_field_errors }}
+          <div class="field">
+            <label for="{{ cancel_form.cancel_reason.id_for_label }}">Cancellation reason (optional)</label>
+            {{ cancel_form.cancel_reason }}
+            {{ cancel_form.cancel_reason.errors }}
+          </div>
+          <button class="submit" type="submit">Cancel appointment</button>
+        </form>
+      </div>
+    {% else %}
+      <div class="flash flash--info" style="margin-top: 16px;">This appointment can no longer be changed online. If you still need help, contact the clinic directly.</div>
+    {% endif %}
+
+    <div class="action-row">
+      <a class="button button--secondary" href="{% url 'appointment-lookup' %}">Open lookup page</a>
+      <a class="button button--secondary" href="{% url 'clinic-booking-slug' appointment.clinic.slug %}">Book another appointment</a>
+    </div>
+  {% endif %}
+{% endblock %}
