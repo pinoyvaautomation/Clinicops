@@ -760,6 +760,49 @@ class SecurityAccessProtectionTests(TestCase):
         self.assertContains(response, 'PH')
         self.assertNotContains(response, '198.51.100.61')
 
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_rate_limit_sends_superadmin_security_alert_email(self):
+        for _ in range(5):
+            self.client.post(
+                reverse('login'),
+                {'username': self.staff_user.username, 'password': 'wrong-password'},
+                REMOTE_ADDR='198.51.100.70',
+                HTTP_CF_IPCOUNTRY='PH',
+            )
+
+        blocked = self.client.post(
+            reverse('login'),
+            {'username': self.staff_user.username, 'password': 'wrong-password'},
+            REMOTE_ADDR='198.51.100.70',
+            HTTP_CF_IPCOUNTRY='PH',
+        )
+
+        self.assertEqual(blocked.status_code, 429)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.superuser.email])
+        self.assertIn('Rate limited', mail.outbox[0].subject)
+        self.assertIn('198.51.100.70', mail.outbox[0].body)
+        self.assertIn('PH', mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_blocked_ip_alert_email_is_throttled(self):
+        SecurityAccessRule.objects.create(
+            name='Block repeated IP',
+            action=SecurityAccessRule.Action.BLOCK,
+            target_type=SecurityAccessRule.TargetType.IP,
+            scope=SecurityAccessRule.Scope.AUTH,
+            value='198.51.100.71',
+        )
+
+        first = self.client.get(reverse('login'), REMOTE_ADDR='198.51.100.71')
+        second = self.client.get(reverse('login'), REMOTE_ADDR='198.51.100.71')
+
+        self.assertEqual(first.status_code, 403)
+        self.assertEqual(second.status_code, 403)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.superuser.email])
+        self.assertIn('Access blocked', mail.outbox[0].subject)
+
 
 class AvatarUploadTests(TestCase):
     def setUp(self):

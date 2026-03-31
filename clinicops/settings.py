@@ -207,6 +207,12 @@ EMAIL_HOST_PASSWORD = os.environ.get('SMTP_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('SMTP_USE_TLS', 'false').lower() == 'true'
 EMAIL_TIMEOUT = int(os.environ.get('EMAIL_TIMEOUT', '10'))
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'ClinicOps <noreply@clinicops.local>')
+SECURITY_ALERT_EMAILS = [
+    email.strip()
+    for email in os.environ.get('SECURITY_ALERT_EMAILS', '').split(',')
+    if email.strip()
+]
+SECURITY_ALERT_COOLDOWN_MINUTES = int(os.environ.get('SECURITY_ALERT_COOLDOWN_MINUTES', '30'))
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 PUBLIC_BRAND_NAME = os.environ.get('PUBLIC_BRAND_NAME', 'ClinicOps')
 PUBLIC_BRAND_COLOR = os.environ.get('PUBLIC_BRAND_COLOR', '#0f5132')

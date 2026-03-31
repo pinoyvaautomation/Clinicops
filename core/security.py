@@ -1,17 +1,21 @@
+import logging
 import hashlib
-from datetime import timedelta
+from datetime import timedelta, timezone as dt_timezone
 from ipaddress import ip_address, ip_network
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.core.cache import cache
+from django.core.mail import send_mail
 from django.db.models import Q
 from django.dispatch import receiver
+from django.conf import settings
 from django.utils import timezone
 
 from .models import SecurityAccessRule, SecurityEvent, Staff
 
 User = get_user_model()
+logger = logging.getLogger(__name__)
 
 AUTH_THROTTLE_RULES = {
     'accounts_login': {
@@ -127,7 +131,7 @@ def find_user_for_security_identifier(identifier):
 
 def log_security_event(*, event_type, request=None, user=None, clinic=None, identifier='', metadata=None):
     """Create a normalized security audit event with request metadata."""
-    SecurityEvent.objects.create(
+    event = SecurityEvent.objects.create(
         clinic=clinic if clinic is not None else _staff_clinic_for_user(user),
         user=user,
         event_type=event_type,
@@ -138,6 +142,8 @@ def log_security_event(*, event_type, request=None, user=None, clinic=None, iden
         path=getattr(request, 'path', '')[:255] if request is not None else '',
         metadata=metadata or {},
     )
+    _maybe_send_security_alert(event)
+    return event
 
 
 def get_auth_throttle_rule(request):
@@ -269,6 +275,95 @@ def resolve_security_access(request, *, auth_only=False):
     if matching_allow:
         return matching_allow, None
     return None, matching_block
+
+
+def _security_alert_recipients():
+    if settings.SECURITY_ALERT_EMAILS:
+        return settings.SECURITY_ALERT_EMAILS
+    return list(
+        User.objects.filter(is_superuser=True, is_active=True)
+        .exclude(email='')
+        .values_list('email', flat=True)
+    )
+
+
+def _security_alert_cache_key(event: SecurityEvent):
+    base = '|'.join(
+        [
+            event.event_type,
+            event.ip_address or '-',
+            event.country_code or '-',
+            event.path or '-',
+            str(event.metadata.get('scope') or '-'),
+            str(event.metadata.get('target_value') or '-'),
+        ]
+    )
+    digest = hashlib.sha256(base.encode('utf-8')).hexdigest()
+    return f'clinicops:security-alert:{digest}'
+
+
+def _security_alert_subject(event: SecurityEvent):
+    label = event.get_event_type_display()
+    ip_label = event.ip_address or 'unknown IP'
+    country_label = f' ({event.country_code})' if event.country_code else ''
+    return f'[ClinicOps Security] {label} from {ip_label}{country_label}'
+
+
+def _security_alert_body(event: SecurityEvent):
+    clinic_name = event.clinic.name if event.clinic_id else 'No linked clinic'
+    user_label = ''
+    if event.user_id:
+        user_label = event.user.get_full_name().strip() or event.user.email or event.user.username
+    user_label = user_label or event.identifier or 'Unknown account'
+    metadata_lines = []
+    for key, value in sorted((event.metadata or {}).items()):
+        metadata_lines.append(f'- {key}: {value}')
+
+    body_lines = [
+        'ClinicOps security alert',
+        '',
+        f'Event: {event.get_event_type_display()}',
+        f'Time (UTC): {event.created_at.astimezone(dt_timezone.utc).strftime("%Y-%m-%d %H:%M:%S %Z")}',
+        f'Clinic: {clinic_name}',
+        f'User / identifier: {user_label}',
+        f'IP address: {event.ip_address or "-"}',
+        f'Country: {event.country_code or "-"}',
+        f'Path: {event.path or "-"}',
+        f'User agent: {event.user_agent or "-"}',
+    ]
+    if metadata_lines:
+        body_lines.extend(['', 'Metadata:'])
+        body_lines.extend(metadata_lines)
+    return '\n'.join(body_lines)
+
+
+def _maybe_send_security_alert(event: SecurityEvent):
+    if event.event_type not in {
+        SecurityEvent.EventType.RATE_LIMITED,
+        SecurityEvent.EventType.ACCESS_BLOCKED,
+    }:
+        return
+
+    recipients = _security_alert_recipients()
+    if not recipients:
+        return
+
+    cache_key = _security_alert_cache_key(event)
+    cooldown_seconds = max(60, int(settings.SECURITY_ALERT_COOLDOWN_MINUTES * 60))
+    if cache.get(cache_key):
+        return
+    cache.set(cache_key, True, cooldown_seconds)
+
+    try:
+        send_mail(
+            _security_alert_subject(event),
+            _security_alert_body(event),
+            settings.DEFAULT_FROM_EMAIL,
+            recipients,
+            fail_silently=False,
+        )
+    except Exception:
+        logger.exception('Security alert email failed for event=%s', event.id)
 
 
 @receiver(user_logged_in)
