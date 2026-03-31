@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Staff account ready</title>
+  </head>
+  <body style="font-family: Arial, sans-serif; background: #f3f4f6; padding: 24px;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+      <tr>
+        <td align="center">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width: 520px; background: #ffffff; border-radius: 8px; border: 1px solid #e5e7eb;">
+            <tr>
+              <td style="padding: 24px;">
+                {% if clinic and clinic.logo_url %}
+                  <img src="{{ clinic.logo_url }}" alt="{{ clinic_name }} logo" style="height: 48px; margin-bottom: 16px;">
+                {% endif %}
+                <h1 style="margin: 0 0 8px; color: {{ clinic.brand_color|default:'#1d4ed8' }};">
+                  Your staff account is ready
+                </h1>
+                <p style="margin: 0 0 16px; color: #111827;">
+                  Hello {{ user.get_full_name|default:user.username }},
+                </p>
+                <p style="margin: 0 0 16px; color: #374151;">
+                  {{ clinic_name }} has activated your ClinicOps staff account.
+                </p>
+                <p style="margin: 24px 0;">
+                  <a href="{{ login_url }}" style="display: inline-block; padding: 12px 18px; background: {{ clinic.brand_color|default:'#1d4ed8' }}; color: #ffffff; text-decoration: none; border-radius: 6px;">
+                    Sign in to ClinicOps
+                  </a>
+                </p>
+                <p style="margin: 0 0 12px; color: #374151;">
+                  Use the email address <strong>{{ user.email }}</strong> and the password shared separately by your clinic administrator.
+                </p>
+                <p style="margin: 0; color: #6b7280; font-size: 13px;">
+                  After you sign in, you can change your password from Account settings.
+                </p>
+              </td>
+            </tr>
+          </table>
+          <p style="margin-top: 16px; font-size: 12px; color: #9ca3af;">
+            If you were not expecting this account, please contact the clinic directly.
+          </p>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>

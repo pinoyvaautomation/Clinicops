@@ -1,0 +1,12 @@
+Hello {{ user.get_full_name|default:user.username }},
+
+Your staff account for {{ clinic_name }} is now active.
+
+Sign in here:
+{{ login_url }}
+
+Use the email address {{ user.email }} and the password shared separately by your clinic administrator.
+
+After you sign in, you can change your password from Account settings.
+
+If you were not expecting this account, please contact the clinic directly.

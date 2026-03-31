@@ -137,6 +137,80 @@ class ReminderTaskTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
 
 
+class StaffEmailTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Staff Email Clinic', timezone='UTC')
+        self.admin_user = User.objects.create_user(
+            username='owner@example.com',
+            email='owner@example.com',
+            password='password',
+            is_active=True,
+        )
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.admin_user.groups.add(admin_group)
+        Staff.objects.create(user=self.admin_user, clinic=self.clinic, is_active=True)
+        self.client.force_login(self.admin_user)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_active_staff_create_sends_welcome_email(self):
+        response = self.client.post(
+            reverse('staff-member-create'),
+            data={
+                'email': 'info@ziloah.com',
+                'first_name': 'Ziloah',
+                'last_name': 'Staff',
+                'password': 'TempPass123!',
+                'role': 'FrontDesk',
+                'is_active': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('staff-members'))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['info@ziloah.com'])
+        self.assertIn('staff account is ready', mail.outbox[0].subject.lower())
+        self.assertIn(reverse('login'), mail.outbox[0].body)
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_inactive_staff_create_sends_verification_email(self):
+        response = self.client.post(
+            reverse('staff-member-create'),
+            data={
+                'email': 'inactive.staff@example.com',
+                'first_name': 'Inactive',
+                'last_name': 'Staff',
+                'password': 'TempPass123!',
+                'role': 'Doctor',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('staff-members'))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['inactive.staff@example.com'])
+        self.assertIn('verify your', mail.outbox[0].subject.lower())
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_staff_create_still_succeeds_when_email_delivery_fails(self):
+        with patch('core.views.EmailMultiAlternatives.send', side_effect=RuntimeError('mail backend failed')):
+            response = self.client.post(
+                reverse('staff-member-create'),
+                data={
+                    'email': 'delivery.fail@example.com',
+                    'first_name': 'Delivery',
+                    'last_name': 'Fail',
+                    'password': 'TempPass123!',
+                    'role': 'Nurse',
+                    'is_active': 'on',
+                },
+            )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('staff-members'))
+        self.assertTrue(User.objects.filter(username='delivery.fail@example.com').exists())
+
+
 class AdminScopeTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
@@ -717,7 +791,7 @@ class FreemiumPlanTests(TestCase):
             email='existing@example.com',
             phone='555-0191',
         )
-        start = timezone.now() + timedelta(days=1)
+        start = timezone.now() - timedelta(hours=1)
         Appointment.objects.create(
             clinic=self.clinic,
             appointment_type=appointment_type,

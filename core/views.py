@@ -13,7 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.auth.tokens import default_token_generator
 from django.core.exceptions import ValidationError
-from django.core.mail import send_mail
+from django.core.mail import EmailMultiAlternatives, send_mail
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
@@ -763,6 +763,7 @@ def _save_staff_member_form(request, clinic: Clinic, form, *, member: Staff | No
     email = form.cleaned_data['email']
     is_create = member is None
     user = member.user if member is not None else None
+    was_active = user.is_active if user is not None else False
 
     if is_create:
         if User.objects.filter(username__iexact=email).exists() or User.objects.filter(email__iexact=email).exists():
@@ -815,6 +816,8 @@ def _save_staff_member_form(request, clinic: Clinic, form, *, member: Staff | No
 
     if not user.is_active:
         _send_verification_email(request, user, clinic=clinic)
+    elif is_create or not was_active:
+        _send_staff_welcome_email(request, user, clinic=clinic)
 
     return member
 
@@ -923,16 +926,55 @@ def _send_verification_email(request, user, clinic=None):
         'clinic_name': clinic_name,
         'verify_url': verify_url,
     }
-    subject = render_to_string('core/email_verify_subject.txt', context).strip()
-    message = render_to_string('core/email_verify.txt', context)
-    html_message = render_to_string('core/email_verify.html', context)
-    send_mail(
-        subject,
-        message,
-        settings.DEFAULT_FROM_EMAIL,
-        [user.email],
-        html_message=html_message,
-        fail_silently=True,
+    _send_rendered_email(
+        subject_template='core/email_verify_subject.txt',
+        text_template='core/email_verify.txt',
+        html_template='core/email_verify.html',
+        context=context,
+        recipients=[user.email],
+    )
+
+
+def _send_rendered_email(*, subject_template: str, text_template: str, html_template: str | None, context: dict, recipients: list[str]) -> bool:
+    subject = render_to_string(subject_template, context).strip()
+    message = render_to_string(text_template, context)
+    email = EmailMultiAlternatives(
+        subject=subject,
+        body=message,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=recipients,
+    )
+    if html_template:
+        email.attach_alternative(render_to_string(html_template, context), 'text/html')
+
+    try:
+        email.send(fail_silently=False)
+        return True
+    except Exception:
+        logger.exception(
+            'Transactional email send failed for template=%s recipients=%s',
+            subject_template,
+            recipients,
+        )
+        return False
+
+
+def _send_staff_welcome_email(request, user, clinic=None):
+    if clinic is None:
+        clinic = _get_user_clinic(user)
+    clinic_name = clinic.name if clinic else 'ClinicOps'
+    context = {
+        'user': user,
+        'clinic': clinic,
+        'clinic_name': clinic_name,
+        'login_url': request.build_absolute_uri(reverse('login')),
+    }
+    _send_rendered_email(
+        subject_template='core/staff_welcome_subject.txt',
+        text_template='core/staff_welcome.txt',
+        html_template='core/staff_welcome.html',
+        context=context,
+        recipients=[user.email],
     )
 
 

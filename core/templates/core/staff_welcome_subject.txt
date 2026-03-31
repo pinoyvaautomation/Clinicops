@@ -1,0 +1,1 @@
+Your {{ clinic_name }} staff account is ready
