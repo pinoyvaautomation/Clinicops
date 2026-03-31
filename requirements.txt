@@ -5,9 +5,11 @@ python-dotenv==1.2.1
 django-allauth[socialaccount]==65.15.0
 django-admin-interface==0.32.0
 django-colorfield==0.14.0
+django-otp==1.7.0
 django-q2==1.9.0
 django-secured-fields==0.4.4
 django-simple-history==3.11.0
 psycopg2-binary==2.9.11
+qrcode==8.2
 whitenoise==6.9.0
 gunicorn==22.0.0

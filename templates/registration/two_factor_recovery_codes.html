@@ -1,0 +1,63 @@
+{% extends "public_shell.html" %}
+
+{% block title %}{{ title }} | {{ public_brand_name|default:"ClinicOps" }}{% endblock %}
+{% block hero_eyebrow %}{{ hero_eyebrow }}{% endblock %}
+{% block hero_title %}{{ hero_title }}{% endblock %}
+{% block hero_text %}{{ hero_text }}{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">{{ recovery_code_count }} active backup codes</span>
+    <span class="pill">Store offline</span>
+  </div>
+{% endblock %}
+{% block hero_points %}
+  <div class="hero-points">
+    <div class="point">
+      <strong>Shown once</strong>
+      <p>These codes are only displayed right now. Save them before you continue.</p>
+    </div>
+    <div class="point">
+      <strong>One use each</strong>
+      <p>Each code works once when the authenticator app is unavailable.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block panel_title %}{{ panel_title }}{% endblock %}
+{% block panel_intro %}<p class="panel-copy">{{ panel_intro }}</p>{% endblock %}
+{% block panel_body %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="flash">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  {% if recovery_codes %}
+    <div class="field" style="padding: 14px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 18px; background: rgba(248, 250, 252, 0.9);">
+      <label>Recovery codes</label>
+      <div style="display:grid; gap:10px; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
+        {% for code in recovery_codes %}
+          <div style="padding: 12px 14px; border-radius: 14px; border: 1px solid rgba(148, 163, 184, 0.18); background:#fff; font: 600 14px/1.4 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;">
+            {{ code }}
+          </div>
+        {% endfor %}
+      </div>
+    </div>
+  {% else %}
+    <div class="flash">This page does not display previous recovery codes again. Generate a fresh set if you need new backup access codes.</div>
+  {% endif %}
+
+  <div class="card-footer">
+    <a class="support-link" href="{{ continue_url }}">Continue</a>
+    <form method="post" action="{% url 'two-factor-regenerate' %}">
+      {% csrf_token %}
+      <button class="social-submit" type="submit">Regenerate recovery codes</button>
+    </form>
+    {% if can_disable_two_factor %}
+      <form method="post" action="{% url 'two-factor-disable' %}">
+        {% csrf_token %}
+        <button class="social-submit" type="submit">Disable 2FA</button>
+      </form>
+    {% endif %}
+  </div>
+{% endblock %}

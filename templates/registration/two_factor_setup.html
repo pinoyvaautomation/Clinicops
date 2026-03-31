@@ -1,0 +1,83 @@
+{% extends "public_shell.html" %}
+
+{% block title %}{{ title }} | {{ public_brand_name|default:"ClinicOps" }}{% endblock %}
+{% block hero_eyebrow %}{{ hero_eyebrow }}{% endblock %}
+{% block hero_title %}{{ hero_title }}{% endblock %}
+{% block hero_text %}{{ hero_text }}{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">Authenticator app</span>
+    <span class="pill">Recovery codes included</span>
+    {% if is_superuser_setup %}
+      <span class="pill">Required for superadmin</span>
+    {% endif %}
+  </div>
+{% endblock %}
+{% block hero_points %}
+  <div class="hero-points">
+    <div class="point">
+      <strong>Step 1: Scan the QR code</strong>
+      <p>Use Google Authenticator, Microsoft Authenticator, Authy, or another TOTP app.</p>
+    </div>
+    <div class="point">
+      <strong>Step 2: Confirm one code</strong>
+      <p>Enter the current 6-digit code from the app to activate two-factor protection.</p>
+    </div>
+    <div class="point">
+      <strong>Step 3: Save recovery codes</strong>
+      <p>You will get one-time recovery codes immediately after setup in case the phone is lost.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block panel_title %}{{ panel_title }}{% endblock %}
+{% block panel_intro %}<p class="panel-copy">{{ panel_intro }}</p>{% endblock %}
+{% block panel_body %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="flash {{ message.tags }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+  {% if form.non_field_errors %}
+    {% for error in form.non_field_errors %}
+      <div class="flash error">{{ error }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="stack-form">
+    <div class="field" style="justify-items: center; padding: 14px; border: 1px solid rgba(148, 163, 184, 0.18); border-radius: 18px; background: rgba(248, 250, 252, 0.9);">
+      <label style="justify-self: start;">Scan this QR code</label>
+      <img src="{{ qr_code_data }}" alt="Two-factor setup QR code" style="width: min(220px, 100%); height: auto; border-radius: 18px; border: 1px solid rgba(148, 163, 184, 0.18); background: #fff; padding: 12px;">
+    </div>
+
+    <div class="field">
+      <label for="id_secret_key">Manual setup key</label>
+      <input id="id_secret_key" type="text" value="{{ secret_key }}" readonly onclick="this.select()">
+      <div class="field-help">If QR scanning is unavailable, enter this secret manually in the authenticator app.</div>
+    </div>
+
+    <form method="post" class="stack-form">
+      {% csrf_token %}
+      <div class="field">
+        <label for="{{ form.token.id_for_label }}">Authenticator code</label>
+        {{ form.token }}
+        {% if form.token.errors %}
+          <div class="field-errors">{{ form.token.errors }}</div>
+        {% endif %}
+      </div>
+      <button class="submit" type="submit">Activate 2FA</button>
+    </form>
+
+    <div class="card-footer">
+      <div class="muted">The account stays protected by password until this code is verified.</div>
+      {% if is_superuser_setup %}
+        <form method="post" action="{% url 'logout' %}">
+          {% csrf_token %}
+          <button class="social-submit" type="submit">Log out instead</button>
+        </form>
+      {% else %}
+        <a class="support-link" href="{% url 'settings' %}">Back to settings</a>
+      {% endif %}
+    </div>
+  </div>
+{% endblock %}

@@ -5,7 +5,6 @@ from django.contrib.auth.models import Group
 from django.db.models import QuerySet
 from simple_history.admin import SimpleHistoryAdmin
 from admin_interface.models import Theme
-
 from .models import (
     Appointment,
     AppointmentType,
@@ -17,6 +16,7 @@ from .models import (
     SecurityAccessRule,
     SecurityEvent,
     Staff,
+    TwoFactorRecoveryCode,
 )
 
 User = get_user_model()
@@ -368,3 +368,11 @@ class SecurityEventAdmin(admin.ModelAdmin):
 
     def has_change_permission(self, request, obj=None):
         return False
+
+
+@admin.register(TwoFactorRecoveryCode)
+class TwoFactorRecoveryCodeAdmin(admin.ModelAdmin):
+    list_display = ('user', 'code_suffix', 'consumed_at', 'created_at')
+    list_filter = ('consumed_at',)
+    search_fields = ('user__username', 'user__email', 'code_suffix')
+    readonly_fields = ('user', 'code_hash', 'code_suffix', 'consumed_at', 'created_at')

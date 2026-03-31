@@ -60,6 +60,8 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
+    'django_otp',
+    'django_otp.plugins.otp_totp',
     'simple_history',
     'secured_fields',
     'django_q',
@@ -74,7 +76,9 @@ MIDDLEWARE = [
     'core.middleware.SecurityAccessMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django_otp.middleware.OTPMiddleware',
     'allauth.account.middleware.AccountMiddleware',
+    'core.two_factor_middleware.TwoFactorEnforcementMiddleware',
     'simple_history.middleware.HistoryRequestMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
@@ -220,6 +224,11 @@ PUBLIC_LOGO_URL = os.environ.get('PUBLIC_LOGO_URL', '')
 GOOGLE_CLIENT_ID = os.environ.get('GOOGLE_CLIENT_ID', '')
 GOOGLE_CLIENT_SECRET = os.environ.get('GOOGLE_CLIENT_SECRET', '')
 GOOGLE_OAUTH_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
+TWO_FACTOR_SUPERUSERS_REQUIRED = os.environ.get('TWO_FACTOR_SUPERUSERS_REQUIRED', 'true').lower() == 'true'
+TWO_FACTOR_ALLOW_CLINIC_ADMINS = os.environ.get('TWO_FACTOR_ALLOW_CLINIC_ADMINS', 'true').lower() == 'true'
+TWO_FACTOR_RECOVERY_CODE_COUNT = int(os.environ.get('TWO_FACTOR_RECOVERY_CODE_COUNT', '10'))
+OTP_TOTP_ISSUER = PUBLIC_BRAND_NAME
+OTP_TOTP_THROTTLE_FACTOR = int(os.environ.get('OTP_TOTP_THROTTLE_FACTOR', '1'))
 
 _secured_keys = os.environ.get('SECURED_FIELDS_KEY')
 if _secured_keys:

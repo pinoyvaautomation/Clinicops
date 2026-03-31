@@ -373,6 +373,12 @@ class SecurityEvent(models.Model):
         PASSWORD_CHANGED = 'password_changed', 'Password changed'
         RATE_LIMITED = 'rate_limited', 'Rate limited'
         ACCESS_BLOCKED = 'access_blocked', 'Access blocked'
+        TWO_FACTOR_ENABLED = 'two_factor_enabled', 'Two-factor enabled'
+        TWO_FACTOR_DISABLED = 'two_factor_disabled', 'Two-factor disabled'
+        TWO_FACTOR_CHALLENGE_PASSED = 'two_factor_challenge_passed', 'Two-factor challenge passed'
+        TWO_FACTOR_CHALLENGE_FAILED = 'two_factor_challenge_failed', 'Two-factor challenge failed'
+        TWO_FACTOR_RECOVERY_USED = 'two_factor_recovery_used', 'Two-factor recovery used'
+        TWO_FACTOR_RESET = 'two_factor_reset', 'Two-factor reset'
 
     clinic = models.ForeignKey(
         Clinic,
@@ -473,3 +479,25 @@ class SecurityAccessRule(models.Model):
 
     def __str__(self) -> str:
         return f'{self.get_action_display()} {self.get_target_type_display()}: {self.value}'
+
+
+class TwoFactorRecoveryCode(models.Model):
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='two_factor_recovery_codes',
+    )
+    code_hash = models.CharField(max_length=64)
+    code_suffix = models.CharField(max_length=6)
+    consumed_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['user_id', 'created_at', 'id']
+        indexes = [
+            models.Index(fields=['user', 'consumed_at']),
+        ]
+
+    def __str__(self) -> str:
+        status = 'used' if self.consumed_at else 'active'
+        return f'Recovery code ending {self.code_suffix} ({status})'

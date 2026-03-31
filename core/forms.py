@@ -254,6 +254,23 @@ class ResendVerificationForm(forms.Form):
         return self.cleaned_data['email'].strip().lower()
 
 
+class TwoFactorTokenForm(forms.Form):
+    token = forms.CharField(max_length=32)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['token'].widget.attrs.update(
+            {
+                'placeholder': '123456 or recovery code',
+                'autocomplete': 'one-time-code',
+                'inputmode': 'numeric',
+            }
+        )
+
+    def clean_token(self):
+        return (self.cleaned_data['token'] or '').strip().replace(' ', '')
+
+
 class AvatarUploadForm(forms.Form):
     avatar = forms.ImageField(required=False)
 

@@ -4,7 +4,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ public_brand_name|default:"ClinicOps" }} Login</title>
+    <title>{{ login_heading|default:"Sign in" }} | {{ public_brand_name|default:"ClinicOps" }}</title>
     <style>
       @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
 
@@ -348,9 +348,9 @@
     <main class="page">
       <section class="shell">
         <article class="hero">
-          <div class="eyebrow">Clinic Portal Access</div>
-          <h1>{{ public_brand_name|default:"ClinicOps" }}</h1>
-          <p>Appointments, patients, staff, reminders, and subscription control all live in one operating system for the clinic. Sign in to continue where the team left off.</p>
+          <div class="eyebrow">{{ login_eyebrow|default:"Clinic Portal Access" }}</div>
+          <h1>{{ login_hero_title|default:public_brand_name|default:"ClinicOps" }}</h1>
+          <p>{{ login_hero_text|default:"Appointments, patients, staff, reminders, and subscription control all live in one operating system for the clinic. Sign in to continue where the team left off." }}</p>
           <div class="hero-meta">
             <span class="pill">Built for clinics</span>
             <span class="pill">Patient and staff access</span>
@@ -383,8 +383,8 @@
               {% endif %}
               <strong>{{ public_brand_name|default:"ClinicOps" }}</strong>
             </div>
-            <h2>Sign in</h2>
-            <p>Use your clinic or patient portal account credentials to continue. Email login still works for accounts set up that way.</p>
+            <h2>{{ login_heading|default:"Sign in" }}</h2>
+            <p>{{ login_description|default:"Use your clinic or patient portal account credentials to continue. Email login still works for accounts set up that way." }}</p>
           </div>
 
           <div class="login-body">
@@ -402,7 +402,7 @@
               <div class="flash">Invalid username, email, or password.</div>
             {% endif %}
 
-            <form method="post" action="{% url 'login' %}">
+            <form method="post" action="{{ login_action_url|default:request.path }}">
               {% csrf_token %}
 
               <div class="field">
@@ -432,7 +432,7 @@
               <button class="submit" type="submit">Log In</button>
             </form>
 
-            {% if google_oauth_enabled %}
+            {% if google_oauth_enabled and show_google_signin %}
               <div class="divider">or</div>
               <form class="social-form" method="post" action="{% provider_login_url 'google' process='login' %}">
                 {% csrf_token %}
@@ -454,9 +454,13 @@
             {% endif %}
 
             <div class="card-footer">
-              <a class="support-link" href="{% url 'password_reset' %}">Forgot your password?</a>
-              <a class="support-link" href="{% url 'resend-verification' %}">Resend verification email</a>
-              {% if google_oauth_enabled %}
+              {% if show_password_reset_link|default:True %}
+                <a class="support-link" href="{% url 'password_reset' %}">Forgot your password?</a>
+              {% endif %}
+              {% if show_resend_verification_link|default:True %}
+                <a class="support-link" href="{% url 'resend-verification' %}">Resend verification email</a>
+              {% endif %}
+              {% if google_oauth_enabled and show_google_signin %}
                 <div class="muted">Google sign-in works only for existing ClinicOps accounts that already use the same email.</div>
               {% endif %}
               <div class="muted">Need a patient account? Ask your clinic for its booking or signup link.</div>

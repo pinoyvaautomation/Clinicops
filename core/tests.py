@@ -15,12 +15,16 @@ from django.core.cache import cache
 from django.core import mail
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.conf import settings
 from django.test import Client
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
 from django.urls import reverse
 
 from allauth.core.exceptions import ImmediateHttpResponse
+from django_otp import DEVICE_ID_SESSION_KEY
+from django_otp.oath import totp
+from django_otp.plugins.otp_totp.models import TOTPDevice
 from PIL import Image
 
 from .admin import AppointmentAdmin
@@ -39,10 +43,12 @@ from .models import (
     SecurityAccessRule,
     SecurityEvent,
     Staff,
+    TwoFactorRecoveryCode,
 )
 from .notifications import create_clinic_notifications
 from .social_auth import ClinicSocialAccountAdapter, find_matching_local_user
 from .tasks import send_upcoming_appointment_reminders
+from .two_factor import generate_recovery_codes
 from .views import _notify_clinic_service_change
 
 User = get_user_model()
@@ -802,6 +808,206 @@ class SecurityAccessProtectionTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [self.superuser.email])
         self.assertIn('Access blocked', mail.outbox[0].subject)
+
+
+class TwoFactorAuthenticationTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.clinic = Clinic.objects.create(name='Two Factor Clinic', timezone='UTC')
+        self.admin_user = User.objects.create_user(
+            username='twofactor-admin@example.com',
+            email='twofactor-admin@example.com',
+            password='password',
+            first_name='Clinic',
+            last_name='Owner',
+        )
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.admin_user.groups.add(admin_group)
+        Staff.objects.create(user=self.admin_user, clinic=self.clinic)
+
+        self.superuser = User.objects.create_superuser(
+            username='otp-root',
+            email='otp-root@example.com',
+            password='password',
+        )
+
+    def _totp_token(self, device):
+        token = totp(
+            device.bin_key,
+            step=device.step,
+            t0=device.t0,
+            digits=device.digits,
+            drift=device.drift,
+        )
+        return str(token).zfill(device.digits)
+
+    def _mark_verified_session(self, client, device):
+        session = client.session
+        session[DEVICE_ID_SESSION_KEY] = device.persistent_id
+        session.save()
+
+    def test_superadmin_login_redirects_to_two_factor_setup_until_enrolled(self):
+        response = self.client.post(
+            reverse('admin-login'),
+            {'username': self.superuser.username, 'password': 'password'},
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('two-factor-setup'))
+
+    def test_superadmin_setup_confirms_device_and_generates_recovery_codes(self):
+        self.client.post(
+            reverse('admin-login'),
+            {'username': self.superuser.username, 'password': 'password'},
+        )
+        self.client.get(reverse('two-factor-setup'))
+        device = TOTPDevice.objects.get(user=self.superuser, confirmed=False)
+
+        response = self.client.post(
+            reverse('two-factor-setup'),
+            {'token': self._totp_token(device)},
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.redirect_chain[0][0], reverse('two-factor-recovery-codes'))
+        device.refresh_from_db()
+        self.assertTrue(device.confirmed)
+        self.assertEqual(
+            TwoFactorRecoveryCode.objects.filter(user=self.superuser).count(),
+            settings.TWO_FACTOR_RECOVERY_CODE_COUNT,
+        )
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                user=self.superuser,
+                event_type=SecurityEvent.EventType.TWO_FACTOR_ENABLED,
+            ).exists()
+        )
+
+        self.assertEqual(
+            len(response.context['recovery_codes']),
+            settings.TWO_FACTOR_RECOVERY_CODE_COUNT,
+        )
+
+    def test_superadmin_requires_verified_session_for_admin_index(self):
+        device = TOTPDevice.objects.create(
+            user=self.superuser,
+            name='ClinicOps Authenticator',
+            confirmed=True,
+        )
+        self.client.force_login(self.superuser)
+
+        blocked = self.client.get('/admin/')
+        self.assertEqual(blocked.status_code, 302)
+        self.assertEqual(blocked['Location'], reverse('two-factor-verify'))
+
+        self._mark_verified_session(self.client, device)
+        allowed = self.client.get('/admin/')
+        self.assertEqual(allowed.status_code, 200)
+
+    def test_clinic_admin_can_enable_two_factor_and_is_challenged_on_login(self):
+        self.client.force_login(self.admin_user)
+
+        setup_page = self.client.get(reverse('two-factor-setup'))
+        self.assertEqual(setup_page.status_code, 200)
+
+        device = TOTPDevice.objects.get(user=self.admin_user, confirmed=False)
+        response = self.client.post(
+            reverse('two-factor-setup'),
+            {'token': self._totp_token(device)},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('two-factor-recovery-codes'))
+
+        self.client.post(reverse('logout'))
+        login_response = self.client.post(
+            reverse('login'),
+            {'username': self.admin_user.username, 'password': 'password'},
+        )
+        self.assertEqual(login_response.status_code, 302)
+        self.assertEqual(login_response['Location'], reverse('two-factor-verify'))
+
+    def test_recovery_code_can_finish_clinic_admin_login_once(self):
+        device = TOTPDevice.objects.create(
+            user=self.admin_user,
+            name='ClinicOps Authenticator',
+            confirmed=True,
+        )
+        codes = generate_recovery_codes(self.admin_user, count=2)
+
+        login_response = self.client.post(
+            reverse('login'),
+            {'username': self.admin_user.username, 'password': 'password'},
+        )
+        self.assertEqual(login_response.status_code, 302)
+        self.assertEqual(login_response['Location'], reverse('two-factor-verify'))
+
+        verify_response = self.client.post(
+            reverse('two-factor-verify'),
+            {'token': codes[0]},
+        )
+        self.assertEqual(verify_response.status_code, 302)
+
+        used_code = TwoFactorRecoveryCode.objects.get(
+            user=self.admin_user,
+            code_suffix=codes[0].replace('-', '')[-4:],
+        )
+        self.assertIsNotNone(used_code.consumed_at)
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                user=self.admin_user,
+                event_type=SecurityEvent.EventType.TWO_FACTOR_RECOVERY_USED,
+            ).exists()
+        )
+
+        self.client.post(reverse('logout'))
+        self.client.post(
+            reverse('login'),
+            {'username': self.admin_user.username, 'password': 'password'},
+        )
+        reused = self.client.post(
+            reverse('two-factor-verify'),
+            {'token': codes[0]},
+        )
+        self.assertEqual(reused.status_code, 200)
+        self.assertContains(reused, 'unused recovery code')
+
+    def test_clinic_admin_can_disable_two_factor_from_settings(self):
+        TOTPDevice.objects.create(
+            user=self.admin_user,
+            name='ClinicOps Authenticator',
+            confirmed=True,
+        )
+        generate_recovery_codes(self.admin_user, count=3)
+        self.client.force_login(self.admin_user)
+
+        response = self.client.post(reverse('two-factor-disable'))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('settings'))
+        self.assertFalse(TOTPDevice.objects.filter(user=self.admin_user).exists())
+        self.assertFalse(
+            TwoFactorRecoveryCode.objects.filter(user=self.admin_user).exists()
+        )
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                user=self.admin_user,
+                event_type=SecurityEvent.EventType.TWO_FACTOR_DISABLED,
+            ).exists()
+        )
+
+    def test_superuser_cannot_disable_two_factor_through_portal_route(self):
+        TOTPDevice.objects.create(
+            user=self.superuser,
+            name='ClinicOps Authenticator',
+            confirmed=True,
+        )
+        self.client.force_login(self.superuser)
+        self._mark_verified_session(self.client, TOTPDevice.objects.get(user=self.superuser))
+
+        response = self.client.post(reverse('two-factor-disable'))
+
+        self.assertEqual(response.status_code, 403)
 
 
 class AvatarUploadTests(TestCase):

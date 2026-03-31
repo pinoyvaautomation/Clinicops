@@ -45,6 +45,7 @@ from .forms import (
     StaffMemberUpdateForm,
     AppointmentTypeForm,
     ClinicAuthenticationForm,
+    TwoFactorTokenForm,
 )
 from .models import (
     Appointment,
@@ -71,6 +72,22 @@ from .plan_limits import (
 from .paypal import PayPalError, get_subscription, verify_webhook_signature
 from .security import find_user_for_security_identifier, log_security_event
 from .subscriptions import clinic_has_active_subscription, map_paypal_status, parse_paypal_datetime
+from .two_factor import (
+    TWO_FACTOR_BACKEND_SESSION_KEY,
+    build_qr_data_uri,
+    consume_recovery_code,
+    finish_two_factor_login,
+    generate_recovery_codes,
+    get_confirmed_totp_device,
+    get_or_create_setup_device,
+    manual_entry_secret,
+    post_two_factor_redirect,
+    recovery_code_count,
+    reset_two_factor_for_user,
+    user_can_manage_two_factor,
+    user_has_confirmed_two_factor,
+    user_requires_two_factor_setup,
+)
 
 User = get_user_model()
 
@@ -82,6 +99,49 @@ _UNSET = object()
 class ClinicLoginView(LoginView):
     authentication_form = ClinicAuthenticationForm
     template_name = 'registration/login.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.setdefault('login_eyebrow', 'Clinic Portal Access')
+        context.setdefault('login_hero_title', context.get('public_brand_name', 'ClinicOps'))
+        context.setdefault(
+            'login_hero_text',
+            'Appointments, patients, staff, reminders, and subscription control all live in one operating system for the clinic. Sign in to continue where the team left off.',
+        )
+        context.setdefault('login_heading', 'Sign in')
+        context.setdefault(
+            'login_description',
+            'Use your clinic or patient portal account credentials to continue. Email login still works for accounts set up that way.',
+        )
+        context.setdefault('login_action_url', reverse('login'))
+        context.setdefault('show_google_signin', settings.GOOGLE_OAUTH_ENABLED)
+        context.setdefault('show_password_reset_link', True)
+        context.setdefault('show_resend_verification_link', True)
+        return context
+
+    def form_valid(self, form):
+        response = super().form_valid(form)
+        user = self.request.user
+        self.request.session[TWO_FACTOR_BACKEND_SESSION_KEY] = getattr(user, 'backend', '')
+        self.request.session['two_factor_redirect_to'] = self.get_success_url()
+
+        if user_requires_two_factor_setup(user):
+            messages.warning(
+                self.request,
+                'Authenticator app setup is required before this account can continue.',
+            )
+            return redirect('two-factor-setup')
+
+        if user_has_confirmed_two_factor(user):
+            messages.info(
+                self.request,
+                'Enter the authenticator code or a recovery code to finish signing in.',
+            )
+            return redirect('two-factor-verify')
+
+        self.request.session.pop('two_factor_redirect_to', None)
+        self.request.session.pop(TWO_FACTOR_BACKEND_SESSION_KEY, None)
+        return response
 
     def form_invalid(self, form):
         identifier = (self.request.POST.get('username') or '').strip()
@@ -95,6 +155,34 @@ class ClinicLoginView(LoginView):
                 metadata={'error_fields': sorted(form.errors.keys())},
             )
         return super().form_invalid(form)
+
+
+class AdminLoginView(ClinicLoginView):
+    def get_success_url(self):
+        return self.get_redirect_url() or reverse('admin:index')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                'login_eyebrow': 'Platform administration',
+                'login_hero_title': 'ClinicOps Admin',
+                'login_hero_text': 'Use the superadmin account to manage platform-wide settings, billing controls, audit tooling, and emergency access actions.',
+                'login_heading': 'Superadmin sign in',
+                'login_description': 'This sign-in is restricted to ClinicOps platform administrators and requires an authenticator app after password verification.',
+                'login_action_url': reverse('admin-login'),
+                'show_google_signin': False,
+                'show_password_reset_link': False,
+                'show_resend_verification_link': False,
+            }
+        )
+        return context
+
+    def form_valid(self, form):
+        if not form.get_user().is_superuser:
+            form.add_error(None, 'Superadmin access only.')
+            return self.form_invalid(form)
+        return super().form_valid(form)
 
 
 class ClinicPasswordChangeView(PasswordChangeView):
@@ -111,6 +199,227 @@ class ClinicPasswordChangeView(PasswordChangeView):
             metadata={'source': 'password_change'},
         )
         return response
+
+
+def _two_factor_template_context(*, request, title, eyebrow, hero_title, hero_text, panel_title, panel_intro, form=None, extra=None):
+    context = {
+        'public_brand_name': settings.PUBLIC_BRAND_NAME,
+        'public_brand_color': settings.PUBLIC_BRAND_COLOR,
+        'public_logo_url': settings.PUBLIC_LOGO_URL,
+        'title': title,
+        'hero_eyebrow': eyebrow,
+        'hero_title': hero_title,
+        'hero_text': hero_text,
+        'panel_title': panel_title,
+        'panel_intro': panel_intro,
+        'form': form,
+    }
+    if extra:
+        context.update(extra)
+    return context
+
+
+@login_required
+def two_factor_setup_view(request):
+    if not user_can_manage_two_factor(request.user):
+        return HttpResponseForbidden('This account cannot manage authenticator app security.')
+
+    if user_has_confirmed_two_factor(request.user):
+        messages.info(request, 'Two-factor authentication is already enabled for this account.')
+        return redirect('settings')
+
+    form = TwoFactorTokenForm(request.POST or None)
+    device = get_or_create_setup_device(request.user)
+    qr_code_data = build_qr_data_uri(device.config_url)
+    secret_key = manual_entry_secret(device)
+
+    if request.method == 'POST' and form.is_valid():
+        token = form.cleaned_data['token']
+        if device.verify_token(token):
+            device.confirmed = True
+            device.name = device.name or 'ClinicOps Authenticator'
+            device.save(update_fields=['confirmed', 'name'])
+            codes = generate_recovery_codes(request.user)
+            request.session['two_factor_recovery_codes'] = codes
+            finish_two_factor_login(request, device=device)
+            request.session.pop(TWO_FACTOR_BACKEND_SESSION_KEY, None)
+            log_security_event(
+                event_type=SecurityEvent.EventType.TWO_FACTOR_ENABLED,
+                request=request,
+                user=request.user,
+                identifier=request.user.email or request.user.username,
+                metadata={
+                    'source': 'setup',
+                    'recovery_code_count': len(codes),
+                },
+            )
+            messages.success(request, 'Authenticator app enabled. Save the recovery codes before leaving the next screen.')
+            return redirect('two-factor-recovery-codes')
+
+        log_security_event(
+            event_type=SecurityEvent.EventType.TWO_FACTOR_CHALLENGE_FAILED,
+            request=request,
+            user=request.user,
+            identifier=request.user.email or request.user.username,
+            metadata={'source': 'setup'},
+        )
+        form.add_error('token', 'That authenticator code could not be verified. Try the current 6-digit code again.')
+
+    return render(
+        request,
+        'registration/two_factor_setup.html',
+        _two_factor_template_context(
+            request=request,
+            title='Set up authenticator',
+            eyebrow='Authenticator setup',
+            hero_title='Protect this account with an authenticator app.',
+            hero_text='Scan the QR code with Google Authenticator, Microsoft Authenticator, Authy, or another TOTP app. Enter the current code once to finish enrollment and generate recovery codes.',
+            panel_title='Set up authenticator',
+            panel_intro='Enrollment becomes active after you confirm the first code from your app.',
+            form=form,
+            extra={
+                'qr_code_data': qr_code_data,
+                'secret_key': secret_key,
+                'config_url': device.config_url,
+                'is_superuser_setup': request.user.is_superuser,
+            },
+        ),
+    )
+
+
+@login_required
+def two_factor_verify_view(request):
+    device = get_confirmed_totp_device(request.user)
+    if not device:
+        messages.warning(request, 'This account does not have an authenticator app enrolled yet.')
+        return redirect('two-factor-setup')
+
+    form = TwoFactorTokenForm(request.POST or None)
+    remaining_codes = recovery_code_count(request.user)
+
+    if request.method == 'POST' and form.is_valid():
+        token = form.cleaned_data['token']
+
+        if device.verify_token(token):
+            finish_two_factor_login(request, device=device)
+            request.session.pop(TWO_FACTOR_BACKEND_SESSION_KEY, None)
+            log_security_event(
+                event_type=SecurityEvent.EventType.TWO_FACTOR_CHALLENGE_PASSED,
+                request=request,
+                user=request.user,
+                identifier=request.user.email or request.user.username,
+                metadata={'source': 'totp'},
+            )
+            return redirect(post_two_factor_redirect(request))
+
+        recovery = consume_recovery_code(request.user, token)
+        if recovery:
+            recovery.consumed_at = timezone.now()
+            recovery.save(update_fields=['consumed_at'])
+            finish_two_factor_login(request, device=device)
+            request.session.pop(TWO_FACTOR_BACKEND_SESSION_KEY, None)
+            log_security_event(
+                event_type=SecurityEvent.EventType.TWO_FACTOR_RECOVERY_USED,
+                request=request,
+                user=request.user,
+                identifier=request.user.email or request.user.username,
+                metadata={'remaining_recovery_codes': recovery_code_count(request.user)},
+            )
+            messages.warning(
+                request,
+                'A recovery code was used for this sign-in. Regenerate your recovery codes after you restore your authenticator app.',
+            )
+            return redirect(post_two_factor_redirect(request))
+
+        log_security_event(
+            event_type=SecurityEvent.EventType.TWO_FACTOR_CHALLENGE_FAILED,
+            request=request,
+            user=request.user,
+            identifier=request.user.email or request.user.username,
+            metadata={'source': 'verify'},
+        )
+        form.add_error('token', 'Enter a valid authenticator code or an unused recovery code.')
+
+    return render(
+        request,
+        'registration/two_factor_verify.html',
+        _two_factor_template_context(
+            request=request,
+            title='Verify sign-in',
+            eyebrow='Two-factor challenge',
+            hero_title='Finish signing in with your authenticator app.',
+            hero_text='Enter the current 6-digit code from your app. If your phone is unavailable, you can use one of your saved recovery codes instead.',
+            panel_title='Verify sign-in',
+            panel_intro='This step protects admin and clinic-owner access before the portal opens.',
+            form=form,
+            extra={'remaining_codes': remaining_codes},
+        ),
+    )
+
+
+@login_required
+def two_factor_recovery_codes_view(request):
+    if not user_can_manage_two_factor(request.user):
+        return HttpResponseForbidden('This account cannot manage authenticator app security.')
+
+    codes = request.session.get('two_factor_recovery_codes', [])
+    return render(
+        request,
+        'registration/two_factor_recovery_codes.html',
+        _two_factor_template_context(
+            request=request,
+            title='Recovery codes',
+            eyebrow='Recovery access',
+            hero_title='Save your recovery codes now.',
+            hero_text='Each recovery code works once if you lose your phone or cannot access the authenticator app. Store them offline before you continue.',
+            panel_title='Recovery codes',
+            panel_intro='These are shown once after setup or regeneration. Generating a new set will invalidate the old ones.',
+            extra={
+                'recovery_codes': codes,
+                'recovery_code_count': recovery_code_count(request.user),
+                'can_disable_two_factor': not request.user.is_superuser,
+                'continue_url': request.session.get('two_factor_redirect_to') or settings.LOGIN_REDIRECT_URL,
+            },
+        ),
+    )
+
+
+@login_required
+@require_POST
+def two_factor_regenerate_view(request):
+    if not user_can_manage_two_factor(request.user):
+        return HttpResponseForbidden('This account cannot manage authenticator app security.')
+    if not user_has_confirmed_two_factor(request.user):
+        messages.warning(request, 'Set up an authenticator app before generating recovery codes.')
+        return redirect('two-factor-setup')
+
+    codes = generate_recovery_codes(request.user)
+    request.session['two_factor_recovery_codes'] = codes
+    messages.success(request, 'Recovery codes regenerated. Save the new set now; old codes no longer work.')
+    return redirect('two-factor-recovery-codes')
+
+
+@login_required
+@require_POST
+def two_factor_disable_view(request):
+    if request.user.is_superuser:
+        return HttpResponseForbidden('Superadmin 2FA must be reset by another superadmin or through platform administration.')
+    if not user_can_manage_two_factor(request.user):
+        return HttpResponseForbidden('This account cannot manage authenticator app security.')
+
+    if user_has_confirmed_two_factor(request.user):
+        reset_two_factor_for_user(request.user)
+        request.session.pop('otp_device_id', None)
+        request.session.pop('two_factor_recovery_codes', None)
+        log_security_event(
+            event_type=SecurityEvent.EventType.TWO_FACTOR_DISABLED,
+            request=request,
+            user=request.user,
+            identifier=request.user.email or request.user.username,
+            metadata={'source': 'settings'},
+        )
+        messages.success(request, 'Authenticator app protection disabled for this account.')
+    return redirect('settings')
 
 
 def page_not_found(request, exception=None):
@@ -1717,6 +2026,9 @@ def settings_view(request):
     booking_embed_code = ''
     can_manage_booking_embed = bool(clinic and profile_type == 'staff' and _is_admin(request.user))
     can_view_clinic_security_activity = bool(clinic and profile_type == 'staff' and _is_admin(request.user))
+    can_manage_two_factor = user_can_manage_two_factor(request.user)
+    two_factor_enabled = user_has_confirmed_two_factor(request.user)
+    two_factor_recovery_codes = recovery_code_count(request.user) if two_factor_enabled else 0
     if can_manage_booking_embed:
         booking_embed_url = _clinic_booking_embed_url(request, clinic)
         booking_embed_code = _clinic_booking_embed_code(request, clinic)
@@ -1751,6 +2063,11 @@ def settings_view(request):
             'booking_public_url': booking_public_url,
             'booking_embed_url': booking_embed_url,
             'booking_embed_code': booking_embed_code,
+            'can_manage_two_factor': can_manage_two_factor,
+            'two_factor_enabled': two_factor_enabled,
+            'two_factor_required': request.user.is_superuser,
+            'two_factor_verified': request.user.is_verified() if hasattr(request.user, 'is_verified') else False,
+            'two_factor_recovery_codes': two_factor_recovery_codes,
             'security_audit_url': reverse('security-audit') if can_view_clinic_security_activity else '',
             'recent_user_security_events': recent_user_security_events,
             'recent_clinic_security_events': recent_clinic_security_events,

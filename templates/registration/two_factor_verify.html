@@ -1,0 +1,56 @@
+{% extends "public_shell.html" %}
+
+{% block title %}{{ title }} | {{ public_brand_name|default:"ClinicOps" }}{% endblock %}
+{% block hero_eyebrow %}{{ hero_eyebrow }}{% endblock %}
+{% block hero_title %}{{ hero_title }}{% endblock %}
+{% block hero_text %}{{ hero_text }}{% endblock %}
+{% block hero_meta %}
+  <div class="hero-meta">
+    <span class="pill">TOTP required</span>
+    <span class="pill">{{ remaining_codes }} recovery codes left</span>
+  </div>
+{% endblock %}
+{% block hero_points %}
+  <div class="hero-points">
+    <div class="point">
+      <strong>Use the current 6-digit code</strong>
+      <p>Codes refresh every 30 seconds in your authenticator app.</p>
+    </div>
+    <div class="point">
+      <strong>Recovery codes work once</strong>
+      <p>If the phone is unavailable, enter one saved recovery code to get back in and then re-enroll the device.</p>
+    </div>
+  </div>
+{% endblock %}
+
+{% block panel_title %}{{ panel_title }}{% endblock %}
+{% block panel_intro %}<p class="panel-copy">{{ panel_intro }}</p>{% endblock %}
+{% block panel_body %}
+  {% if messages %}
+    {% for message in messages %}
+      <div class="flash">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <form method="post" class="stack-form">
+    {% csrf_token %}
+    <div class="field">
+      <label for="{{ form.token.id_for_label }}">Authenticator code or recovery code</label>
+      {{ form.token }}
+      <div class="field-help">Examples: <code>123456</code> or one of your saved recovery codes.</div>
+      {% if form.token.errors %}
+        <div class="field-errors">{{ form.token.errors }}</div>
+      {% endif %}
+    </div>
+
+    <button class="submit" type="submit">Verify and continue</button>
+  </form>
+
+  <div class="card-footer">
+    <div class="muted">If you use a recovery code, regenerate the set after restoring your authenticator app.</div>
+    <form method="post" action="{% url 'logout' %}">
+      {% csrf_token %}
+      <button class="social-submit" type="submit">Log out instead</button>
+    </form>
+  </div>
+{% endblock %}

@@ -404,6 +404,47 @@
             </div>
           </div>
 
+          {% if can_manage_two_factor %}
+            <div class="profile-line">
+              <span class="label">Two-factor authentication</span>
+              <strong>
+                {% if two_factor_enabled %}
+                  Enabled
+                {% elif two_factor_required %}
+                  Required but not set up
+                {% else %}
+                  Not enabled
+                {% endif %}
+              </strong>
+              <p class="note" style="margin-top: 10px;">
+                {% if two_factor_enabled %}
+                  Authenticator protection is active for this account. {{ two_factor_recovery_codes }} recovery codes are still available.
+                {% elif two_factor_required %}
+                  This account must enroll an authenticator app before it can continue using protected areas.
+                {% else %}
+                  Add an authenticator app plus recovery codes so this account can recover if the phone is unavailable.
+                {% endif %}
+              </p>
+              <div class="inline-actions">
+                {% if two_factor_enabled %}
+                  <a class="btn-ghost" href="{% url 'two-factor-recovery-codes' %}">View recovery screen</a>
+                  <form method="post" action="{% url 'two-factor-regenerate' %}" style="margin:0;">
+                    {% csrf_token %}
+                    <button class="btn-ghost" type="submit">Regenerate codes</button>
+                  </form>
+                  {% if not two_factor_required %}
+                    <form method="post" action="{% url 'two-factor-disable' %}" style="margin:0;">
+                      {% csrf_token %}
+                      <button class="btn-ghost" type="submit">Disable 2FA</button>
+                    </form>
+                  {% endif %}
+                {% else %}
+                  <a class="btn-ghost" href="{% url 'two-factor-setup' %}">Set up authenticator</a>
+                {% endif %}
+              </div>
+            </div>
+          {% endif %}
+
           {% if clinic and clinic.slug and profile_type == 'staff' %}
             <div class="profile-line link-box">
               <span class="label">Public booking link</span>
