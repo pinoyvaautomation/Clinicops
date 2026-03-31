@@ -1,11 +1,76 @@
+import hashlib
+from datetime import timedelta
+from ipaddress import ip_address, ip_network
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import user_logged_in, user_logged_out
+from django.core.cache import cache
 from django.db.models import Q
 from django.dispatch import receiver
+from django.utils import timezone
 
-from .models import SecurityEvent, Staff
+from .models import SecurityAccessRule, SecurityEvent, Staff
 
 User = get_user_model()
+
+AUTH_THROTTLE_RULES = {
+    'accounts_login': {
+        'paths': ['/accounts/login/'],
+        'mode': 'failure_only',
+        'limit': 5,
+        'window_minutes': 15,
+        'lockout_minutes': 30,
+        'identifier_fields': ['username'],
+    },
+    'admin_login': {
+        'paths': ['/admin/login/'],
+        'mode': 'failure_only',
+        'limit': 5,
+        'window_minutes': 15,
+        'lockout_minutes': 30,
+        'identifier_fields': ['username'],
+    },
+    'clinic_signup': {
+        'paths': ['/signup/'],
+        'mode': 'all_posts',
+        'limit': 8,
+        'window_minutes': 30,
+        'lockout_minutes': 30,
+        'identifier_fields': ['admin_email'],
+    },
+    'patient_signup': {
+        'paths': ['/clinic/', '/patient-signup/'],
+        'mode': 'all_posts',
+        'limit': 8,
+        'window_minutes': 30,
+        'lockout_minutes': 20,
+        'identifier_fields': ['email'],
+    },
+    'resend_verification': {
+        'paths': ['/resend-verification/'],
+        'mode': 'all_posts',
+        'limit': 5,
+        'window_minutes': 15,
+        'lockout_minutes': 20,
+        'identifier_fields': ['email'],
+    },
+    'password_reset': {
+        'paths': ['/accounts/password_reset/'],
+        'mode': 'all_posts',
+        'limit': 5,
+        'window_minutes': 15,
+        'lockout_minutes': 20,
+        'identifier_fields': ['email'],
+    },
+    'appointment_lookup': {
+        'paths': ['/appointments/lookup/'],
+        'mode': 'all_posts',
+        'limit': 10,
+        'window_minutes': 15,
+        'lockout_minutes': 15,
+        'identifier_fields': ['email', 'confirmation_code'],
+    },
+}
 
 
 def _staff_clinic_for_user(user):
@@ -18,13 +83,28 @@ def _staff_clinic_for_user(user):
         return None
 
 
-def _get_client_ip(request):
+def get_client_ip(request):
     if request is None:
         return ''
     forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR', '')
     if forwarded_for:
         return forwarded_for.split(',')[0].strip()
     return (request.META.get('REMOTE_ADDR') or '').strip()
+
+
+def get_client_country(request):
+    if request is None:
+        return ''
+    candidate = (
+        request.META.get('HTTP_CF_IPCOUNTRY')
+        or request.META.get('HTTP_X_COUNTRY_CODE')
+        or request.META.get('HTTP_X_VERCEL_IP_COUNTRY')
+        or request.META.get('HTTP_X_APPENGINE_COUNTRY')
+        or ''
+    ).strip().upper()
+    if len(candidate) == 2 and candidate.isalpha() and candidate not in {'XX', 'T1'}:
+        return candidate
+    return ''
 
 
 def _get_user_agent(request):
@@ -52,15 +132,148 @@ def log_security_event(*, event_type, request=None, user=None, clinic=None, iden
         user=user,
         event_type=event_type,
         identifier=(identifier or '').strip()[:254],
-        ip_address=_get_client_ip(request) or None,
+        ip_address=get_client_ip(request) or None,
+        country_code=get_client_country(request),
         user_agent=_get_user_agent(request),
         path=getattr(request, 'path', '')[:255] if request is not None else '',
         metadata=metadata or {},
     )
 
 
+def get_auth_throttle_rule(request):
+    path = getattr(request, 'path', '')
+    for scope, rule in AUTH_THROTTLE_RULES.items():
+        if scope == 'patient_signup':
+            if path.startswith('/clinic/') and path.endswith('/patient-signup/'):
+                return scope, rule
+            continue
+        if path in rule['paths']:
+            return scope, rule
+    return None, None
+
+
+def get_security_identifier_from_request(request, rule):
+    if request is None or rule is None:
+        return ''
+    for field in rule.get('identifier_fields', []):
+        value = (request.POST.get(field) or '').strip()
+        if value:
+            return value.lower() if '@' in value else value
+    return ''
+
+
+def _throttle_cache_key(scope, ip_value, identifier):
+    base = f'{scope}|{ip_value or "-"}|{identifier or "-"}'
+    digest = hashlib.sha256(base.encode('utf-8')).hexdigest()
+    return f'clinicops:auth-guard:{digest}'
+
+
+def _read_throttle_bucket(scope, ip_value, identifier):
+    return cache.get(_throttle_cache_key(scope, ip_value, identifier)) or {}
+
+
+def _write_throttle_bucket(scope, ip_value, identifier, bucket, *, timeout_seconds):
+    cache.set(_throttle_cache_key(scope, ip_value, identifier), bucket, timeout_seconds)
+
+
+def clear_auth_throttle(request, *identifiers):
+    ip_value = get_client_ip(request)
+    normalized_identifiers = {''}
+    for identifier in identifiers:
+        value = (identifier or '').strip()
+        if value:
+            normalized_identifiers.add(value.lower() if '@' in value else value)
+    for scope in ('accounts_login', 'admin_login'):
+        for identifier in normalized_identifiers:
+            cache.delete(_throttle_cache_key(scope, ip_value, identifier))
+
+
+def is_auth_request_rate_limited(request, *, scope, rule, identifier=''):
+    ip_value = get_client_ip(request)
+    bucket = _read_throttle_bucket(scope, ip_value, identifier)
+    locked_until = bucket.get('locked_until')
+    if locked_until and timezone.now().timestamp() < locked_until:
+        return True
+    return False
+
+
+def register_auth_attempt(request, *, scope, rule, identifier='', success=False):
+    ip_value = get_client_ip(request)
+    now_ts = timezone.now().timestamp()
+    window_seconds = int(rule['window_minutes'] * 60)
+    lockout_seconds = int(rule['lockout_minutes'] * 60)
+    timeout_seconds = max(window_seconds, lockout_seconds) + 60
+    bucket = _read_throttle_bucket(scope, ip_value, identifier)
+    attempts = [ts for ts in bucket.get('attempts', []) if now_ts - ts < window_seconds]
+
+    if success and rule['mode'] == 'failure_only':
+        cache.delete(_throttle_cache_key(scope, ip_value, identifier))
+        return False
+
+    attempts.append(now_ts)
+    should_lock = len(attempts) >= int(rule['limit'])
+    bucket['attempts'] = attempts
+    bucket['locked_until'] = now_ts + lockout_seconds if should_lock else 0
+    _write_throttle_bucket(scope, ip_value, identifier, bucket, timeout_seconds=timeout_seconds)
+    return should_lock
+
+
+def _rule_matches_ip(rule, ip_value):
+    if not ip_value:
+        return False
+    try:
+        client_ip = ip_address(ip_value)
+        if '/' in rule.value:
+            return client_ip in ip_network(rule.value, strict=False)
+        return str(client_ip) == rule.value
+    except ValueError:
+        return False
+
+
+def _rule_matches_country(rule, country_code):
+    return bool(country_code) and rule.value == country_code
+
+
+def resolve_security_access(request, *, auth_only=False):
+    ip_value = get_client_ip(request)
+    country_code = get_client_country(request)
+    if not ip_value and not country_code:
+        return None, None
+
+    matching_allow = None
+    matching_block = None
+    rules = SecurityAccessRule.objects.filter(is_active=True).order_by('action', 'id')
+    for rule in rules:
+        if auth_only and rule.scope == SecurityAccessRule.Scope.GLOBAL:
+            applies = True
+        elif auth_only:
+            applies = rule.scope == SecurityAccessRule.Scope.AUTH
+        else:
+            applies = rule.scope == SecurityAccessRule.Scope.GLOBAL
+        if not applies:
+            continue
+
+        matched = False
+        if rule.target_type == SecurityAccessRule.TargetType.IP:
+            matched = _rule_matches_ip(rule, ip_value)
+        elif rule.target_type == SecurityAccessRule.TargetType.COUNTRY:
+            matched = _rule_matches_country(rule, country_code)
+
+        if not matched:
+            continue
+        if rule.action == SecurityAccessRule.Action.ALLOW and matching_allow is None:
+            matching_allow = rule
+        elif rule.action == SecurityAccessRule.Action.BLOCK and matching_block is None:
+            matching_block = rule
+
+    if matching_allow:
+        return matching_allow, None
+    return None, matching_block
+
+
 @receiver(user_logged_in)
 def log_successful_login(sender, request, user, **kwargs):
+    clear_auth_throttle(request, user.email, user.username)
     log_security_event(
         event_type=SecurityEvent.EventType.LOGIN_SUCCESS,
         request=request,

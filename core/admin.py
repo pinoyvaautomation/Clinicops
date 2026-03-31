@@ -14,6 +14,7 @@ from .models import (
     ClinicSubscription,
     Patient,
     Plan,
+    SecurityAccessRule,
     SecurityEvent,
     Staff,
 )
@@ -326,20 +327,6 @@ class ClinicSubscriptionAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
 class AdminBrandingAdmin(admin.ModelAdmin):
     list_display = ('site_header', 'site_title', 'index_title', 'updated_at')
 
-
-@admin.register(SecurityEvent)
-class SecurityEventAdmin(admin.ModelAdmin):
-    list_display = ('event_type', 'user', 'identifier', 'clinic', 'ip_address', 'created_at')
-    list_filter = ('event_type', 'clinic')
-    search_fields = ('user__username', 'user__email', 'identifier', 'ip_address', 'user_agent')
-    readonly_fields = ('clinic', 'user', 'event_type', 'identifier', 'ip_address', 'user_agent', 'path', 'metadata', 'created_at')
-
-    def has_add_permission(self, request):
-        return False
-
-    def has_change_permission(self, request, obj=None):
-        return False
-
     def has_add_permission(self, request):
         return not AdminBranding.objects.exists()
 
@@ -350,3 +337,34 @@ class SecurityEventAdmin(admin.ModelAdmin):
             theme.title = obj.site_header
             theme.name = obj.site_title
             theme.save(update_fields=['title', 'name'])
+
+
+@admin.register(SecurityAccessRule)
+class SecurityAccessRuleAdmin(admin.ModelAdmin):
+    list_display = ('name', 'action', 'target_type', 'value', 'scope', 'is_active', 'updated_at')
+    list_filter = ('action', 'target_type', 'scope', 'is_active')
+    search_fields = ('name', 'value', 'note')
+    list_editable = ('is_active',)
+    fieldsets = (
+        ('Rule', {
+            'fields': ('name', 'action', 'target_type', 'scope', 'value', 'is_active'),
+            'description': 'Whitelist or block an IP/CIDR range or a two-letter country code. Country matches depend on a proxy header such as CF-IPCountry.',
+        }),
+        ('Notes', {
+            'fields': ('note',),
+        }),
+    )
+
+
+@admin.register(SecurityEvent)
+class SecurityEventAdmin(admin.ModelAdmin):
+    list_display = ('event_type', 'user', 'identifier', 'clinic', 'ip_address', 'country_code', 'created_at')
+    list_filter = ('event_type', 'clinic', 'country_code')
+    search_fields = ('user__username', 'user__email', 'identifier', 'ip_address', 'user_agent', 'country_code')
+    readonly_fields = ('clinic', 'user', 'event_type', 'identifier', 'ip_address', 'country_code', 'user_agent', 'path', 'metadata', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

@@ -11,6 +11,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
+from django.core.cache import cache
 from django.core import mail
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -35,6 +36,7 @@ from .models import (
     PayPalWebhookEvent,
     Patient,
     Plan,
+    SecurityAccessRule,
     SecurityEvent,
     Staff,
 )
@@ -544,6 +546,219 @@ class SecurityEventTests(TestCase):
         response = self.client.get(reverse('security-audit'))
 
         self.assertEqual(response.status_code, 403)
+
+
+class SecurityAccessProtectionTests(TestCase):
+    def setUp(self):
+        cache.clear()
+        self.addCleanup(cache.clear)
+        self.client = Client()
+        self.clinic = Clinic.objects.create(name='Guard Clinic', timezone='UTC')
+
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.staff_user = User.objects.create_user(
+            username='guard-admin@example.com',
+            email='guard-admin@example.com',
+            password='password',
+        )
+        self.staff_user.groups.add(admin_group)
+        Staff.objects.create(user=self.staff_user, clinic=self.clinic)
+
+        self.superuser = User.objects.create_superuser(
+            username='rootadmin',
+            email='rootadmin@example.com',
+            password='password',
+        )
+
+    def test_login_events_capture_country_code(self):
+        response = self.client.post(
+            reverse('login'),
+            {'username': self.staff_user.username, 'password': 'wrong-password'},
+            REMOTE_ADDR='198.51.100.10',
+            HTTP_CF_IPCOUNTRY='PH',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        event = SecurityEvent.objects.get(event_type=SecurityEvent.EventType.LOGIN_FAILED)
+        self.assertEqual(event.country_code, 'PH')
+        self.assertEqual(event.ip_address, '198.51.100.10')
+
+    def test_accounts_login_rate_limits_repeated_failures(self):
+        for _ in range(5):
+            response = self.client.post(
+                reverse('login'),
+                {'username': self.staff_user.username, 'password': 'wrong-password'},
+                REMOTE_ADDR='198.51.100.20',
+                HTTP_CF_IPCOUNTRY='PH',
+            )
+            self.assertEqual(response.status_code, 200)
+
+        blocked = self.client.post(
+            reverse('login'),
+            {'username': self.staff_user.username, 'password': 'wrong-password'},
+            REMOTE_ADDR='198.51.100.20',
+            HTTP_CF_IPCOUNTRY='PH',
+        )
+
+        self.assertEqual(blocked.status_code, 429)
+        self.assertContains(blocked, 'Too many attempts', status_code=429)
+        self.assertEqual(
+            SecurityEvent.objects.filter(
+                event_type=SecurityEvent.EventType.LOGIN_FAILED,
+                ip_address='198.51.100.20',
+            ).count(),
+            5,
+        )
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                event_type=SecurityEvent.EventType.RATE_LIMITED,
+                ip_address='198.51.100.20',
+                country_code='PH',
+            ).exists()
+        )
+
+    def test_admin_login_rate_limits_repeated_failures(self):
+        login_url = reverse('admin:login')
+
+        for _ in range(5):
+            response = self.client.post(
+                login_url,
+                {'username': self.superuser.username, 'password': 'wrong-password', 'next': '/admin/'},
+                REMOTE_ADDR='198.51.100.30',
+            )
+            self.assertEqual(response.status_code, 200)
+
+        blocked = self.client.post(
+            login_url,
+            {'username': self.superuser.username, 'password': 'wrong-password', 'next': '/admin/'},
+            REMOTE_ADDR='198.51.100.30',
+        )
+
+        self.assertEqual(blocked.status_code, 429)
+        self.assertContains(blocked, 'Too many attempts', status_code=429)
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                event_type=SecurityEvent.EventType.LOGIN_FAILED,
+                ip_address='198.51.100.30',
+                identifier=self.superuser.username,
+            ).exists()
+        )
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                event_type=SecurityEvent.EventType.RATE_LIMITED,
+                ip_address='198.51.100.30',
+            ).exists()
+        )
+
+    def test_signup_rate_limits_repeated_posts(self):
+        signup_url = reverse('clinic-signup')
+
+        for _ in range(8):
+            response = self.client.post(
+                signup_url,
+                {'admin_email': 'owner@example.com'},
+                REMOTE_ADDR='198.51.100.40',
+                HTTP_CF_IPCOUNTRY='SG',
+            )
+            self.assertEqual(response.status_code, 200)
+
+        blocked = self.client.post(
+            signup_url,
+            {'admin_email': 'owner@example.com'},
+            REMOTE_ADDR='198.51.100.40',
+            HTTP_CF_IPCOUNTRY='SG',
+        )
+
+        self.assertEqual(blocked.status_code, 429)
+        self.assertContains(blocked, 'Too many attempts', status_code=429)
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                event_type=SecurityEvent.EventType.RATE_LIMITED,
+                ip_address='198.51.100.40',
+                country_code='SG',
+            ).exists()
+        )
+
+    def test_block_rule_denies_auth_access_and_logs_event(self):
+        SecurityAccessRule.objects.create(
+            name='Block test IP',
+            action=SecurityAccessRule.Action.BLOCK,
+            target_type=SecurityAccessRule.TargetType.IP,
+            scope=SecurityAccessRule.Scope.AUTH,
+            value='198.51.100.50',
+        )
+
+        response = self.client.get(
+            reverse('login'),
+            REMOTE_ADDR='198.51.100.50',
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'Access blocked', status_code=403)
+        self.assertTrue(
+            SecurityEvent.objects.filter(
+                event_type=SecurityEvent.EventType.ACCESS_BLOCKED,
+                ip_address='198.51.100.50',
+            ).exists()
+        )
+
+    def test_allow_rule_overrides_country_block(self):
+        SecurityAccessRule.objects.create(
+            name='Block PH auth',
+            action=SecurityAccessRule.Action.BLOCK,
+            target_type=SecurityAccessRule.TargetType.COUNTRY,
+            scope=SecurityAccessRule.Scope.AUTH,
+            value='PH',
+        )
+        SecurityAccessRule.objects.create(
+            name='Allow office IP',
+            action=SecurityAccessRule.Action.ALLOW,
+            target_type=SecurityAccessRule.TargetType.IP,
+            scope=SecurityAccessRule.Scope.AUTH,
+            value='198.51.100.51',
+        )
+
+        response = self.client.get(
+            reverse('login'),
+            REMOTE_ADDR='198.51.100.51',
+            HTTP_CF_IPCOUNTRY='PH',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(
+            SecurityEvent.objects.filter(
+                event_type=SecurityEvent.EventType.ACCESS_BLOCKED,
+                ip_address='198.51.100.51',
+            ).exists()
+        )
+
+    def test_security_audit_can_filter_by_country(self):
+        SecurityEvent.objects.create(
+            clinic=self.clinic,
+            user=self.staff_user,
+            event_type=SecurityEvent.EventType.RATE_LIMITED,
+            identifier=self.staff_user.email,
+            ip_address='198.51.100.60',
+            country_code='PH',
+            path='/accounts/login/',
+        )
+        SecurityEvent.objects.create(
+            clinic=self.clinic,
+            user=self.staff_user,
+            event_type=SecurityEvent.EventType.ACCESS_BLOCKED,
+            identifier=self.staff_user.email,
+            ip_address='198.51.100.61',
+            country_code='SG',
+            path='/accounts/login/',
+        )
+        self.client.force_login(self.staff_user)
+
+        response = self.client.get(reverse('security-audit'), {'country': 'PH'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '198.51.100.60')
+        self.assertContains(response, 'PH')
+        self.assertNotContains(response, '198.51.100.61')
 
 
 class AvatarUploadTests(TestCase):

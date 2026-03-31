@@ -1,4 +1,5 @@
 import secured_fields
+import ipaddress
 from django.utils import timezone
 from django.utils.crypto import get_random_string
 from django.utils.text import slugify
@@ -370,6 +371,8 @@ class SecurityEvent(models.Model):
         LOGIN_FAILED = 'login_failed', 'Login failed'
         LOGOUT = 'logout', 'Logout'
         PASSWORD_CHANGED = 'password_changed', 'Password changed'
+        RATE_LIMITED = 'rate_limited', 'Rate limited'
+        ACCESS_BLOCKED = 'access_blocked', 'Access blocked'
 
     clinic = models.ForeignKey(
         Clinic,
@@ -388,6 +391,7 @@ class SecurityEvent(models.Model):
     event_type = models.CharField(max_length=64, choices=EventType.choices)
     identifier = models.CharField(max_length=254, blank=True)
     ip_address = models.GenericIPAddressField(blank=True, null=True)
+    country_code = models.CharField(max_length=8, blank=True)
     user_agent = models.CharField(max_length=255, blank=True)
     path = models.CharField(max_length=255, blank=True)
     metadata = models.JSONField(default=dict, blank=True)
@@ -399,8 +403,73 @@ class SecurityEvent(models.Model):
             models.Index(fields=['clinic', '-created_at']),
             models.Index(fields=['user', '-created_at']),
             models.Index(fields=['event_type', '-created_at']),
+            models.Index(fields=['country_code', '-created_at']),
         ]
 
     def __str__(self) -> str:
         target = self.user or self.identifier or 'unknown user'
         return f'{self.get_event_type_display()} ({target})'
+
+
+class SecurityAccessRule(models.Model):
+    class Action(models.TextChoices):
+        ALLOW = 'allow', 'Whitelist'
+        BLOCK = 'block', 'Block'
+
+    class TargetType(models.TextChoices):
+        IP = 'ip', 'IP or CIDR'
+        COUNTRY = 'country', 'Country code'
+
+    class Scope(models.TextChoices):
+        AUTH = 'auth', 'Auth-sensitive routes'
+        GLOBAL = 'global', 'Whole site'
+
+    name = models.CharField(max_length=100)
+    action = models.CharField(max_length=16, choices=Action.choices)
+    target_type = models.CharField(max_length=16, choices=TargetType.choices)
+    scope = models.CharField(
+        max_length=16,
+        choices=Scope.choices,
+        default=Scope.AUTH,
+    )
+    value = models.CharField(max_length=64)
+    note = models.TextField(blank=True)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['action', 'target_type', 'value']
+        indexes = [
+            models.Index(fields=['is_active', 'action', 'target_type']),
+            models.Index(fields=['scope', 'is_active']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['action', 'target_type', 'scope', 'value'],
+                name='unique_security_access_rule',
+            )
+        ]
+
+    def clean(self):
+        value = (self.value or '').strip()
+        if self.target_type == self.TargetType.IP:
+            try:
+                if '/' in value:
+                    value = str(ipaddress.ip_network(value, strict=False))
+                else:
+                    value = str(ipaddress.ip_address(value))
+            except ValueError as exc:
+                raise ValidationError({'value': f'Enter a valid IP address or CIDR range. ({exc})'})
+        else:
+            value = value.upper()
+            if len(value) != 2 or not value.isalpha():
+                raise ValidationError({'value': 'Enter a two-letter country code such as PH or SG.'})
+        self.value = value
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f'{self.get_action_display()} {self.get_target_type_display()}: {self.value}'

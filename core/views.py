@@ -1775,6 +1775,7 @@ def security_audit_view(request):
     sort = (request.GET.get('sort') or 'newest').strip()
     date_from = (request.GET.get('date_from') or '').strip()
     date_to = (request.GET.get('date_to') or '').strip()
+    country = (request.GET.get('country') or '').strip().upper()
 
     events = SecurityEvent.objects.filter(clinic=clinic).select_related('user')
 
@@ -1794,6 +1795,12 @@ def security_audit_view(request):
     valid_event_types = {choice[0] for choice in SecurityEvent.EventType.choices}
     if event_type in valid_event_types:
         events = events.filter(event_type=event_type)
+
+    if country:
+        if len(country) == 2 and country.isalpha():
+            events = events.filter(country_code=country)
+        else:
+            country = ''
 
     if date_from:
         try:
@@ -1823,6 +1830,8 @@ def security_audit_view(request):
         'login_success_count': recent_scope.filter(event_type=SecurityEvent.EventType.LOGIN_SUCCESS).count(),
         'login_failed_count': recent_scope.filter(event_type=SecurityEvent.EventType.LOGIN_FAILED).count(),
         'password_changed_count': recent_scope.filter(event_type=SecurityEvent.EventType.PASSWORD_CHANGED).count(),
+        'rate_limited_count': recent_scope.filter(event_type=SecurityEvent.EventType.RATE_LIMITED).count(),
+        'access_blocked_count': recent_scope.filter(event_type=SecurityEvent.EventType.ACCESS_BLOCKED).count(),
     }
 
     return render(
@@ -1840,6 +1849,7 @@ def security_audit_view(request):
                 'sort': sort,
                 'date_from': date_from,
                 'date_to': date_to,
+                'country': country,
             },
             'role_choices': valid_roles,
             'event_type_choices': SecurityEvent.EventType.choices,

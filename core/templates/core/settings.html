@@ -451,6 +451,7 @@
                 <div class="security-meta">
                   <span>{{ event.created_local|date:"M j, g:i A" }}</span>
                   {% if event.ip_address %}<span>IP {{ event.ip_address }}</span>{% endif %}
+                  {% if event.country_code %}<span>{{ event.country_code }}</span>{% endif %}
                 </div>
                 {% if event.user_agent %}
                   <p class="note" style="margin-top: 8px;">{{ event.user_agent|truncatechars:96 }}</p>
@@ -483,6 +484,7 @@
                   <div class="security-meta">
                     <span>{{ event.created_local|date:"M j, g:i A" }}</span>
                     {% if event.ip_address %}<span>IP {{ event.ip_address }}</span>{% endif %}
+                    {% if event.country_code %}<span>{{ event.country_code }}</span>{% endif %}
                   </div>
                   {% if event.user_agent %}
                     <p class="note" style="margin-top: 8px;">{{ event.user_agent|truncatechars:88 }}</p>

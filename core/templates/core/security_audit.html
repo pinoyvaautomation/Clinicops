@@ -62,18 +62,18 @@
       }
       .summary-grid {
         margin-top: 18px;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(3, minmax(0, 1fr));
       }
       .content-grid {
         margin-top: 18px;
         grid-template-columns: minmax(0, 1fr);
       }
       .filter-grid {
-        grid-template-columns: repeat(6, minmax(0, 1fr));
+        grid-template-columns: repeat(7, minmax(0, 1fr));
         align-items: end;
       }
       .audit-row {
-        grid-template-columns: minmax(0, 1.1fr) minmax(180px, 0.7fr) minmax(180px, 0.7fr) minmax(0, 0.8fr);
+        grid-template-columns: minmax(0, 1.1fr) minmax(180px, 0.7fr) minmax(180px, 0.7fr) minmax(150px, 0.55fr) minmax(0, 0.8fr);
         align-items: start;
       }
       .eyebrow,
@@ -228,6 +228,14 @@
         background: rgba(37, 99, 235, 0.12);
         color: #1d4ed8;
       }
+      .event-pill.event-rate-limited {
+        background: rgba(217, 119, 6, 0.14);
+        color: #b45309;
+      }
+      .event-pill.event-access-blocked {
+        background: rgba(127, 29, 29, 0.14);
+        color: #991b1b;
+      }
       .empty-state {
         padding: 28px;
         text-align: center;
@@ -237,7 +245,7 @@
       }
       @media (max-width: 1180px) {
         .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .filter-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .filter-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
         .audit-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       }
       @media (max-width: 900px) {
@@ -312,6 +320,14 @@
           <span class="label">Password changes</span>
           <strong>{{ summary.password_changed_count }}</strong>
         </article>
+        <article class="summary-card">
+          <span class="label">Rate limited</span>
+          <strong>{{ summary.rate_limited_count }}</strong>
+        </article>
+        <article class="summary-card">
+          <span class="label">Access blocked</span>
+          <strong>{{ summary.access_blocked_count }}</strong>
+        </article>
       </section>
 
       <section class="content-grid">
@@ -348,6 +364,10 @@
             <div class="field">
               <label for="id_date_to">Date to</label>
               <input id="id_date_to" type="date" name="date_to" value="{{ filters.date_to }}">
+            </div>
+            <div class="field">
+              <label for="id_country">Country</label>
+              <input id="id_country" type="text" name="country" value="{{ filters.country }}" placeholder="PH" maxlength="2">
             </div>
             <div class="field">
               <label for="id_sort">Sort</label>
@@ -390,6 +410,10 @@
                     <div>
                       <strong>IP / path</strong><br>
                       {{ event.ip_address|default:"-" }} · {{ event.path|default:"-" }}
+                    </div>
+                    <div>
+                      <strong>Country</strong><br>
+                      {{ event.country_code|default:"-" }}
                     </div>
                     <div>
                       <strong>Browser</strong><br>
