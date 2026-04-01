@@ -31,6 +31,7 @@
         font-family: 'IBM Plex Sans', Arial, sans-serif;
         color: var(--login-ink);
         background: var(--login-accent);
+        overflow: hidden;
       }
       h1, h2, h3, strong {
         font-family: 'Space Grotesk', Arial, sans-serif;
@@ -89,9 +90,10 @@
       .page {
         flex: 1;
         width: 100%;
+        overflow: hidden;
       }
       .shell {
-        min-height: calc(100vh - 95px);
+        height: calc(100vh - 95px);
         display: grid;
         grid-template-columns: minmax(0, 1.08fr) minmax(380px, 0.92fr);
       }
@@ -100,42 +102,29 @@
         color: var(--login-accent);
         padding: clamp(34px, 5vw, 52px);
         display: flex;
+        align-items: center;
+        justify-content: center;
       }
       .hero-inner {
         display: flex;
-        flex-direction: column;
-        justify-content: space-between;
-        gap: 28px;
+        align-items: center;
+        justify-content: center;
         width: 100%;
         min-height: 100%;
       }
-      .hero-copy {
-        max-width: 720px;
-      }
-      .hero-copy h1 {
-        margin: 0;
-        font-size: clamp(2.3rem, 4vw, 4rem);
-        line-height: 1.12;
-        color: var(--login-accent);
-      }
-      .hero-copy p {
-        margin: 18px 0 0;
-        max-width: 560px;
-        color: rgba(254, 254, 253, 0.82);
-        font-size: 1rem;
-        line-height: 1.72;
-      }
       .hero-carousel-frame {
-        margin-top: auto;
-        width: min(100%, 640px);
-        min-height: 188px;
-        padding: 16px;
+        width: min(100%, 760px);
+        min-height: 300px;
+        padding: 18px;
         border: 2px solid var(--login-secondary);
         background: rgba(255, 255, 255, 0.02);
+        display: flex;
+        align-items: center;
       }
       .hero-carousel {
         position: relative;
-        min-height: 152px;
+        min-height: 220px;
+        width: 100%;
       }
       .hero-slide {
         position: absolute;
@@ -144,32 +133,32 @@
         flex-direction: column;
         justify-content: center;
         gap: 12px;
-        padding: 26px 24px 30px;
+        padding: 34px 34px 46px;
         border-radius: 28px;
         border: 1px solid rgba(255, 255, 255, 0.12);
         background:
           radial-gradient(circle at right bottom, rgba(255, 209, 38, 0.14), transparent 36%),
           linear-gradient(135deg, rgba(17, 26, 48, 0.96) 0%, rgba(35, 43, 67, 0.94) 52%, rgba(27, 63, 70, 0.96) 100%);
         opacity: 0;
-        transform: translateX(18px);
+        transform: translateY(14px) scale(0.985);
         pointer-events: none;
-        transition: opacity 0.36s ease, transform 0.36s ease;
+        transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
       }
       .hero-slide.active {
         opacity: 1;
-        transform: translateX(0);
+        transform: translateY(0) scale(1);
         pointer-events: auto;
       }
       .hero-slide strong {
-        font-size: clamp(1.35rem, 2.3vw, 1.95rem);
+        font-size: clamp(1.5rem, 2.6vw, 2.55rem);
         color: var(--login-accent);
       }
       .hero-slide p {
         margin: 0;
         color: rgba(254, 254, 253, 0.88);
-        font-size: 1rem;
-        line-height: 1.7;
-        max-width: 520px;
+        font-size: 1.04rem;
+        line-height: 1.72;
+        max-width: 560px;
       }
       .hero-dots {
         position: absolute;
@@ -199,6 +188,7 @@
         display: flex;
         align-items: center;
         justify-content: center;
+        overflow-y: auto;
       }
       .login-card {
         width: min(100%, 452px);
@@ -207,6 +197,7 @@
         border-radius: 4px;
         background: #fff;
         box-shadow: 0 0 0 3px rgba(11, 11, 11, 0.02);
+        margin: auto 0;
       }
       .login-card h2 {
         margin: 0 0 10px;
@@ -349,23 +340,28 @@
         .shell {
           grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr);
         }
-        .hero-copy h1 {
-          font-size: clamp(2.15rem, 4.6vw, 3.35rem);
-        }
       }
       @media (max-width: 980px) {
+        body.login-page {
+          overflow: auto;
+        }
+        .page {
+          overflow: visible;
+        }
         .shell {
-          min-height: auto;
+          height: auto;
           grid-template-columns: 1fr;
         }
         .login-panel {
           order: 1;
+          overflow: visible;
         }
         .hero {
           order: 2;
         }
         .hero-carousel-frame {
           width: 100%;
+          min-height: 240px;
         }
       }
       @media (max-width: 900px) {
@@ -379,12 +375,6 @@
       @media (max-width: 720px) {
         .hero {
           padding: 28px 20px;
-        }
-        .hero-copy h1 {
-          font-size: clamp(2rem, 8vw, 2.8rem);
-        }
-        .hero-copy p {
-          font-size: 0.96rem;
         }
         .hero-carousel-frame {
           min-height: 206px;
@@ -417,9 +407,6 @@
           width: 100%;
           justify-content: center;
         }
-        .hero-copy h1 {
-          font-size: 2rem;
-        }
         .hero-slide strong {
           font-size: 1.24rem;
         }
@@ -435,11 +422,6 @@
       <section class="shell">
         <article class="hero">
           <div class="hero-inner">
-            <div class="hero-copy">
-              <h1>{{ login_hero_title|default:"Appointments, patients, staff, reminders, and subscription control all live in one operating system for the clinic. Sign in to continue where the team left off." }}</h1>
-              <p>{{ login_hero_text|default:"Manage the clinic from one secure workspace while patients and staff access the same branded system without switching tools." }}</p>
-            </div>
-
             <div class="hero-carousel-frame" aria-label="ClinicOps highlights">
               <div class="hero-carousel" id="login-hero-carousel">
                 <div class="hero-slide active" data-slide>
@@ -542,7 +524,7 @@
                 <a class="support-link" href="{% url 'resend-verification' %}">Resend verification email</a>
               {% endif %}
               {% if google_oauth_enabled and show_google_signin %}
-                <div class="muted">Google sign-in works only for existing ClinicOps accounts that already use the same email.</div>
+                <div class="muted">Google sign-in works only for existing accounts that already use the same email.</div>
               {% endif %}
               <div class="muted">Need a patient account? Ask your clinic for its booking or signup link.</div>
             </div>
@@ -550,7 +532,6 @@
         </section>
       </section>
     </main>
-    {% include "core/partials/site_footer.html" %}
     <script>
       (function() {
         const slides = Array.from(document.querySelectorAll('[data-slide]'));
