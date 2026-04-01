@@ -6,174 +6,226 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ login_heading|default:"Sign in" }} | {{ public_brand_name|default:"ClinicOps" }}</title>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
 
       :root {
-        --brand: {{ public_brand_color|default:"#0f5132" }};
-        --ink: #0f172a;
-        --ink-soft: #334155;
-        --muted: #64748b;
-        --line: rgba(148, 163, 184, 0.22);
-        --panel: rgba(255, 255, 255, 0.94);
-        --danger: #b42318;
-        --danger-bg: #fff2f1;
+        --login-primary: #00488a;
+        --login-primary-strong: #003d76;
+        --login-secondary: #ffd126;
+        --login-accent: #fefefd;
+        --login-ink: #0b0b0b;
+        --login-muted: #475467;
+        --login-line: rgba(11, 11, 11, 0.12);
+        --login-panel-line: rgba(11, 11, 11, 0.18);
+        --login-danger: #b42318;
+        --login-danger-bg: #fff2f1;
       }
 
       * { box-sizing: border-box; }
-      body {
+      html { background: var(--login-accent); }
+      body.login-page {
         margin: 0;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
         font-family: 'IBM Plex Sans', Arial, sans-serif;
-        color: var(--ink);
-        background:
-          radial-gradient(circle at top left, rgba(15, 81, 50, 0.12), transparent 30%),
-          radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 28%),
-          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+        color: var(--login-ink);
+        background: var(--login-accent);
       }
       h1, h2, h3, strong {
         font-family: 'Space Grotesk', Arial, sans-serif;
-        letter-spacing: -0.03em;
+        letter-spacing: -0.035em;
       }
+
+      body.login-page .public-nav {
+        width: 100%;
+        margin: 0;
+        top: 0;
+        padding: 18px clamp(18px, 4vw, 42px);
+        border: none;
+        border-bottom: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 0;
+        box-shadow: none;
+        background: rgba(254, 254, 253, 0.98);
+        backdrop-filter: none;
+      }
+      body.login-page .public-brand {
+        gap: 16px;
+      }
+      body.login-page .public-brand__mark {
+        width: 58px;
+        height: 58px;
+        border-radius: 999px;
+        background: var(--login-ink);
+        color: var(--login-accent);
+        font-size: 1rem;
+      }
+      body.login-page .public-brand__name {
+        color: var(--login-ink);
+        font-size: 1.18rem;
+      }
+      body.login-page .public-brand__tag {
+        color: rgba(11, 11, 11, 0.78);
+        font-size: 13px;
+      }
+      body.login-page .public-nav__links .cta {
+        min-width: 170px;
+        min-height: 56px;
+        padding: 12px 28px;
+        border-radius: 8px;
+        background: var(--login-ink);
+        color: var(--login-accent);
+        border: 1px solid var(--login-ink);
+        box-shadow: none;
+        font-size: 0.98rem;
+      }
+      body.login-page .public-nav__links .cta:hover {
+        background: var(--login-primary);
+        border-color: var(--login-primary);
+        box-shadow: none;
+        transform: none;
+      }
+
       .page {
         flex: 1;
-        width: min(1180px, calc(100% - 32px));
-        margin: 0 auto;
-        padding: 34px 0 56px;
+        width: 100%;
       }
       .shell {
+        min-height: calc(100vh - 95px);
         display: grid;
-        gap: 18px;
-        grid-template-columns: minmax(0, 1.05fr) minmax(360px, 430px);
-        align-items: stretch;
-      }
-      .hero, .login-card {
-        border: 1px solid var(--line);
-        border-radius: 30px;
-        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+        grid-template-columns: minmax(0, 1.08fr) minmax(380px, 0.92fr);
       }
       .hero {
-        padding: 34px;
-        color: #f8fafc;
-        background:
-          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 24%),
-          linear-gradient(135deg, #0f172a 0%, #111827 56%, var(--brand) 160%);
+        background: linear-gradient(180deg, var(--login-primary) 0%, var(--login-primary-strong) 100%);
+        color: var(--login-accent);
+        padding: clamp(34px, 5vw, 52px);
+        display: flex;
+      }
+      .hero-inner {
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        gap: 28px;
+        width: 100%;
+        min-height: 100%;
+      }
+      .hero-copy {
+        max-width: 720px;
+      }
+      .hero-copy h1 {
+        margin: 0;
+        font-size: clamp(2.3rem, 4vw, 4rem);
+        line-height: 1.12;
+        color: var(--login-accent);
+      }
+      .hero-copy p {
+        margin: 18px 0 0;
+        max-width: 560px;
+        color: rgba(254, 254, 253, 0.82);
+        font-size: 1rem;
+        line-height: 1.72;
+      }
+      .hero-carousel-frame {
+        margin-top: auto;
+        width: min(100%, 640px);
+        min-height: 188px;
+        padding: 16px;
+        border: 2px solid var(--login-secondary);
+        background: rgba(255, 255, 255, 0.02);
+      }
+      .hero-carousel {
         position: relative;
-        overflow: hidden;
+        min-height: 152px;
       }
-      .hero::after {
-        content: '';
+      .hero-slide {
         position: absolute;
-        inset: auto -12% -18% auto;
-        width: 280px;
-        height: 280px;
-        border-radius: 999px;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 66%);
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 12px;
+        padding: 26px 24px 30px;
+        border-radius: 28px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background:
+          radial-gradient(circle at right bottom, rgba(255, 209, 38, 0.14), transparent 36%),
+          linear-gradient(135deg, rgba(17, 26, 48, 0.96) 0%, rgba(35, 43, 67, 0.94) 52%, rgba(27, 63, 70, 0.96) 100%);
+        opacity: 0;
+        transform: translateX(18px);
         pointer-events: none;
+        transition: opacity 0.36s ease, transform 0.36s ease;
       }
-      .eyebrow, .pill, .chip {
+      .hero-slide.active {
+        opacity: 1;
+        transform: translateX(0);
+        pointer-events: auto;
+      }
+      .hero-slide strong {
+        font-size: clamp(1.35rem, 2.3vw, 1.95rem);
+        color: var(--login-accent);
+      }
+      .hero-slide p {
+        margin: 0;
+        color: rgba(254, 254, 253, 0.88);
+        font-size: 1rem;
+        line-height: 1.7;
+        max-width: 520px;
+      }
+      .hero-dots {
+        position: absolute;
+        right: 22px;
+        bottom: 18px;
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-height: 34px;
-        padding: 7px 12px;
+      }
+      .hero-dot {
+        width: 10px;
+        height: 10px;
         border-radius: 999px;
-        font-size: 13px;
-        font-weight: 600;
+        border: none;
+        background: rgba(254, 254, 253, 0.26);
+        cursor: pointer;
+        transition: transform 0.16s ease, background 0.16s ease;
       }
-      .eyebrow, .pill {
-        background: rgba(255, 255, 255, 0.12);
-        color: #f8fafc;
+      .hero-dot.active {
+        transform: scale(1.08);
+        background: var(--login-secondary);
       }
-      .hero h1 {
-        margin: 18px 0 12px;
-        font-size: clamp(2.4rem, 5vw, 4.1rem);
-        line-height: 0.96;
-      }
-      .hero p {
-        margin: 0;
-        max-width: 560px;
-        color: rgba(248, 250, 252, 0.78);
-        line-height: 1.7;
-        font-size: 1.04rem;
-      }
-      .hero-meta, .hero-points, .card-footer {
+
+      .login-panel {
+        background: var(--login-accent);
+        padding: clamp(28px, 4vw, 54px);
         display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .hero-meta {
-        margin-top: 20px;
-      }
-      .hero-points {
-        margin-top: 28px;
-        display: grid;
-        gap: 12px;
-      }
-      .point {
-        padding: 16px;
-        border-radius: 22px;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        background: rgba(255, 255, 255, 0.08);
-      }
-      .point strong {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 1.08rem;
-      }
-      .point p {
-        margin: 0;
-        font-size: 0.95rem;
-      }
-      .login-card {
-        background: var(--panel);
-        overflow: hidden;
-      }
-      .login-head {
-        padding: 26px 26px 14px;
-      }
-      .brand-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: var(--ink);
-      }
-      .brand-row img {
-        height: 34px;
-        width: auto;
-      }
-      .brand-mark {
-        width: 42px;
-        height: 42px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, var(--brand), #0f172a);
-        color: #fff;
-        display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-weight: 700;
-        font-size: 1rem;
       }
-      .login-head h2 {
-        margin: 18px 0 8px;
+      .login-card {
+        width: min(100%, 452px);
+        padding: 32px 34px;
+        border: 1px solid var(--login-panel-line);
+        border-radius: 4px;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(11, 11, 11, 0.02);
+      }
+      .login-card h2 {
+        margin: 0 0 10px;
         font-size: 2rem;
+        color: var(--login-ink);
       }
-      .login-head p {
+      .login-card p {
         margin: 0;
-        color: var(--muted);
-        line-height: 1.6;
-      }
-      .login-body {
-        padding: 0 26px 26px;
+        color: var(--login-muted);
+        font-size: 1rem;
+        line-height: 1.7;
       }
       .flash {
         margin-top: 16px;
         padding: 12px 14px;
-        border-radius: 16px;
         border: 1px solid rgba(180, 35, 24, 0.18);
-        background: var(--danger-bg);
-        color: var(--danger);
+        border-radius: 8px;
+        background: var(--login-danger-bg);
+        color: var(--login-danger);
         font-size: 14px;
         font-weight: 600;
       }
@@ -181,9 +233,9 @@
         margin-top: 10px;
       }
       form {
-        margin-top: 18px;
+        margin-top: 22px;
         display: grid;
-        gap: 12px;
+        gap: 16px;
       }
       .field {
         display: grid;
@@ -191,55 +243,54 @@
       }
       label {
         display: block;
-        color: var(--ink-soft);
-        font-size: 13px;
-        font-weight: 600;
+        color: var(--login-ink);
+        font-size: 0.96rem;
+        font-weight: 700;
       }
       input {
         width: 100%;
-        min-height: 48px;
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 14px;
+        min-height: 50px;
         padding: 12px 14px;
-        font: inherit;
+        border: 1px solid rgba(11, 11, 11, 0.34);
+        border-radius: 6px;
         background: #fff;
-        color: var(--ink);
+        color: var(--login-ink);
+        font: inherit;
       }
       input:focus {
         outline: none;
-        border-color: var(--brand);
-        box-shadow: 0 0 0 4px rgba(15, 81, 50, 0.08);
+        border-color: var(--login-primary);
+        box-shadow: 0 0 0 3px rgba(0, 72, 138, 0.12);
       }
       .submit {
-        margin-top: 4px;
         width: 100%;
-        min-height: 52px;
-        border: none;
-        border-radius: 16px;
-        background: linear-gradient(135deg, var(--brand), #0f172a);
-        color: #fff;
-        font-size: 0.98rem;
+        min-height: 54px;
+        border: 1px solid var(--login-primary);
+        border-radius: 6px;
+        background: var(--login-primary);
+        color: var(--login-accent);
+        font-size: 1rem;
         font-weight: 700;
-        letter-spacing: 0.04em;
         cursor: pointer;
+      }
+      .submit:hover {
+        background: var(--login-primary-strong);
       }
       .divider {
         display: flex;
         align-items: center;
         gap: 10px;
-        margin: 16px 0 4px;
-        color: var(--muted);
-        font-size: 13px;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
+        margin: 18px 0 4px;
+        color: var(--login-ink);
+        font-size: 0.92rem;
+        font-weight: 700;
       }
       .divider::before,
       .divider::after {
         content: '';
         flex: 1;
         height: 1px;
-        background: rgba(148, 163, 184, 0.28);
+        background: rgba(11, 11, 11, 0.14);
       }
       .social-form {
         margin-top: 0;
@@ -247,22 +298,20 @@
       .social-submit {
         width: 100%;
         min-height: 52px;
-        border: 1px solid rgba(15, 23, 42, 0.12);
-        border-radius: 16px;
-        background: #fff;
-        color: var(--ink);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 12px;
+        border: 1px solid rgba(11, 11, 11, 0.24);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--login-ink);
         font: inherit;
         font-weight: 700;
         cursor: pointer;
-        box-shadow: 0 10px 24px rgba(148, 163, 184, 0.12);
       }
       .social-submit:hover {
-        border-color: rgba(15, 81, 50, 0.28);
-        box-shadow: 0 12px 28px rgba(15, 81, 50, 0.12);
+        border-color: var(--login-primary);
       }
       .social-mark {
         width: 22px;
@@ -278,116 +327,148 @@
         display: block;
       }
       .card-footer {
-        margin-top: 18px;
+        margin-top: 22px;
         display: grid;
-        gap: 10px;
+        gap: 8px;
       }
       .support-link {
-        color: var(--brand);
+        color: var(--login-ink);
         text-decoration: none;
-        font-weight: 600;
+        font-weight: 700;
       }
       .support-link:hover {
-        text-decoration: underline;
+        color: var(--login-primary);
       }
       .muted {
-        color: var(--muted);
-        font-size: 14px;
+        color: var(--login-muted);
+        font-size: 0.95rem;
+        line-height: 1.6;
       }
-      .logo-fallback {
-        display: none;
-      }
-      .brand-row.logo-broken img {
-        display: none;
-      }
-      .brand-row.logo-broken .logo-fallback {
-        display: inline-flex;
+
+      @media (max-width: 1120px) {
+        .shell {
+          grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr);
+        }
+        .hero-copy h1 {
+          font-size: clamp(2.15rem, 4.6vw, 3.35rem);
+        }
       }
       @media (max-width: 980px) {
         .shell {
+          min-height: auto;
           grid-template-columns: 1fr;
         }
-        .login-card {
+        .login-panel {
           order: 1;
         }
         .hero {
           order: 2;
         }
+        .hero-carousel-frame {
+          width: 100%;
+        }
       }
-      @media (max-width: 820px) {
-        .hero-points {
-          display: none;
+      @media (max-width: 900px) {
+        body.login-page .public-nav {
+          padding: 14px 16px;
         }
-        .hero h1 {
-          font-size: clamp(2rem, 8vw, 3rem);
+        body.login-page .public-nav__links {
+          right: 16px;
         }
-        .hero p {
-          font-size: 1rem;
+      }
+      @media (max-width: 720px) {
+        .hero {
+          padding: 28px 20px;
+        }
+        .hero-copy h1 {
+          font-size: clamp(2rem, 8vw, 2.8rem);
+        }
+        .hero-copy p {
+          font-size: 0.96rem;
+        }
+        .hero-carousel-frame {
+          min-height: 206px;
+          padding: 12px;
+        }
+        .hero-carousel {
+          min-height: 180px;
+        }
+        .hero-slide {
+          padding: 22px 18px 34px;
+          border-radius: 22px;
+        }
+        .login-panel {
+          padding: 24px 16px;
+        }
+        .login-card {
+          padding: 26px 20px;
         }
       }
       @media (max-width: 560px) {
-        .page {
-          width: calc(100% - 24px);
-          padding-top: 22px;
-          padding-bottom: 40px;
+        body.login-page .public-brand {
+          gap: 12px;
         }
-        .hero, .login-card {
-          border-radius: 24px;
+        body.login-page .public-brand__mark {
+          width: 48px;
+          height: 48px;
         }
-        .hero,
-        .login-head,
-        .login-body {
-          padding-left: 20px;
-          padding-right: 20px;
+        body.login-page .public-nav__links .cta {
+          min-width: 0;
+          width: 100%;
+          justify-content: center;
+        }
+        .hero-copy h1 {
+          font-size: 2rem;
+        }
+        .hero-slide strong {
+          font-size: 1.24rem;
+        }
+        .login-card h2 {
+          font-size: 1.72rem;
         }
       }
     </style>
   </head>
-  <body>
+  <body class="login-page">
     {% include "core/partials/public_nav.html" %}
     <main class="page">
       <section class="shell">
         <article class="hero">
-          <div class="eyebrow">{{ login_eyebrow|default:"Clinic Portal Access" }}</div>
-          <h1>{{ login_hero_title|default:public_brand_name|default:"ClinicOps" }}</h1>
-          <p>{{ login_hero_text|default:"Appointments, patients, staff, reminders, and subscription control all live in one operating system for the clinic. Sign in to continue where the team left off." }}</p>
-          <div class="hero-meta">
-            <span class="pill">Built for clinics</span>
-            <span class="pill">Patient and staff access</span>
-          </div>
+          <div class="hero-inner">
+            <div class="hero-copy">
+              <h1>{{ login_hero_title|default:"Appointments, patients, staff, reminders, and subscription control all live in one operating system for the clinic. Sign in to continue where the team left off." }}</h1>
+              <p>{{ login_hero_text|default:"Manage the clinic from one secure workspace while patients and staff access the same branded system without switching tools." }}</p>
+            </div>
 
-          <div class="hero-points">
-            <div class="point">
-              <strong>One login, full operations view</strong>
-              <p>Move from schedule management to patient follow-up and billing without switching tools.</p>
-            </div>
-            <div class="point">
-              <strong>Same design language as the portal</strong>
-              <p>The login experience now matches the rest of the product instead of feeling like a separate basic auth screen.</p>
-            </div>
-            <div class="point">
-              <strong>Responsive from the start</strong>
-              <p>The layout collapses into a single-column flow on smaller screens so the form stays readable on tablet and mobile.</p>
+            <div class="hero-carousel-frame" aria-label="ClinicOps highlights">
+              <div class="hero-carousel" id="login-hero-carousel">
+                <div class="hero-slide active" data-slide>
+                  <strong>One login, full operations view</strong>
+                  <p>Move from schedule management to patient follow-up and billing without switching tools.</p>
+                </div>
+                <div class="hero-slide" data-slide>
+                  <strong>Same design language as the portal</strong>
+                  <p>The login experience now matches the rest of the product instead of feeling like a separate basic auth screen.</p>
+                </div>
+                <div class="hero-slide" data-slide>
+                  <strong>Responsive from the start</strong>
+                  <p>The layout collapses into a single-column flow on smaller screens so the form stays readable on tablet and mobile.</p>
+                </div>
+                <div class="hero-dots" aria-label="Highlight navigation">
+                  <button type="button" class="hero-dot active" data-slide-dot aria-label="Show first highlight"></button>
+                  <button type="button" class="hero-dot" data-slide-dot aria-label="Show second highlight"></button>
+                  <button type="button" class="hero-dot" data-slide-dot aria-label="Show third highlight"></button>
+                </div>
+              </div>
             </div>
           </div>
         </article>
 
-        <article class="login-card">
-          <div class="login-head">
-            <div class="brand-row{% if public_logo_url %}{% else %} logo-broken{% endif %}">
-              {% if public_logo_url %}
-                <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.brand-row').classList.add('logo-broken')">
-                <span class="brand-mark logo-fallback">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
-              {% else %}
-                <span class="brand-mark">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
-              {% endif %}
-              <strong>{{ public_brand_name|default:"ClinicOps" }}</strong>
-            </div>
+        <section class="login-panel">
+          <article class="login-card">
             <h2>{{ login_heading|default:"Sign in" }}</h2>
             <p>{{ login_description|default:"Use your clinic or patient portal account credentials to continue. Email login still works for accounts set up that way." }}</p>
-          </div>
 
-          <div class="login-body">
             {% if messages %}
               {% for message in messages %}
                 <div class="flash">{{ message }}</div>
@@ -433,7 +514,7 @@
             </form>
 
             {% if google_oauth_enabled and show_google_signin %}
-              <div class="divider">or</div>
+              <div class="divider">OR</div>
               <form class="social-form" method="post" action="{% provider_login_url 'google' process='login' %}">
                 {% csrf_token %}
                 {% if next %}
@@ -465,10 +546,59 @@
               {% endif %}
               <div class="muted">Need a patient account? Ask your clinic for its booking or signup link.</div>
             </div>
-          </div>
-        </article>
+          </article>
+        </section>
       </section>
     </main>
     {% include "core/partials/site_footer.html" %}
+    <script>
+      (function() {
+        const slides = Array.from(document.querySelectorAll('[data-slide]'));
+        const dots = Array.from(document.querySelectorAll('[data-slide-dot]'));
+        if (!slides.length || slides.length !== dots.length) return;
+
+        let activeIndex = 0;
+        let timer = null;
+
+        function showSlide(index) {
+          activeIndex = index;
+          slides.forEach(function(slide, slideIndex) {
+            slide.classList.toggle('active', slideIndex === index);
+          });
+          dots.forEach(function(dot, dotIndex) {
+            dot.classList.toggle('active', dotIndex === index);
+          });
+        }
+
+        function startCarousel() {
+          stopCarousel();
+          timer = window.setInterval(function() {
+            showSlide((activeIndex + 1) % slides.length);
+          }, 4600);
+        }
+
+        function stopCarousel() {
+          if (timer) {
+            window.clearInterval(timer);
+            timer = null;
+          }
+        }
+
+        dots.forEach(function(dot, index) {
+          dot.addEventListener('click', function() {
+            showSlide(index);
+            startCarousel();
+          });
+        });
+
+        const heroCarousel = document.getElementById('login-hero-carousel');
+        if (heroCarousel) {
+          heroCarousel.addEventListener('mouseenter', stopCarousel);
+          heroCarousel.addEventListener('mouseleave', startCarousel);
+        }
+
+        startCarousel();
+      })();
+    </script>
   </body>
 </html>
