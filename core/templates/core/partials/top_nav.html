@@ -555,6 +555,7 @@
     top: 58px;
     right: -21px;
     z-index: 2;
+    transition: left 0.2s ease, right 0.2s ease, transform 0.2s ease;
   }
   .sidebar-toggle {
     width: 42px;
@@ -580,6 +581,11 @@
   }
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-toggle svg {
     transform: rotate(180deg);
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-toolbar {
+    left: calc((var(--shell-sidebar-width) - 42px) / 2);
+    right: auto;
+    transform: none;
   }
   .portal-sidebar .sidebar-brand {
     display: none;
