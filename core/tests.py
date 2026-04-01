@@ -16,6 +16,7 @@ from django.core import mail
 from django.core.exceptions import ValidationError
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.conf import settings
+from django.db import OperationalError
 from django.test import Client
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
@@ -809,6 +810,27 @@ class SecurityAccessProtectionTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, [self.superuser.email])
         self.assertIn('Access blocked', mail.outbox[0].subject)
+
+    def test_login_page_stays_available_if_security_rule_query_fails(self):
+        with patch('core.security.SecurityAccessRule.objects.filter', side_effect=OperationalError('db unavailable')):
+            response = self.client.get(reverse('login'))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_dashboard_head_skips_heavy_rendering(self):
+        self.client.force_login(self.staff_user)
+
+        response = self.client.head(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_superuser_request_fails_open_if_two_factor_device_lookup_breaks(self):
+        self.client.force_login(self.superuser)
+
+        with patch('core.two_factor.TOTPDevice.objects.filter', side_effect=OperationalError('otp unavailable')):
+            response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 403)
 
 
 class TwoFactorAuthenticationTests(TestCase):

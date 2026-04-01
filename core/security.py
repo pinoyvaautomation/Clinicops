@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.signals import user_logged_in, user_logged_out
 from django.core.cache import cache
 from django.core.mail import send_mail
+from django.db import DatabaseError
 from django.db.models import Q
 from django.dispatch import receiver
 from django.conf import settings
@@ -122,26 +123,34 @@ def find_user_for_security_identifier(identifier):
     identifier = (identifier or '').strip()
     if not identifier:
         return None
-    return (
-        User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier))
-        .order_by('id')
-        .first()
-    )
+    try:
+        return (
+            User.objects.filter(Q(username__iexact=identifier) | Q(email__iexact=identifier))
+            .order_by('id')
+            .first()
+        )
+    except DatabaseError:
+        logger.warning('ClinicOps security identifier lookup skipped because the database is unavailable.', exc_info=True)
+        return None
 
 
 def log_security_event(*, event_type, request=None, user=None, clinic=None, identifier='', metadata=None):
     """Create a normalized security audit event with request metadata."""
-    event = SecurityEvent.objects.create(
-        clinic=clinic if clinic is not None else _staff_clinic_for_user(user),
-        user=user,
-        event_type=event_type,
-        identifier=(identifier or '').strip()[:254],
-        ip_address=get_client_ip(request) or None,
-        country_code=get_client_country(request),
-        user_agent=_get_user_agent(request),
-        path=getattr(request, 'path', '')[:255] if request is not None else '',
-        metadata=metadata or {},
-    )
+    try:
+        event = SecurityEvent.objects.create(
+            clinic=clinic if clinic is not None else _staff_clinic_for_user(user),
+            user=user,
+            event_type=event_type,
+            identifier=(identifier or '').strip()[:254],
+            ip_address=get_client_ip(request) or None,
+            country_code=get_client_country(request),
+            user_agent=_get_user_agent(request),
+            path=getattr(request, 'path', '')[:255] if request is not None else '',
+            metadata=metadata or {},
+        )
+    except DatabaseError:
+        logger.warning('ClinicOps security event logging skipped because the database is unavailable.', exc_info=True)
+        return None
     _maybe_send_security_alert(event)
     return event
 
@@ -248,7 +257,11 @@ def resolve_security_access(request, *, auth_only=False):
 
     matching_allow = None
     matching_block = None
-    rules = SecurityAccessRule.objects.filter(is_active=True).order_by('action', 'id')
+    try:
+        rules = SecurityAccessRule.objects.filter(is_active=True).order_by('action', 'id')
+    except DatabaseError:
+        logger.warning('ClinicOps security access rules skipped because the database is unavailable.', exc_info=True)
+        return None, None
     for rule in rules:
         if auth_only and rule.scope == SecurityAccessRule.Scope.GLOBAL:
             applies = True
@@ -280,11 +293,15 @@ def resolve_security_access(request, *, auth_only=False):
 def _security_alert_recipients():
     if settings.SECURITY_ALERT_EMAILS:
         return settings.SECURITY_ALERT_EMAILS
-    return list(
-        User.objects.filter(is_superuser=True, is_active=True)
-        .exclude(email='')
-        .values_list('email', flat=True)
-    )
+    try:
+        return list(
+            User.objects.filter(is_superuser=True, is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+    except DatabaseError:
+        logger.warning('ClinicOps security alert recipients could not be loaded because the database is unavailable.', exc_info=True)
+        return []
 
 
 def _security_alert_cache_key(event: SecurityEvent):

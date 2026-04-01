@@ -18,7 +18,7 @@ from django.core import signing
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
+from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render, redirect
 from django.template.loader import render_to_string
 from django.urls import reverse, reverse_lazy
@@ -1659,6 +1659,9 @@ def dashboard_view(request):
         staff = request.user.staff
     except Staff.DoesNotExist:
         return HttpResponseForbidden('Staff access required.')
+
+    if request.method == 'HEAD':
+        return HttpResponse(status=200)
 
     clinic = staff.clinic
     tz = ZoneInfo(clinic.timezone or 'UTC')

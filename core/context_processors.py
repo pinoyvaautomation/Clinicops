@@ -1,6 +1,7 @@
 from zoneinfo import ZoneInfo
 
 from django.conf import settings
+from django.db import DatabaseError
 from django.utils import timezone
 
 from .models import Notification, Patient, Staff
@@ -37,58 +38,69 @@ def user_roles(request):
     plan_usage = None
 
     try:
-        staff = user.staff
-        clinic = staff.clinic
-        if staff.avatar:
-            avatar_url = staff.avatar.url
-        plan_usage = clinic_usage_summary(clinic)
-        notifications_enabled = clinic_can_use_notifications(clinic, usage=plan_usage)
-        if notifications_enabled:
-            latest_notifications = list(
-                Notification.objects.filter(recipient=user)
+        try:
+            staff = user.staff
+            clinic = staff.clinic
+            if staff.avatar:
+                avatar_url = staff.avatar.url
+            plan_usage = clinic_usage_summary(clinic)
+            notifications_enabled = clinic_can_use_notifications(clinic, usage=plan_usage)
+            if notifications_enabled:
+                latest_notifications = list(
+                    Notification.objects.filter(recipient=user)
+                    .select_related('clinic')
+                    .order_by('-created_at')[:5]
+                )
+                unread_notifications = Notification.objects.filter(recipient=user, is_read=False).count()
+                default_tz = timezone.get_current_timezone()
+                notification_preview = [
+                    {
+                        'id': item.id,
+                        'title': item.title,
+                        'body': item.body,
+                        'link': item.link,
+                        'level': item.level,
+                        'is_read': item.is_read,
+                        'created_at_label': timezone.localtime(
+                            item.created_at,
+                            ZoneInfo(item.clinic.timezone or 'UTC') if item.clinic else default_tz,
+                        ).strftime('%b %d, %I:%M %p'),
+                    }
+                    for item in latest_notifications
+                ]
+        except Staff.DoesNotExist:
+            patient_profiles = (
+                Patient.objects.filter(user=user)
                 .select_related('clinic')
-                .order_by('-created_at')[:5]
+                .order_by('clinic__name')
             )
-            unread_notifications = Notification.objects.filter(recipient=user, is_read=False).count()
-            default_tz = timezone.get_current_timezone()
-            notification_preview = [
-                {
-                    'id': item.id,
-                    'title': item.title,
-                    'body': item.body,
-                    'link': item.link,
-                    'level': item.level,
-                    'is_read': item.is_read,
-                    'created_at_label': timezone.localtime(
-                        item.created_at,
-                        ZoneInfo(item.clinic.timezone or 'UTC') if item.clinic else default_tz,
-                    ).strftime('%b %d, %I:%M %p'),
-                }
-                for item in latest_notifications
-            ]
-    except Staff.DoesNotExist:
-        patient_profiles = (
-            Patient.objects.filter(user=user)
-            .select_related('clinic')
-            .order_by('clinic__name')
-        )
-        patient = None
-        if patient_profiles.exists():
-            patient_multi = patient_profiles.count() > 1
-            selected_id = request.session.get('patient_clinic_id')
-            patient_selected_id = selected_id
-            if selected_id:
-                patient = patient_profiles.filter(clinic_id=selected_id).first()
-            if not patient and patient_profiles.count() == 1:
-                patient = patient_profiles.first()
-            patient_clinic_options = [
-                {'id': profile.clinic_id, 'name': profile.clinic.name}
-                for profile in patient_profiles
-            ]
-        if patient:
-            clinic = patient.clinic
-            if patient.avatar:
-                avatar_url = patient.avatar.url
+            patient = None
+            if patient_profiles.exists():
+                patient_multi = patient_profiles.count() > 1
+                selected_id = request.session.get('patient_clinic_id')
+                patient_selected_id = selected_id
+                if selected_id:
+                    patient = patient_profiles.filter(clinic_id=selected_id).first()
+                if not patient and patient_profiles.count() == 1:
+                    patient = patient_profiles.first()
+                patient_clinic_options = [
+                    {'id': profile.clinic_id, 'name': profile.clinic.name}
+                    for profile in patient_profiles
+                ]
+            if patient:
+                clinic = patient.clinic
+                if patient.avatar:
+                    avatar_url = patient.avatar.url
+    except DatabaseError:
+        clinic = None
+        avatar_url = None
+        patient_multi = False
+        patient_clinic_options = []
+        patient_selected_id = None
+        unread_notifications = 0
+        notification_preview = []
+        notifications_enabled = True
+        plan_usage = None
 
     return {
         **brand_context,

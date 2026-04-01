@@ -1,6 +1,7 @@
 from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
+from django.db import DatabaseError
 from django.utils import timezone
 
 from .models import Appointment, AppointmentType, ClinicSubscription, Staff
@@ -8,23 +9,29 @@ from .models import Appointment, AppointmentType, ClinicSubscription, Staff
 
 def get_current_subscription(clinic):
     """Plan notes: prefer the latest active subscription before any pending billing attempt."""
-    active_subscription = (
-        ClinicSubscription.objects.filter(
-            clinic=clinic,
-            status=ClinicSubscription.Status.ACTIVE,
+    try:
+        active_subscription = (
+            ClinicSubscription.objects.filter(
+                clinic=clinic,
+                status=ClinicSubscription.Status.ACTIVE,
+            )
+            .select_related('plan')
+            .order_by('-created_at')
+            .first()
         )
-        .select_related('plan')
-        .order_by('-created_at')
-        .first()
-    )
+    except DatabaseError:
+        return None
     if active_subscription:
         return active_subscription
-    return (
-        ClinicSubscription.objects.filter(clinic=clinic)
-        .select_related('plan')
-        .order_by('-created_at')
-        .first()
-    )
+    try:
+        return (
+            ClinicSubscription.objects.filter(clinic=clinic)
+            .select_related('plan')
+            .order_by('-created_at')
+            .first()
+        )
+    except DatabaseError:
+        return None
 
 
 def get_clinic_plan(clinic):
@@ -85,17 +92,22 @@ def clinic_usage_summary(clinic):
     month_start = month_start_local.astimezone(dt_timezone.utc)
     next_month = next_month_local.astimezone(dt_timezone.utc)
 
-    staff_used = Staff.objects.filter(clinic=clinic, is_active=True).count()
-    service_used = AppointmentType.objects.filter(clinic=clinic, is_active=True).count()
-    appointment_used = (
-        Appointment.objects.filter(
-            clinic=clinic,
-            start_at__gte=month_start,
-            start_at__lt=next_month,
+    try:
+        staff_used = Staff.objects.filter(clinic=clinic, is_active=True).count()
+        service_used = AppointmentType.objects.filter(clinic=clinic, is_active=True).count()
+        appointment_used = (
+            Appointment.objects.filter(
+                clinic=clinic,
+                start_at__gte=month_start,
+                start_at__lt=next_month,
+            )
+            .exclude(status=Appointment.Status.CANCELLED)
+            .count()
         )
-        .exclude(status=Appointment.Status.CANCELLED)
-        .count()
-    )
+    except DatabaseError:
+        staff_used = 0
+        service_used = 0
+        appointment_used = 0
 
     staff_limit = plan.staff_limit if plan else None
     service_limit = plan.service_limit if plan else None

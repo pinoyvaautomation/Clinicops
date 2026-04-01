@@ -6,6 +6,7 @@ from io import BytesIO
 import qrcode
 from django.conf import settings
 from django.contrib.auth import get_user_model, login as auth_login
+from django.db import DatabaseError
 from django.utils.crypto import get_random_string
 from django_otp import login as otp_login
 from django_otp.plugins.otp_totp.models import TOTPDevice
@@ -30,51 +31,76 @@ def user_can_manage_two_factor(user):
 def user_has_confirmed_two_factor(user):
     if not user or not getattr(user, 'is_authenticated', False):
         return False
-    return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+    try:
+        return TOTPDevice.objects.filter(user=user, confirmed=True).exists()
+    except DatabaseError:
+        return None
 
 
 def user_requires_two_factor_setup(user):
-    return bool(
-        user
-        and getattr(user, 'is_authenticated', False)
-        and user.is_superuser
-        and settings.TWO_FACTOR_SUPERUSERS_REQUIRED
-        and not user_has_confirmed_two_factor(user)
-    )
+    try:
+        confirmed = user_has_confirmed_two_factor(user)
+        if confirmed is None:
+            return False
+        return bool(
+            user
+            and getattr(user, 'is_authenticated', False)
+            and user.is_superuser
+            and settings.TWO_FACTOR_SUPERUSERS_REQUIRED
+            and not confirmed
+        )
+    except DatabaseError:
+        return False
 
 
 def user_requires_two_factor_verification(user):
-    return bool(
-        user
-        and getattr(user, 'is_authenticated', False)
-        and user_has_confirmed_two_factor(user)
-        and not user.is_verified()
-    )
+    try:
+        confirmed = user_has_confirmed_two_factor(user)
+        if confirmed is None:
+            return False
+        return bool(
+            user
+            and getattr(user, 'is_authenticated', False)
+            and confirmed
+            and not user.is_verified()
+        )
+    except DatabaseError:
+        return False
 
 
 def get_confirmed_totp_device(user):
     if not user or not getattr(user, 'is_authenticated', False):
         return None
-    return (
-        TOTPDevice.objects.filter(user=user, confirmed=True)
-        .order_by('-id')
-        .first()
-    )
+    try:
+        return (
+            TOTPDevice.objects.filter(user=user, confirmed=True)
+            .order_by('-id')
+            .first()
+        )
+    except DatabaseError:
+        return None
 
 
 def get_or_create_setup_device(user):
-    device = (
-        TOTPDevice.objects.filter(user=user, confirmed=False)
-        .order_by('-id')
-        .first()
-    )
+    device = None
+    try:
+        device = (
+            TOTPDevice.objects.filter(user=user, confirmed=False)
+            .order_by('-id')
+            .first()
+        )
+    except DatabaseError:
+        return None
     if device:
         return device
-    return TOTPDevice.objects.create(
-        user=user,
-        name=TWO_FACTOR_DEVICE_NAME,
-        confirmed=False,
-    )
+    try:
+        return TOTPDevice.objects.create(
+            user=user,
+            name=TWO_FACTOR_DEVICE_NAME,
+            confirmed=False,
+        )
+    except DatabaseError:
+        return None
 
 
 def build_qr_data_uri(config_url):
@@ -99,7 +125,10 @@ def _recovery_code_hash(code):
 
 def generate_recovery_codes(user, *, count=None):
     count = count or settings.TWO_FACTOR_RECOVERY_CODE_COUNT
-    TwoFactorRecoveryCode.objects.filter(user=user).delete()
+    try:
+        TwoFactorRecoveryCode.objects.filter(user=user).delete()
+    except DatabaseError:
+        return []
 
     plain_codes = []
     objects = []
@@ -115,7 +144,10 @@ def generate_recovery_codes(user, *, count=None):
                 code_suffix=normalized[-4:],
             )
         )
-    TwoFactorRecoveryCode.objects.bulk_create(objects)
+    try:
+        TwoFactorRecoveryCode.objects.bulk_create(objects)
+    except DatabaseError:
+        return []
     return plain_codes
 
 
@@ -124,24 +156,33 @@ def consume_recovery_code(user, code):
     if not normalized:
         return None
     code_hash = _recovery_code_hash(normalized)
-    return (
-        TwoFactorRecoveryCode.objects.filter(
-            user=user,
-            code_hash=code_hash,
-            consumed_at__isnull=True,
+    try:
+        return (
+            TwoFactorRecoveryCode.objects.filter(
+                user=user,
+                code_hash=code_hash,
+                consumed_at__isnull=True,
+            )
+            .order_by('id')
+            .first()
         )
-        .order_by('id')
-        .first()
-    )
+    except DatabaseError:
+        return None
 
 
 def reset_two_factor_for_user(user):
-    TOTPDevice.objects.filter(user=user).delete()
-    TwoFactorRecoveryCode.objects.filter(user=user).delete()
+    try:
+        TOTPDevice.objects.filter(user=user).delete()
+        TwoFactorRecoveryCode.objects.filter(user=user).delete()
+    except DatabaseError:
+        return
 
 
 def recovery_code_count(user):
-    return TwoFactorRecoveryCode.objects.filter(user=user, consumed_at__isnull=True).count()
+    try:
+        return TwoFactorRecoveryCode.objects.filter(user=user, consumed_at__isnull=True).count()
+    except DatabaseError:
+        return 0
 
 
 def finish_two_factor_login(request, *, device):
