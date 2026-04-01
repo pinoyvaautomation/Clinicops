@@ -584,8 +584,11 @@
   }
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-toolbar {
     top: 28px;
-    left: calc((var(--shell-sidebar-width) - 42px) / 2);
+    left: 0;
+    width: var(--shell-sidebar-width);
     right: auto;
+    display: flex;
+    justify-content: center;
     transform: none;
   }
   .portal-sidebar .sidebar-brand {
@@ -791,6 +794,11 @@
   }
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links {
     padding: 52px 8px 0;
+    justify-items: center;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a {
+    width: 56px;
+    margin-inline: auto;
   }
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a:hover,
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a.active,
