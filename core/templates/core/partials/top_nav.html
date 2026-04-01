@@ -547,12 +547,12 @@
     background: rgba(255, 255, 255, 0.98);
     border-right: 1px solid var(--shell-divider);
     z-index: 1100;
-    overflow: hidden;
+    overflow: visible;
     transition: width 0.2s ease, padding 0.2s ease;
   }
   .sidebar-toolbar {
     position: absolute;
-    top: 26px;
+    top: 86px;
     right: -21px;
     z-index: 2;
   }
@@ -796,50 +796,6 @@
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a.active .nav-link__icon {
     color: currentColor;
   }
-  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]::before,
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: calc(100% + 6px);
-    width: 10px;
-    height: 10px;
-    background: #111827;
-    border-radius: 3px;
-    transform: translateY(-50%) rotate(45deg) translateX(-6px);
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.16s ease, transform 0.16s ease;
-    z-index: 20;
-  }
-  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]::after,
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]::after {
-    content: attr(data-tooltip);
-    position: absolute;
-    top: 50%;
-    left: calc(100% + 12px);
-    padding: 10px 12px;
-    border-radius: 10px;
-    background: #111827;
-    color: #ffffff;
-    font-size: 13px;
-    font-weight: 700;
-    line-height: 1;
-    white-space: nowrap;
-    transform: translateY(-50%) translateX(-6px);
-    opacity: 0;
-    pointer-events: none;
-    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
-    transition: opacity 0.16s ease, transform 0.16s ease;
-    z-index: 20;
-  }
-  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]:hover::before,
-  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]:hover::after,
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]:hover::before,
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]:hover::after {
-    opacity: 1;
-    transform: translateY(-50%) translateX(0);
-  }
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer {
     padding-inline: 10px;
   }
@@ -997,6 +953,39 @@
     clip: rect(0, 0, 0, 0);
     white-space: nowrap;
     border: 0;
+  }
+  .sidebar-hover-tooltip {
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #111827;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate3d(-9999px, -9999px, 0);
+    transition: opacity 0.12s ease;
+    z-index: 2200;
+  }
+  .sidebar-hover-tooltip::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: -5px;
+    width: 10px;
+    height: 10px;
+    background: #111827;
+    border-radius: 3px;
+    transform: translateY(-50%) rotate(45deg);
+  }
+  .sidebar-hover-tooltip.is-visible {
+    opacity: 1;
   }
   .topbar-search__panel {
     position: absolute;
@@ -1314,6 +1303,8 @@
     </div>
   </div>
 </aside>
+
+<div class="sidebar-hover-tooltip" id="sidebar-hover-tooltip" aria-hidden="true"></div>
 
 <div class="top-nav">
   <div class="topbar-left">
@@ -2016,6 +2007,94 @@
     });
     window.addEventListener('portalSidebarStateChange', function() {
       applyFooterState(readStoredState());
+    });
+  })();
+</script>
+
+<script>
+  (function() {
+    const body = document.body;
+    const tooltip = document.getElementById('sidebar-hover-tooltip');
+    const sidebar = document.querySelector('.portal-sidebar');
+    const scrollArea = sidebar?.querySelector('.links');
+    if (!tooltip || !sidebar) return;
+
+    let activeTarget = null;
+
+    function canShowTooltip() {
+      return window.innerWidth > 899 && body.classList.contains('portal-sidebar-collapsed');
+    }
+
+    function hideTooltip() {
+      activeTarget = null;
+      tooltip.classList.remove('is-visible');
+      tooltip.style.transform = 'translate3d(-9999px, -9999px, 0)';
+      tooltip.setAttribute('aria-hidden', 'true');
+    }
+
+    function positionTooltip(target) {
+      if (!target || !canShowTooltip()) {
+        hideTooltip();
+        return;
+      }
+
+      const label = target.getAttribute('data-tooltip');
+      if (!label) {
+        hideTooltip();
+        return;
+      }
+
+      tooltip.textContent = label;
+      tooltip.setAttribute('aria-hidden', 'false');
+      tooltip.classList.add('is-visible');
+      tooltip.style.transform = 'translate3d(-9999px, -9999px, 0)';
+
+      const rect = target.getBoundingClientRect();
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const top = Math.round(rect.top + (rect.height / 2) - (tooltipRect.height / 2));
+      const left = Math.round(rect.right + 14);
+
+      tooltip.style.transform = `translate3d(${left}px, ${top}px, 0)`;
+    }
+
+    function handleEnter(event) {
+      const target = event.currentTarget;
+      if (!canShowTooltip()) return;
+      activeTarget = target;
+      positionTooltip(target);
+    }
+
+    function handleLeave() {
+      hideTooltip();
+    }
+
+    sidebar.querySelectorAll('[data-tooltip]').forEach(function(item) {
+      item.addEventListener('mouseenter', handleEnter);
+      item.addEventListener('mouseleave', handleLeave);
+      item.addEventListener('focus', handleEnter);
+      item.addEventListener('blur', handleLeave);
+    });
+
+    scrollArea?.addEventListener('scroll', hideTooltip, { passive: true });
+    window.addEventListener('scroll', hideTooltip, { passive: true });
+    window.addEventListener('resize', function() {
+      if (activeTarget) {
+        positionTooltip(activeTarget);
+      } else {
+        hideTooltip();
+      }
+    });
+    window.addEventListener('portalSidebarStateChange', function() {
+      if (activeTarget) {
+        positionTooltip(activeTarget);
+      } else {
+        hideTooltip();
+      }
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') {
+        hideTooltip();
+      }
     });
   })();
 </script>
