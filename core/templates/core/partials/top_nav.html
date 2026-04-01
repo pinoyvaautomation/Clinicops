@@ -61,7 +61,7 @@
   .nav-actions {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 16px;
     flex-shrink: 0;
   }
   .nav-popover {
@@ -123,8 +123,8 @@
   }
   .nav-overlay.open { display: block; }
   .avatar-btn {
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 999px;
     border: none;
     background: #111827;
@@ -141,8 +141,8 @@
   }
   .notification-btn {
     position: relative;
-    width: 36px;
-    height: 36px;
+    width: 44px;
+    height: 44px;
     border-radius: 999px;
     border: 1px solid rgba(148, 163, 184, 0.22);
     background: #ffffff;
@@ -509,10 +509,11 @@
   }
   body.portal-shell-page {
     --shell-edge: 0px;
-    --shell-sidebar-width-expanded: 204px;
-    --shell-sidebar-width-collapsed: 78px;
+    --shell-sidebar-width-expanded: 196px;
+    --shell-sidebar-width-collapsed: 92px;
     --shell-sidebar-width: var(--shell-sidebar-width-expanded);
-    --shell-topbar-height: 76px;
+    --shell-topbar-height: 92px;
+    --shell-divider: rgba(148, 163, 184, 0.22);
   }
   body.portal-shell-page.portal-sidebar-collapsed {
     --shell-sidebar-width: var(--shell-sidebar-width-collapsed);
@@ -520,58 +521,57 @@
   body.portal-shell-page .wrap {
     max-width: none;
     margin: 0;
-    padding: calc(var(--shell-topbar-height) + 18px) 16px 44px calc(var(--shell-sidebar-width) + 18px);
+    padding: calc(var(--shell-topbar-height) + 24px) 24px 44px calc(var(--shell-sidebar-width) + 24px);
     transition: padding 0.2s ease;
   }
   body.portal-shell-page .site-footer {
     margin: 36px 0 0 var(--shell-sidebar-width);
     border-radius: 0;
-    border: 1px solid rgba(148, 163, 184, 0.18);
+    border: 1px solid var(--shell-divider);
     box-shadow: none;
     transition: margin 0.2s ease;
   }
   body.portal-shell-page .site-footer__inner {
     max-width: none;
   }
-  .portal-sidebar,
-  .nav-drawer,
-  .top-nav {
-    background: rgba(255, 255, 255, 0.9);
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    backdrop-filter: blur(14px);
-    box-shadow: 0 18px 38px rgba(148, 163, 184, 0.18);
-  }
   .portal-sidebar {
     position: fixed;
-    top: var(--shell-edge);
+    top: var(--shell-topbar-height);
     left: var(--shell-edge);
     bottom: var(--shell-edge);
     width: var(--shell-sidebar-width);
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 12px;
-    border-radius: 0;
+    gap: 18px;
+    padding: 24px 0 18px;
+    background: rgba(255, 255, 255, 0.98);
+    border-right: 1px solid var(--shell-divider);
     z-index: 1100;
     overflow: hidden;
     transition: width 0.2s ease, padding 0.2s ease;
   }
   .sidebar-toolbar {
-    display: flex;
-    justify-content: flex-end;
+    position: absolute;
+    top: 26px;
+    right: -21px;
+    z-index: 2;
   }
   .sidebar-toggle {
-    width: 38px;
-    height: 38px;
-    border-radius: 14px;
-    border: 1px solid rgba(148, 163, 184, 0.22);
-    background: rgba(255, 255, 255, 0.9);
+    width: 42px;
+    height: 42px;
+    border-radius: 999px;
+    border: 1px solid var(--shell-divider);
+    background: #ffffff;
     color: #0f172a;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    box-shadow: 0 10px 24px rgba(148, 163, 184, 0.14);
+    box-shadow: 0 10px 20px rgba(15, 23, 42, 0.08);
+    transition: background 0.16s ease, transform 0.16s ease;
+  }
+  .sidebar-toggle:hover {
+    background: #f8fafc;
   }
   .sidebar-toggle svg {
     width: 18px;
@@ -581,34 +581,16 @@
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-toggle svg {
     transform: rotate(180deg);
   }
-  .sidebar-brand {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    min-height: 56px;
-    padding: 10px 12px;
-    border-radius: 20px;
-    background: rgba(255, 255, 255, 0.66);
-    border: 1px solid rgba(148, 163, 184, 0.12);
-    transition: padding 0.2s ease, justify-content 0.2s ease;
-  }
-  .brand-name {
-    transition: opacity 0.18s ease;
-  }
-  .brand-title {
-    color: #0f172a;
-    font-family: 'Space Grotesk', Arial, sans-serif;
-    font-size: 1.25rem;
-    font-weight: 700;
-    letter-spacing: -0.03em;
+  .portal-sidebar .sidebar-brand {
+    display: none;
   }
   .sidebar-heading {
     color: #94a3b8;
-    font-size: 11px;
+    font-size: 12px;
     font-weight: 700;
-    letter-spacing: 0.16em;
+    letter-spacing: 0.18em;
     text-transform: uppercase;
-    padding: 0 12px;
+    padding: 0 20px;
     transition: opacity 0.18s ease;
   }
   .portal-sidebar .links,
@@ -621,10 +603,10 @@
     flex: 1 1 auto;
     min-height: 0;
     overflow-y: auto;
-    padding-right: 4px;
+    padding: 8px 12px 0 18px;
   }
   .portal-sidebar .links::-webkit-scrollbar {
-    width: 8px;
+    width: 6px;
   }
   .portal-sidebar .links::-webkit-scrollbar-thumb {
     background: rgba(148, 163, 184, 0.28);
@@ -637,12 +619,17 @@
     min-width: 0;
   }
   .nav-link__icon {
-    width: 20px;
-    height: 20px;
+    width: 40px;
+    height: 40px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    flex: 0 0 20px;
+    flex: 0 0 40px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #172554, #0f172a);
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.1);
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease, transform 0.16s ease;
   }
   .nav-link__icon svg {
     width: 100%;
@@ -663,10 +650,11 @@
     text-decoration: none;
     color: #0f172a;
     font-weight: 700;
-    font-size: 14px;
-    padding: 12px 14px;
-    border-radius: 18px;
-    transition: background 0.16s ease, color 0.16s ease;
+    font-size: 15px;
+    min-height: 54px;
+    padding: 0 10px;
+    border-radius: 16px;
+    transition: background 0.16s ease, color 0.16s ease, box-shadow 0.16s ease;
   }
   .nav-drawer .links a {
     display: block;
@@ -680,19 +668,24 @@
   }
   .portal-sidebar .links a:hover,
   .nav-drawer .links a:hover {
-    background: rgba(15, 23, 42, 0.05);
+    background: rgba(14, 165, 166, 0.06);
   }
   .portal-sidebar .links a.active,
   .nav-drawer .links a.active {
-    background: linear-gradient(135deg, rgba(14, 165, 166, 0.14), rgba(255, 255, 255, 0.92));
+    background: rgba(14, 165, 166, 0.08);
     color: #0f766e;
-    box-shadow: inset 0 0 0 1px rgba(14, 165, 166, 0.14);
+    box-shadow: inset 3px 0 0 rgba(14, 165, 166, 0.46);
+  }
+  .portal-sidebar .links a:hover .nav-link__icon,
+  .portal-sidebar .links a.active .nav-link__icon {
+    background: linear-gradient(135deg, #0f766e, #172554);
+    box-shadow: 0 10px 22px rgba(15, 118, 110, 0.18);
   }
   .sidebar-footer,
   .nav-drawer__footer {
     display: grid;
-    gap: 8px;
-    padding-top: 12px;
+    gap: 10px;
+    padding: 14px 18px 0;
     border-top: 1px solid rgba(148, 163, 184, 0.14);
     flex: 0 0 auto;
   }
@@ -704,7 +697,7 @@
     width: 100%;
     border: none;
     background: transparent;
-    padding: 0 12px;
+    padding: 0;
     color: #64748b;
     font: inherit;
     font-size: 12px;
@@ -737,15 +730,22 @@
     text-decoration: none;
     color: #0f172a;
     font-weight: 700;
-    padding: 11px 14px;
+    min-height: 48px;
+    padding: 0 10px;
     border-radius: 16px;
-    background: rgba(255, 255, 255, 0.72);
-    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: transparent;
+    border: none;
+    transition: background 0.16s ease, color 0.16s ease;
   }
   .sidebar-footer a.active {
-    background: linear-gradient(135deg, rgba(14, 165, 166, 0.14), rgba(255, 255, 255, 0.92));
+    background: rgba(14, 165, 166, 0.08);
     color: #0f766e;
-    box-shadow: inset 0 0 0 1px rgba(14, 165, 166, 0.14);
+    box-shadow: inset 3px 0 0 rgba(14, 165, 166, 0.46);
+  }
+  .sidebar-footer a:hover .nav-link__icon,
+  .sidebar-footer a.active .nav-link__icon {
+    background: linear-gradient(135deg, #0f766e, #172554);
+    box-shadow: 0 10px 22px rgba(15, 118, 110, 0.18);
   }
   .nav-drawer__footer a {
     display: block;
@@ -760,29 +760,24 @@
   .top-nav {
     width: auto;
     margin: 0;
-    padding: 12px 16px;
+    padding: 18px 28px;
     position: fixed;
     top: var(--shell-edge);
-    left: var(--shell-sidebar-width);
+    left: 0;
     right: var(--shell-edge);
     min-height: var(--shell-topbar-height);
+    background: rgba(255, 255, 255, 0.98);
+    border-bottom: 1px solid var(--shell-divider);
+    box-shadow: none;
+    backdrop-filter: none;
     border-radius: 0;
     z-index: 1200;
-    transition: left 0.2s ease;
+    transition: none;
   }
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar {
-    padding: 12px 10px;
-  }
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-toolbar {
-    justify-content: center;
-  }
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-brand {
-    justify-content: center;
-    padding: 10px;
+    padding: 24px 0 18px;
   }
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-heading,
-  body.portal-shell-page.portal-sidebar-collapsed .brand-name,
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer__toggle,
   body.portal-shell-page.portal-sidebar-collapsed .nav-link__label {
     opacity: 0;
     width: 0;
@@ -792,34 +787,133 @@
   }
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a,
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a {
+    position: relative;
     justify-content: center;
-    padding-inline: 12px;
+    padding-inline: 0;
+    min-height: 56px;
   }
-  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer.is-collapsed .sidebar-footer__content {
-    display: grid;
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links {
+    padding: 8px 8px 0;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a:hover,
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a.active,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a:hover,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a.active {
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.98), rgba(15, 118, 110, 0.9));
+    color: #ffffff;
+    box-shadow: none;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a:hover .nav-link__icon,
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a.active .nav-link__icon,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a:hover .nav-link__icon,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a.active .nav-link__icon {
+    background: transparent;
+    box-shadow: none;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]::before,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 6px);
+    width: 10px;
+    height: 10px;
+    background: #111827;
+    border-radius: 3px;
+    transform: translateY(-50%) rotate(45deg) translateX(-6px);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    z-index: 20;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]::after,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 50%;
+    left: calc(100% + 12px);
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: #111827;
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    line-height: 1;
+    white-space: nowrap;
+    transform: translateY(-50%) translateX(-6px);
+    opacity: 0;
+    pointer-events: none;
+    box-shadow: 0 12px 28px rgba(15, 23, 42, 0.2);
+    transition: opacity 0.16s ease, transform 0.16s ease;
+    z-index: 20;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]:hover::before,
+  body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a[data-tooltip]:hover::after,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]:hover::before,
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer a[data-tooltip]:hover::after {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer {
+    padding-inline: 10px;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer__toggle {
+    justify-content: center;
+    text-align: center;
+    gap: 4px;
+    font-size: 10px;
+    line-height: 1.35;
+    letter-spacing: 0.02em;
+    padding-inline: 0;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer__toggle span {
+    display: block;
+    max-width: 100%;
+  }
+  body.portal-shell-page.portal-sidebar-collapsed .sidebar-footer__content {
+    display: none;
   }
   .topbar-left {
     display: flex;
     align-items: center;
     gap: 14px;
+    flex: 0 0 280px;
     min-width: 0;
+  }
+  .topbar-brand-mark {
+    width: 48px;
+    height: 48px;
+    border-radius: 18px;
+    border: 1px solid rgba(148, 163, 184, 0.2);
+    background: linear-gradient(135deg, rgba(14, 165, 166, 0.14), rgba(241, 245, 249, 0.94));
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    flex: 0 0 48px;
+  }
+  .topbar-brand-mark img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .topbar-brand-mark__placeholder {
+    width: 100%;
+    height: 100%;
+    background: #f1f5f9;
   }
   .topbar-context {
     display: grid;
-    gap: 2px;
+    gap: 4px;
     min-width: 0;
   }
   .topbar-eyebrow {
-    color: #94a3b8;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
+    display: none;
   }
   .topbar-title {
     color: #0f172a;
     font-family: 'Space Grotesk', Arial, sans-serif;
-    font-size: 1.3rem;
+    font-size: 1.2rem;
     font-weight: 700;
     letter-spacing: -0.03em;
     line-height: 1;
@@ -829,7 +923,7 @@
   }
   .topbar-meta {
     color: #64748b;
-    font-size: 12px;
+    font-size: 13px;
     font-weight: 600;
     white-space: nowrap;
     overflow: hidden;
@@ -837,29 +931,29 @@
   }
   .topbar-search {
     position: relative;
-    flex: 1 1 420px;
-    max-width: 540px;
-    margin-left: auto;
+    flex: 1 1 520px;
+    max-width: 520px;
+    margin: 0 auto;
   }
   .topbar-search form {
     margin: 0;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: center;
-    border: 1px solid rgba(148, 163, 184, 0.18);
-    border-radius: 0;
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+    border: 1px solid var(--shell-divider);
+    border-radius: 14px;
+    background: #ffffff;
     overflow: hidden;
   }
   .topbar-search__field {
     width: 100%;
     min-width: 0;
-    min-height: 46px;
+    min-height: 54px;
     border: none;
     background: transparent;
-    padding: 0 16px;
+    padding: 0 18px;
     font: inherit;
+    font-size: 15px;
     color: #0f172a;
   }
   .topbar-search__field:focus {
@@ -871,22 +965,26 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    min-height: 46px;
-    padding: 0 16px;
+    min-height: 54px;
+    min-width: 82px;
+    padding: 0 12px;
     border: none;
-    border-left: 1px solid rgba(148, 163, 184, 0.18);
-    background: rgba(255, 255, 255, 0.94);
+    border-left: 1px solid var(--shell-divider);
+    background: #ffffff;
     color: #0f172a;
     font: inherit;
     font-weight: 700;
     text-decoration: none;
     cursor: pointer;
   }
+  .topbar-search__button {
+    font-size: 0;
+  }
   .topbar-search__shortcut {
     display: none;
     min-height: 40px;
     padding: 0 12px;
-    border: 1px solid rgba(148, 163, 184, 0.18);
+    border: 1px solid var(--shell-divider);
     border-radius: 0;
     background: #fff;
   }
@@ -902,6 +1000,17 @@
     width: 100%;
     height: 100%;
     display: block;
+  }
+  .visually-hidden {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
   }
   .topbar-search__panel {
     position: absolute;
@@ -1050,12 +1159,24 @@
       padding: 12px 14px;
       border-radius: 22px;
       top: 12px;
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 18px 38px rgba(148, 163, 184, 0.18);
+      border-bottom-width: 1px;
     }
     .topbar-search {
       display: none;
     }
     .topbar-search__shortcut {
       display: inline-flex;
+    }
+    .topbar-left {
+      flex: 1 1 auto;
+    }
+    .topbar-brand-mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 14px;
+      flex-basis: 40px;
     }
     .topbar-title {
       font-size: 1rem;
@@ -1112,52 +1233,52 @@
   <div class="sidebar-heading">Workspace</div>
   <div class="links">
     {% if nav_is_staff %}
-      <a class="nav-link {% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}" title="Dashboard">
+      <a class="nav-link {% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}" aria-label="Dashboard" data-tooltip="Dashboard">
         <span class="nav-link__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M4.75 12.25 12 5l7.25 7.25V19a1.75 1.75 0 0 1-1.75 1.75h-11A1.75 1.75 0 0 1 4.75 19v-6.75Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 20.75v-5.5h5v5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
         <span class="nav-link__label">Dashboard</span>
       </a>
-      <a class="nav-link {% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}" title="Calendar">
+      <a class="nav-link {% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}" aria-label="Calendar" data-tooltip="Calendar">
         <span class="nav-link__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><rect x="4.75" y="6.75" width="14.5" height="12.5" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M8 4.75v4M16 4.75v4M4.75 10.25h14.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </span>
         <span class="nav-link__label">Calendar</span>
       </a>
-      <a class="nav-link {% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}" title="Appointments">
+      <a class="nav-link {% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}" aria-label="Appointments" data-tooltip="Appointments">
         <span class="nav-link__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M7 4.75h10a2.25 2.25 0 0 1 2.25 2.25v10A2.25 2.25 0 0 1 17 19.25H7A2.25 2.25 0 0 1 4.75 17V7A2.25 2.25 0 0 1 7 4.75Z" stroke="currentColor" stroke-width="1.8"/><path d="M8.5 9.25h7M8.5 12h7M8.5 14.75h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </span>
         <span class="nav-link__label">Appointments</span>
       </a>
       {% if nav_can_manage_waitlist %}
-        <a class="nav-link {% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}" title="Waitlist">
+        <a class="nav-link {% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}" aria-label="Waitlist" data-tooltip="Waitlist">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M6.75 7.75h10.5M6.75 12h7.5M6.75 16.25h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17 13.75a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" stroke="currentColor" stroke-width="1.8"/><path d="m18.9 18.15 1.35 1.35" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           <span class="nav-link__label">Waitlist</span>
         </a>
       {% endif %}
-      <a class="nav-link {% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}" title="Patients">
+      <a class="nav-link {% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}" aria-label="Patients" data-tooltip="Patients">
         <span class="nav-link__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 12.25a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z" stroke="currentColor" stroke-width="1.8"/><path d="M5.75 19.25a6.25 6.25 0 0 1 12.5 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
         </span>
         <span class="nav-link__label">Patients</span>
       </a>
       {% if nav_is_admin %}
-        <a class="nav-link {% if current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}active{% endif %}" href="{% url 'staff-members' %}" title="Staff">
+        <a class="nav-link {% if current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}active{% endif %}" href="{% url 'staff-members' %}" aria-label="Staff" data-tooltip="Staff">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M8.5 11a2.75 2.75 0 1 0 0-5.5 2.75 2.75 0 0 0 0 5.5ZM15.75 12.5a2.25 2.25 0 1 0 0-4.5 2.25 2.25 0 0 0 0 4.5Z" stroke="currentColor" stroke-width="1.8"/><path d="M4.75 18.75a4.25 4.25 0 0 1 7.73-2.42M13.25 18.75a3.5 3.5 0 0 1 6 0" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
           <span class="nav-link__label">Staff</span>
         </a>
-        <a class="nav-link {% if current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}active{% endif %}" href="{% url 'appointment-types' %}" title="Services">
+        <a class="nav-link {% if current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}active{% endif %}" href="{% url 'appointment-types' %}" aria-label="Services" data-tooltip="Services">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M5 7.75h14M5 12h14M5 16.25h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.75 14.25 19.5 17l-2.75 2.75" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
           <span class="nav-link__label">Services</span>
         </a>
-        <a class="nav-link {% if current == 'billing' %}active{% endif %}" href="{% url 'billing' %}" title="Billing">
+        <a class="nav-link {% if current == 'billing' %}active{% endif %}" href="{% url 'billing' %}" aria-label="Billing" data-tooltip="Billing">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><rect x="4.75" y="6.75" width="14.5" height="10.5" rx="2" stroke="currentColor" stroke-width="1.8"/><path d="M4.75 10.25h14.5M8.5 14.25h2.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
@@ -1165,14 +1286,14 @@
         </a>
       {% endif %}
     {% else %}
-      <a class="nav-link {% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}" title="Portal">
+      <a class="nav-link {% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}" aria-label="Portal" data-tooltip="Portal">
         <span class="nav-link__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M4.75 12.25 12 5l7.25 7.25V19a1.75 1.75 0 0 1-1.75 1.75h-11A1.75 1.75 0 0 1 4.75 19v-6.75Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M9.5 20.75v-5.5h5v5.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
         </span>
         <span class="nav-link__label">Portal</span>
       </a>
       {% if nav_patient_multi %}
-        <a class="nav-link" href="#" id="clinic-switch-btn" title="Switch clinic">
+        <a class="nav-link" href="#" id="clinic-switch-btn" aria-label="Switch clinic" data-tooltip="Switch clinic">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M7.75 7.75h10.5v10.5H7.75z" stroke="currentColor" stroke-width="1.8"/><path d="m9.5 5.75-2 2 2 2M14.5 18.25l2-2-2-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
           </span>
@@ -1190,14 +1311,14 @@
       </svg>
     </button>
     <div class="sidebar-footer__content" id="sidebar-footer-content">
-      <a class="nav-link {% if current == 'settings' or current == 'password_change' or current == 'password_change_done' %}active{% endif %}" href="{% url 'settings' %}" title="Account settings">
+      <a class="nav-link {% if current == 'settings' or current == 'password_change' or current == 'password_change_done' %}active{% endif %}" href="{% url 'settings' %}" aria-label="Account settings" data-tooltip="Account settings">
         <span class="nav-link__icon" aria-hidden="true">
           <svg viewBox="0 0 24 24" fill="none"><path d="M12 9.25a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5Z" stroke="currentColor" stroke-width="1.8"/><path d="M19.25 12a7.25 7.25 0 0 0-.08-1.02l1.58-1.23-1.5-2.6-1.92.61a7.3 7.3 0 0 0-1.77-1.02l-.28-2.02h-3l-.28 2.02a7.3 7.3 0 0 0-1.77 1.02l-1.92-.61-1.5 2.6 1.58 1.23A7.25 7.25 0 0 0 4.75 12c0 .34.03.68.08 1.02l-1.58 1.23 1.5 2.6 1.92-.61c.54.43 1.14.77 1.77 1.02l.28 2.02h3l.28-2.02a7.3 7.3 0 0 0 1.77-1.02l1.92.61 1.5-2.6-1.58-1.23c.05-.34.08-.68.08-1.02Z" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
         </span>
         <span class="nav-link__label">Account settings</span>
       </a>
       {% if nav_is_admin %}
-        <a class="nav-link {% if current == 'security-audit' %}active{% endif %}" href="{% url 'security-audit' %}" title="Security audit">
+        <a class="nav-link {% if current == 'security-audit' %}active{% endif %}" href="{% url 'security-audit' %}" aria-label="Security audit" data-tooltip="Security audit">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M12 4.75 18.25 7v5.32c0 3.12-2.14 6.03-6.25 6.93-4.11-.9-6.25-3.8-6.25-6.93V7L12 4.75Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M12 9v4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 16.5h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
           </span>
@@ -1213,43 +1334,22 @@
     <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
       <span></span>
     </button>
+    <div class="topbar-brand-mark" aria-hidden="true">
+      {% if nav_clinic and nav_clinic.logo_url %}
+        <img src="{{ nav_clinic.logo_url }}" alt="">
+      {% else %}
+        <div class="topbar-brand-mark__placeholder"></div>
+      {% endif %}
+    </div>
     <div class="topbar-context">
-      <div class="topbar-eyebrow">{% if nav_is_staff %}Current view{% else %}Patient portal{% endif %}</div>
-      <div class="topbar-title">
-        {% if current == 'dashboard' %}
-          Dashboard
-        {% elif current == 'calendar' %}
-          Calendar
-        {% elif current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' %}
-          Appointments
-        {% elif current == 'staff-appointment-history' %}
-          Appointment history
-        {% elif current == 'staff-waitlist' %}
-          Waitlist
-        {% elif current == 'staff-patients' or current == 'staff-patient-edit' %}
-          Patients
-        {% elif current == 'staff-members' or current == 'staff-member-create' or current == 'staff-member-edit' %}
-          Staff
-        {% elif current == 'appointment-types' or current == 'appointment-type-create' or current == 'appointment-type-edit' %}
-          Services
-        {% elif current == 'billing' %}
-          Billing
-        {% elif current == 'notifications' %}
-          Notifications
-        {% elif current == 'settings' %}
-          Settings
-        {% elif current == 'security-audit' %}
-          Security audit
-        {% elif current == 'portal-search' %}
-          Search
-        {% elif current == 'password_change' %}
-          Change password
-        {% elif current == 'password_change_done' %}
-          Password updated
-        {% elif current == 'patient-portal' %}
-          Patient portal
+      <div class="topbar-title">ClinicOps</div>
+      <div class="topbar-meta">
+        {% if nav_clinic %}
+          {{ nav_clinic.name }}
+        {% elif nav_is_staff %}
+          Clinic workspace
         {% else %}
-          ClinicOps
+          Patient portal
         {% endif %}
       </div>
     </div>
@@ -1278,7 +1378,7 @@
               <path d="m21 21-4.35-4.35M10.75 18a7.25 7.25 0 1 1 0-14.5 7.25 7.25 0 0 1 0 14.5Z" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
             </svg>
           </span>
-          Search
+          <span class="visually-hidden">Search</span>
         </button>
       </form>
       <div class="topbar-search__panel" aria-live="polite"></div>
@@ -1868,8 +1968,17 @@
     const body = document.body;
     const footer = document.getElementById('sidebar-footer');
     const footerToggle = document.getElementById('sidebar-footer-toggle');
+    const sidebarToggle = document.getElementById('sidebar-toggle');
     const storageKey = 'clinicops-sidebar-footer-open';
     if (!footer || !footerToggle) return;
+
+    function syncSidebarToggleButton() {
+      if (!sidebarToggle) return;
+      const collapsed = body.classList.contains('portal-sidebar-collapsed');
+      sidebarToggle.setAttribute('aria-pressed', collapsed ? 'true' : 'false');
+      sidebarToggle.setAttribute('aria-label', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+      sidebarToggle.setAttribute('title', collapsed ? 'Expand sidebar' : 'Collapse sidebar');
+    }
 
     function isExpandedDesktop() {
       return window.innerWidth > 899 && !body.classList.contains('portal-sidebar-collapsed');
@@ -1891,7 +2000,7 @@
     }
 
     function applyFooterState(isOpen) {
-      const shouldCollapse = isExpandedDesktop() && !isOpen;
+      const shouldCollapse = !isExpandedDesktop() || !isOpen;
       footer.classList.toggle('is-collapsed', shouldCollapse);
       footerToggle.setAttribute('aria-expanded', shouldCollapse ? 'false' : 'true');
       footerToggle.setAttribute('title', shouldCollapse ? 'Show workspace actions' : 'Hide workspace actions');
@@ -1900,6 +2009,17 @@
     applyFooterState(readStoredState());
 
     footerToggle.addEventListener('click', function() {
+      if (window.innerWidth > 899 && body.classList.contains('portal-sidebar-collapsed')) {
+        try {
+          window.localStorage.setItem('clinicops-sidebar-collapsed', '0');
+        } catch (error) {}
+        body.classList.remove('portal-sidebar-collapsed');
+        syncSidebarToggleButton();
+        window.dispatchEvent(new CustomEvent('portalSidebarStateChange'));
+        writeStoredState(true);
+        applyFooterState(true);
+        return;
+      }
       const nextOpen = footer.classList.contains('is-collapsed');
       writeStoredState(nextOpen);
       applyFooterState(nextOpen);
