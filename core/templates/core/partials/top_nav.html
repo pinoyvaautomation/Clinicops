@@ -555,7 +555,7 @@
     top: 58px;
     right: -21px;
     z-index: 2;
-    transition: left 0.2s ease, right 0.2s ease, transform 0.2s ease;
+    transition: top 0.2s ease, left 0.2s ease, right 0.2s ease, transform 0.2s ease;
   }
   .sidebar-toggle {
     width: 42px;
@@ -583,6 +583,7 @@
     transform: rotate(180deg);
   }
   body.portal-shell-page.portal-sidebar-collapsed .sidebar-toolbar {
+    top: 20px;
     left: calc((var(--shell-sidebar-width) - 42px) / 2);
     right: auto;
     transform: none;
@@ -786,7 +787,7 @@
     min-height: 56px;
   }
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links {
-    padding: 8px 8px 0;
+    padding: 68px 8px 0;
   }
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a:hover,
   body.portal-shell-page.portal-sidebar-collapsed .portal-sidebar .links a.active,
