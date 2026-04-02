@@ -95,7 +95,7 @@
       .shell {
         height: calc(100vh - 95px);
         display: grid;
-        grid-template-columns: minmax(0, 1.08fr) minmax(380px, 0.92fr);
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
       }
       .hero {
         background: linear-gradient(180deg, var(--login-primary) 0%, var(--login-primary-strong) 100%);
@@ -113,8 +113,8 @@
         min-height: 100%;
       }
       .hero-carousel-frame {
-        width: min(100%, 760px);
-        min-height: 300px;
+        width: min(100%, 780px);
+        min-height: 260px;
         padding: 0;
         border: none;
         background: transparent;
@@ -123,7 +123,7 @@
       }
       .hero-carousel {
         position: relative;
-        min-height: 220px;
+        min-height: 260px;
         width: 100%;
       }
       .hero-slide {
@@ -338,7 +338,7 @@
 
       @media (max-width: 1120px) {
         .shell {
-          grid-template-columns: minmax(0, 1fr) minmax(340px, 0.9fr);
+          grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
         }
       }
       @media (max-width: 980px) {
@@ -378,7 +378,6 @@
         }
         .hero-carousel-frame {
           min-height: 206px;
-          padding: 12px;
         }
         .hero-carousel {
           min-height: 180px;
