@@ -1,15 +1,10 @@
 {% extends "public_shell.html" %}
 
 {% block title %}{{ title }}{% endblock %}
-{% block hero_eyebrow %}Security guard {{ status_code }}{% endblock %}
+{% block hero_eyebrow %}{% endblock %}
 {% block hero_title %}{{ title }}{% endblock %}
 {% block hero_text %}ClinicOps blocked this request because the current access pattern triggered a security control. This usually happens after repeated failed attempts or a blocked access rule.{% endblock %}
-{% block hero_meta %}
-  <div class="hero-meta">
-    <span class="pill">Auth protection active</span>
-    <span class="pill">Status {{ status_code }}</span>
-  </div>
-{% endblock %}
+{% block hero_meta %}{% endblock %}
 {% block panel_title %}Request blocked{% endblock %}
 {% block panel_intro %}
   <p class="panel-copy">{{ message }}</p>
