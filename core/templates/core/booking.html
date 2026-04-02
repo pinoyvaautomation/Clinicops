@@ -1,199 +1,700 @@
-{% extends "public_shell.html" %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ clinic.name }} Book Appointment</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
 
-{% block title %}{{ clinic.name }} Book Appointment{% endblock %}
-{% block shell_class %}shell--wide{% endblock %}
-{% block hero_eyebrow %}Online booking{% endblock %}
-{% block hero_title %}Book with {{ clinic.name }}{% endblock %}
-{% block hero_text %}Choose a service, pick an open slot, and submit the appointment in one flow. The booking experience now uses the same branded layout as the rest of the product, so patients are not dropped into a generic form page.{% endblock %}
-{% block hero_meta %}
-  <div class="hero-meta">
-    <span class="pill">{{ appointment_types|length }} service{{ appointment_types|length|pluralize }} available</span>
-    <span class="pill">{{ slot_count }} open slot{{ slot_count|pluralize }} in this view</span>
-  </div>
-{% endblock %}
-{% block hero_points %}
-  <div class="hero-points">
-    <div class="point">
-      <strong>Pick a service first</strong>
-      <p>Availability updates based on the selected appointment type so the patient only sees workable booking windows.</p>
-    </div>
-    <div class="point">
-      <strong>Portal-ready follow-up</strong>
-      <p>Patients can create an account for easier appointment tracking or sign in if they already have access.</p>
-    </div>
-  </div>
-{% endblock %}
-{% block panel_title %}{% if embed_mode %}Book with {{ clinic.name }}{% else %}Book appointment{% endif %}{% endblock %}
-{% block panel_intro %}
-  <p class="panel-copy">
-    {% if embed_mode %}
-      Booking is running inside your clinic website. Need the full page instead?
-      <a class="inline-link" href="{{ booking_public_url }}" target="_blank" rel="noopener">Open booking in a new tab</a>.
-    {% else %}
-      Want a patient account?
-      <a class="inline-link" href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
-      Already have one?
-      <a class="inline-link" href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
+      :root {
+        --booking-primary: #00488a;
+        --booking-primary-strong: #003d76;
+        --booking-secondary: #ffd126;
+        --booking-accent: #fefefd;
+        --booking-ink: #0b0b0b;
+        --booking-muted: #475467;
+        --booking-line: rgba(11, 11, 11, 0.12);
+        --booking-panel-line: rgba(11, 11, 11, 0.18);
+        --booking-success: #166534;
+        --booking-success-bg: #ecfdf3;
+        --booking-danger: #b42318;
+        --booking-danger-bg: #fff2f1;
+        --booking-info: #1d4ed8;
+        --booking-info-bg: #eff6ff;
+      }
+
+      * { box-sizing: border-box; }
+      html { background: var(--booking-accent); }
+      body.booking-page {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--booking-ink);
+        background: var(--booking-accent);
+        overflow: hidden;
+      }
+      body.booking-page.embed-mode {
+        overflow: auto;
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.035em;
+      }
+      a {
+        color: var(--booking-primary);
+      }
+
+      body.booking-page .public-nav {
+        width: 100%;
+        margin: 0;
+        top: 0;
+        padding: 18px clamp(18px, 4vw, 42px);
+        border: none;
+        border-bottom: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 0;
+        box-shadow: none;
+        background: rgba(254, 254, 253, 0.98);
+        backdrop-filter: none;
+      }
+      body.booking-page .public-brand {
+        gap: 16px;
+      }
+      body.booking-page .public-brand__mark {
+        width: 58px;
+        height: 58px;
+        border-radius: 999px;
+        background: var(--booking-ink);
+        color: var(--booking-accent);
+        font-size: 1rem;
+      }
+      body.booking-page .public-brand__name {
+        color: var(--booking-ink);
+        font-size: 1.18rem;
+      }
+      body.booking-page .public-brand__tag {
+        color: rgba(11, 11, 11, 0.78);
+        font-size: 13px;
+      }
+      body.booking-page .public-nav__links .cta {
+        min-width: 170px;
+        min-height: 56px;
+        padding: 12px 28px;
+        border-radius: 8px;
+        background: var(--booking-ink);
+        color: var(--booking-accent);
+        border: 1px solid var(--booking-ink);
+        box-shadow: none;
+        font-size: 0.98rem;
+      }
+      body.booking-page .public-nav__links .cta:hover {
+        background: var(--booking-primary);
+        border-color: var(--booking-primary);
+        box-shadow: none;
+        transform: none;
+      }
+
+      .page {
+        flex: 1;
+        width: 100%;
+        overflow: hidden;
+      }
+      .page--embed {
+        overflow: visible;
+      }
+      .shell {
+        height: calc(100vh - 95px);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+      .shell--embed {
+        height: auto;
+        grid-template-columns: 1fr;
+      }
+      .hero {
+        padding: clamp(34px, 5vw, 52px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, var(--booking-primary) 0%, var(--booking-primary-strong) 100%);
+      }
+      .hero-carousel {
+        position: relative;
+        width: min(100%, 780px);
+        min-height: 260px;
+      }
+      .hero-slide {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 14px;
+        padding: 36px 38px 48px;
+        border-radius: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background:
+          radial-gradient(circle at right bottom, rgba(255, 209, 38, 0.14), transparent 40%),
+          linear-gradient(135deg, rgba(17, 26, 48, 0.97) 0%, rgba(35, 43, 67, 0.95) 52%, rgba(27, 63, 70, 0.97) 100%);
+        opacity: 0;
+        transform: translateY(14px) scale(0.985);
+        pointer-events: none;
+        transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .hero-slide.active {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .hero-slide strong {
+        font-size: clamp(1.55rem, 2.5vw, 2.55rem);
+        color: var(--booking-accent);
+      }
+      .hero-slide p {
+        margin: 0;
+        max-width: 620px;
+        color: rgba(254, 254, 253, 0.9);
+        font-size: 1.04rem;
+        line-height: 1.72;
+      }
+      .hero-dots {
+        position: absolute;
+        right: 28px;
+        bottom: 22px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .hero-dot {
+        width: 10px;
+        height: 10px;
+        border: none;
+        border-radius: 999px;
+        background: rgba(254, 254, 253, 0.26);
+        cursor: pointer;
+        transition: transform 0.16s ease, background 0.16s ease;
+      }
+      .hero-dot.active {
+        transform: scale(1.08);
+        background: var(--booking-secondary);
+      }
+
+      .booking-panel {
+        background: var(--booking-accent);
+        padding: clamp(28px, 4vw, 54px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow-y: auto;
+      }
+      .booking-panel--embed {
+        padding: 0;
+        overflow: visible;
+        background: transparent;
+      }
+      .booking-card {
+        width: min(100%, 560px);
+        padding: 32px 34px;
+        border: 1px solid var(--booking-panel-line);
+        border-radius: 4px;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(11, 11, 11, 0.02);
+        margin: auto 0;
+      }
+      .booking-card--embed {
+        width: 100%;
+        padding: 22px 18px;
+        border: none;
+        border-radius: 0;
+        box-shadow: none;
+        margin: 0;
+      }
+      .booking-card h2 {
+        margin: 0 0 10px;
+        font-size: 2rem;
+        color: var(--booking-ink);
+      }
+      .booking-card p {
+        margin: 0;
+        color: var(--booking-muted);
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+      .stack-form,
+      form {
+        margin-top: 18px;
+        display: grid;
+        gap: 16px;
+      }
+      .field-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .field-grid .field--wide {
+        grid-column: 1 / -1;
+      }
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+      label {
+        display: block;
+        color: var(--booking-ink);
+        font-size: 0.96rem;
+        font-weight: 700;
+      }
+      input,
+      select,
+      textarea {
+        width: 100%;
+        min-height: 50px;
+        padding: 12px 14px;
+        border: 1px solid rgba(11, 11, 11, 0.24);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--booking-ink);
+        font: inherit;
+      }
+      textarea {
+        min-height: 118px;
+        resize: vertical;
+      }
+      input:focus,
+      select:focus,
+      textarea:focus {
+        outline: none;
+        border-color: var(--booking-primary);
+        box-shadow: 0 0 0 3px rgba(0, 72, 138, 0.12);
+      }
+      .field-help {
+        color: var(--booking-muted);
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+      .errorlist {
+        margin: 6px 0 0;
+        padding: 10px 12px;
+        list-style: none;
+        border-radius: 8px;
+        background: var(--booking-danger-bg);
+        color: var(--booking-danger);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .flash {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 8px;
+        background: #f8fafc;
+        color: var(--booking-muted);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .flash--success {
+        border-color: rgba(22, 101, 52, 0.16);
+        background: var(--booking-success-bg);
+        color: var(--booking-success);
+      }
+      .flash--danger {
+        border-color: rgba(180, 35, 24, 0.18);
+        background: var(--booking-danger-bg);
+        color: var(--booking-danger);
+      }
+      .flash--info {
+        border-color: rgba(29, 78, 216, 0.18);
+        background: var(--booking-info-bg);
+        color: #1d4ed8;
+      }
+      .section-card {
+        margin-top: 16px;
+        padding: 16px;
+        border: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 10px;
+        background: #fff;
+      }
+      .section-card h3 {
+        margin: 0 0 8px;
+        font-size: 1.08rem;
+      }
+      .section-card p {
+        margin: 0;
+      }
+      .submit,
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 54px;
+        padding: 0 18px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .submit,
+      .button--primary {
+        background: var(--booking-primary);
+        border-color: var(--booking-primary);
+        color: var(--booking-accent);
+      }
+      .submit:hover,
+      .button--primary:hover {
+        background: var(--booking-primary-strong);
+        border-color: var(--booking-primary-strong);
+        text-decoration: none;
+      }
+      .button--secondary {
+        background: #fff;
+        color: var(--booking-ink);
+        border-color: rgba(11, 11, 11, 0.18);
+      }
+      .inline-link {
+        color: var(--booking-primary);
+        font-weight: 700;
+      }
+      .action-row,
+      .card-footer {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 12px;
+      }
+
+      @media (max-width: 980px) {
+        body.booking-page {
+          overflow: auto;
+        }
+        .page {
+          overflow: visible;
+        }
+        .shell {
+          height: auto;
+          grid-template-columns: 1fr;
+        }
+        .booking-panel {
+          order: 1;
+          overflow: visible;
+        }
+        .hero {
+          order: 2;
+        }
+      }
+      @media (max-width: 900px) {
+        body.booking-page .public-nav {
+          padding: 14px 16px;
+        }
+        body.booking-page .public-nav__links {
+          right: 16px;
+        }
+      }
+      @media (max-width: 720px) {
+        .hero {
+          padding: 28px 20px;
+        }
+        .hero-carousel {
+          min-height: 206px;
+        }
+        .hero-slide {
+          padding: 24px 22px 38px;
+          border-radius: 24px;
+        }
+        .booking-panel {
+          padding: 24px 16px;
+        }
+        .booking-card {
+          padding: 26px 20px;
+        }
+      }
+      @media (max-width: 640px) {
+        .field-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 560px) {
+        body.booking-page .public-brand {
+          gap: 12px;
+        }
+        body.booking-page .public-brand__mark {
+          width: 48px;
+          height: 48px;
+        }
+        body.booking-page .public-nav__links .cta {
+          min-width: 0;
+          width: 100%;
+          justify-content: center;
+        }
+        .hero-slide strong {
+          font-size: 1.26rem;
+        }
+        .booking-card h2 {
+          font-size: 1.72rem;
+        }
+      }
+    </style>
+  </head>
+  <body class="booking-page{% if embed_mode %} embed-mode{% endif %}">
+    {% if not embed_mode %}
+      {% include "core/partials/public_nav.html" %}
     {% endif %}
-  </p>
-{% endblock %}
-{% block panel_body %}
-  {% if appointment_types %}
-    <div class="section-card">
-      <h3>Choose appointment type</h3>
-      <p>Update the service first so the available slot list stays accurate.</p>
-      <form method="get" class="stack-form" style="margin-top: 14px;">
-        {% if embed_mode %}
-          <input type="hidden" name="embed" value="1">
+    <main class="page{% if embed_mode %} page--embed{% endif %}">
+      <section class="shell{% if embed_mode %} shell--embed{% endif %}">
+        {% if not embed_mode %}
+          <article class="hero">
+            <div class="hero-carousel" id="booking-hero-carousel" aria-label="Booking highlights">
+              <div class="hero-slide active" data-slide>
+                <strong>Choose a service and open slot</strong>
+                <p>Pick the appointment type first so the patient only sees workable booking windows for {{ clinic.name }}.</p>
+              </div>
+              <div class="hero-slide" data-slide>
+                <strong>Self-service follow-up stays available</strong>
+                <p>After booking, patients can manage the appointment or create a portal account without being dropped into a generic form flow.</p>
+              </div>
+              <div class="hero-slide" data-slide>
+                <strong>Waitlist support covers full schedules</strong>
+                <p>If no slot is open right now, patients can leave their preferred dates so the clinic can follow up when availability returns.</p>
+              </div>
+              <div class="hero-dots" aria-label="Booking highlight navigation">
+                <button type="button" class="hero-dot active" data-slide-dot aria-label="Show first highlight"></button>
+                <button type="button" class="hero-dot" data-slide-dot aria-label="Show second highlight"></button>
+                <button type="button" class="hero-dot" data-slide-dot aria-label="Show third highlight"></button>
+              </div>
+            </div>
+          </article>
         {% endif %}
-        <div class="field">
-          <label for="type">Appointment type</label>
-          <select id="type" name="type" onchange="this.form.submit()">
-            {% for appt_type in appointment_types %}
-              <option value="{{ appt_type.id }}" {% if selected_type and appt_type.id == selected_type.id %}selected{% endif %}>
-                {{ appt_type.name }} ({{ appt_type.duration_minutes }} min)
-              </option>
-            {% endfor %}
-          </select>
-          <noscript>
-            <button class="submit" type="submit" style="margin-top: 12px;">Update slots</button>
-          </noscript>
-        </div>
-      </form>
-      {% if selected_type %}
-        <div class="field-help">Selected service: <strong>{{ selected_type.name }}</strong> for {{ selected_type.duration_minutes }} minutes.</div>
-      {% endif %}
-    </div>
-  {% else %}
-    <div class="flash flash--info">No appointment types are configured yet. Please contact the clinic directly.</div>
-  {% endif %}
 
-  {% if appointment_types and slot_count == 0 %}
-    <div class="flash flash--danger">No appointment slots are available right now. Please check back later.</div>
-  {% endif %}
+        <section class="booking-panel{% if embed_mode %} booking-panel--embed{% endif %}">
+          <article class="booking-card{% if embed_mode %} booking-card--embed{% endif %}">
+            <h2>{% if embed_mode %}Book with {{ clinic.name }}{% else %}Book appointment{% endif %}</h2>
+            <p>
+              {% if embed_mode %}
+                Booking is running inside your clinic website. Need the full page instead?
+                <a class="inline-link" href="{{ booking_public_url }}" target="_blank" rel="noopener">Open booking in a new tab</a>.
+              {% else %}
+                Want a patient account?
+                <a class="inline-link" href="{% url 'patient-signup-slug' clinic.slug %}">Create one here</a>.
+                Already have one?
+                <a class="inline-link" href="{% url 'login' %}?next={% url 'patient-portal' %}">Sign in</a>.
+              {% endif %}
+            </p>
 
-  {% if waitlist_success %}
-    <div class="flash flash--success">You were added to the clinic waitlist. The team can contact you if a matching slot becomes available.</div>
-  {% endif %}
+            {% if appointment_types %}
+              <div class="section-card">
+                <h3>Choose appointment type</h3>
+                <p>Update the service first so the available slot list stays accurate.</p>
+                <form method="get" class="stack-form" style="margin-top: 14px;">
+                  {% if embed_mode %}
+                    <input type="hidden" name="embed" value="1">
+                  {% endif %}
+                  <div class="field">
+                    <label for="type">Appointment type</label>
+                    <select id="type" name="type" onchange="this.form.submit()">
+                      {% for appt_type in appointment_types %}
+                        <option value="{{ appt_type.id }}" {% if selected_type and appt_type.id == selected_type.id %}selected{% endif %}>
+                          {{ appt_type.name }} ({{ appt_type.duration_minutes }} min)
+                        </option>
+                      {% endfor %}
+                    </select>
+                    <noscript>
+                      <button class="submit" type="submit" style="margin-top: 12px;">Update slots</button>
+                    </noscript>
+                  </div>
+                </form>
+                {% if selected_type %}
+                  <div class="field-help">Selected service: <strong>{{ selected_type.name }}</strong> for {{ selected_type.duration_minutes }} minutes.</div>
+                {% endif %}
+              </div>
+            {% else %}
+              <div class="flash flash--info">No appointment types are configured yet. Please contact the clinic directly.</div>
+            {% endif %}
 
-  {% if appointment_types and slot_count != 0 %}
-    <form method="post" class="stack-form" style="margin-top: 14px;">
-      {% csrf_token %}
-      <input type="hidden" name="form_action" value="booking">
-      {% if embed_mode %}
-        <input type="hidden" name="embed" value="1">
-      {% endif %}
-      {{ form.non_field_errors }}
-      {{ form.appointment_type_id }}
+            {% if appointment_types and slot_count == 0 %}
+              <div class="flash flash--danger">No appointment slots are available right now. Please check back later.</div>
+            {% endif %}
 
-      <div class="field-grid">
-        <div class="field">
-          <label for="id_first_name">First name</label>
-          {{ form.first_name }}
-          {{ form.first_name.errors }}
-        </div>
-        <div class="field">
-          <label for="id_last_name">Last name</label>
-          {{ form.last_name }}
-          {{ form.last_name.errors }}
-        </div>
-        <div class="field">
-          <label for="id_email">Email</label>
-          {{ form.email }}
-          {{ form.email.errors }}
-        </div>
-        <div class="field">
-          <label for="id_phone">Phone</label>
-          {{ form.phone }}
-          {{ form.phone.errors }}
-        </div>
-        <div class="field field--wide">
-          <label for="id_dob">Date of birth (optional)</label>
-          {{ form.dob }}
-          {{ form.dob.errors }}
-        </div>
-        <div class="field field--wide">
-          <label for="id_slot">Available slots</label>
-          {{ form.slot }}
-          {{ form.slot.errors }}
-        </div>
-        <div class="field field--wide">
-          <label for="id_notes">Notes (optional)</label>
-          {{ form.notes }}
-          {{ form.notes.errors }}
-        </div>
-        <div class="field field--wide">
-          <label for="id_intake_reason">Main reason for visit (optional)</label>
-          {{ form.intake_reason }}
-          {{ form.intake_reason.errors }}
-          <div class="field-help">You can add more intake details and consent later from the self-service booking link.</div>
-        </div>
-      </div>
+            {% if waitlist_success %}
+              <div class="flash flash--success">You were added to the clinic waitlist. The team can contact you if a matching slot becomes available.</div>
+            {% endif %}
 
-      <button class="submit" type="submit">Book appointment</button>
-    </form>
-  {% endif %}
+            {% if appointment_types and slot_count != 0 %}
+              <form method="post" class="stack-form">
+                {% csrf_token %}
+                <input type="hidden" name="form_action" value="booking">
+                {% if embed_mode %}
+                  <input type="hidden" name="embed" value="1">
+                {% endif %}
+                {{ form.non_field_errors }}
+                {{ form.appointment_type_id }}
 
-  {% if appointment_types and slot_count == 0 and waitlist_form %}
-    <div class="section-card" style="margin-top: 16px;">
-      <h3>Join the waitlist</h3>
-      <p>If the schedule is full, leave your contact details and preferred dates so the clinic can reach out if a slot opens.</p>
-      <form method="post" class="stack-form" style="margin-top: 14px;">
-        {% csrf_token %}
-        <input type="hidden" name="form_action" value="waitlist">
-        {% if embed_mode %}
-          <input type="hidden" name="embed" value="1">
-        {% endif %}
-        {% if selected_type %}
-          <input type="hidden" name="type" value="{{ selected_type.id }}">
-        {% endif %}
-        {{ waitlist_form.non_field_errors }}
-        <div class="field-grid">
-          <div class="field">
-            <label for="{{ waitlist_form.first_name.id_for_label }}">First name</label>
-            {{ waitlist_form.first_name }}
-            {{ waitlist_form.first_name.errors }}
-          </div>
-          <div class="field">
-            <label for="{{ waitlist_form.last_name.id_for_label }}">Last name</label>
-            {{ waitlist_form.last_name }}
-            {{ waitlist_form.last_name.errors }}
-          </div>
-          <div class="field">
-            <label for="{{ waitlist_form.email.id_for_label }}">Email</label>
-            {{ waitlist_form.email }}
-            {{ waitlist_form.email.errors }}
-          </div>
-          <div class="field">
-            <label for="{{ waitlist_form.phone.id_for_label }}">Phone</label>
-            {{ waitlist_form.phone }}
-            {{ waitlist_form.phone.errors }}
-          </div>
-          <div class="field">
-            <label for="{{ waitlist_form.preferred_start_date.id_for_label }}">Preferred start date</label>
-            {{ waitlist_form.preferred_start_date }}
-            {{ waitlist_form.preferred_start_date.errors }}
-          </div>
-          <div class="field">
-            <label for="{{ waitlist_form.preferred_end_date.id_for_label }}">Preferred end date</label>
-            {{ waitlist_form.preferred_end_date }}
-            {{ waitlist_form.preferred_end_date.errors }}
-          </div>
-          <div class="field field--wide">
-            <label for="{{ waitlist_form.notes.id_for_label }}">Notes (optional)</label>
-            {{ waitlist_form.notes }}
-            {{ waitlist_form.notes.errors }}
-          </div>
-          <div class="field field--wide">
-            <label style="display:flex;gap:10px;align-items:flex-start;">
-              {{ waitlist_form.consent_to_contact }}
-              <span>{{ waitlist_form.consent_to_contact.label }}</span>
-            </label>
-            {{ waitlist_form.consent_to_contact.errors }}
-          </div>
-        </div>
-        <button class="submit" type="submit">Join waitlist</button>
-      </form>
-    </div>
-  {% endif %}
-{% endblock %}
+                <div class="field-grid">
+                  <div class="field">
+                    <label for="id_first_name">First name</label>
+                    {{ form.first_name }}
+                    {{ form.first_name.errors }}
+                  </div>
+                  <div class="field">
+                    <label for="id_last_name">Last name</label>
+                    {{ form.last_name }}
+                    {{ form.last_name.errors }}
+                  </div>
+                  <div class="field">
+                    <label for="id_email">Email</label>
+                    {{ form.email }}
+                    {{ form.email.errors }}
+                  </div>
+                  <div class="field">
+                    <label for="id_phone">Phone</label>
+                    {{ form.phone }}
+                    {{ form.phone.errors }}
+                  </div>
+                  <div class="field field--wide">
+                    <label for="id_dob">Date of birth (optional)</label>
+                    {{ form.dob }}
+                    {{ form.dob.errors }}
+                  </div>
+                  <div class="field field--wide">
+                    <label for="id_slot">Available slots</label>
+                    {{ form.slot }}
+                    {{ form.slot.errors }}
+                  </div>
+                  <div class="field field--wide">
+                    <label for="id_notes">Notes (optional)</label>
+                    {{ form.notes }}
+                    {{ form.notes.errors }}
+                  </div>
+                  <div class="field field--wide">
+                    <label for="id_intake_reason">Main reason for visit (optional)</label>
+                    {{ form.intake_reason }}
+                    {{ form.intake_reason.errors }}
+                    <div class="field-help">You can add more intake details and consent later from the self-service booking link.</div>
+                  </div>
+                </div>
+
+                <button class="submit" type="submit">Book appointment</button>
+              </form>
+            {% endif %}
+
+            {% if appointment_types and slot_count == 0 and waitlist_form %}
+              <div class="section-card">
+                <h3>Join the waitlist</h3>
+                <p>If the schedule is full, leave your contact details and preferred dates so the clinic can reach out if a slot opens.</p>
+                <form method="post" class="stack-form" style="margin-top: 14px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="form_action" value="waitlist">
+                  {% if embed_mode %}
+                    <input type="hidden" name="embed" value="1">
+                  {% endif %}
+                  {% if selected_type %}
+                    <input type="hidden" name="type" value="{{ selected_type.id }}">
+                  {% endif %}
+                  {{ waitlist_form.non_field_errors }}
+                  <div class="field-grid">
+                    <div class="field">
+                      <label for="{{ waitlist_form.first_name.id_for_label }}">First name</label>
+                      {{ waitlist_form.first_name }}
+                      {{ waitlist_form.first_name.errors }}
+                    </div>
+                    <div class="field">
+                      <label for="{{ waitlist_form.last_name.id_for_label }}">Last name</label>
+                      {{ waitlist_form.last_name }}
+                      {{ waitlist_form.last_name.errors }}
+                    </div>
+                    <div class="field">
+                      <label for="{{ waitlist_form.email.id_for_label }}">Email</label>
+                      {{ waitlist_form.email }}
+                      {{ waitlist_form.email.errors }}
+                    </div>
+                    <div class="field">
+                      <label for="{{ waitlist_form.phone.id_for_label }}">Phone</label>
+                      {{ waitlist_form.phone }}
+                      {{ waitlist_form.phone.errors }}
+                    </div>
+                    <div class="field">
+                      <label for="{{ waitlist_form.preferred_start_date.id_for_label }}">Preferred start date</label>
+                      {{ waitlist_form.preferred_start_date }}
+                      {{ waitlist_form.preferred_start_date.errors }}
+                    </div>
+                    <div class="field">
+                      <label for="{{ waitlist_form.preferred_end_date.id_for_label }}">Preferred end date</label>
+                      {{ waitlist_form.preferred_end_date }}
+                      {{ waitlist_form.preferred_end_date.errors }}
+                    </div>
+                    <div class="field field--wide">
+                      <label for="{{ waitlist_form.notes.id_for_label }}">Notes (optional)</label>
+                      {{ waitlist_form.notes }}
+                      {{ waitlist_form.notes.errors }}
+                    </div>
+                    <div class="field field--wide">
+                      <label style="display:flex;gap:10px;align-items:flex-start;">
+                        {{ waitlist_form.consent_to_contact }}
+                        <span>{{ waitlist_form.consent_to_contact.label }}</span>
+                      </label>
+                      {{ waitlist_form.consent_to_contact.errors }}
+                    </div>
+                  </div>
+                  <button class="submit" type="submit">Join waitlist</button>
+                </form>
+              </div>
+            {% endif %}
+          </article>
+        </section>
+      </section>
+    </main>
+    {% if not embed_mode %}
+      <script>
+        (function() {
+          const slides = Array.from(document.querySelectorAll('[data-slide]'));
+          const dots = Array.from(document.querySelectorAll('[data-slide-dot]'));
+          if (!slides.length || slides.length !== dots.length) return;
+
+          let activeIndex = 0;
+          let timer = null;
+
+          function showSlide(index) {
+            activeIndex = index;
+            slides.forEach(function(slide, slideIndex) {
+              slide.classList.toggle('active', slideIndex === index);
+            });
+            dots.forEach(function(dot, dotIndex) {
+              dot.classList.toggle('active', dotIndex === index);
+            });
+          }
+
+          function startCarousel() {
+            stopCarousel();
+            timer = window.setInterval(function() {
+              showSlide((activeIndex + 1) % slides.length);
+            }, 4600);
+          }
+
+          function stopCarousel() {
+            if (timer) {
+              window.clearInterval(timer);
+              timer = null;
+            }
+          }
+
+          dots.forEach(function(dot, index) {
+            dot.addEventListener('click', function() {
+              showSlide(index);
+              startCarousel();
+            });
+          });
+
+          const heroCarousel = document.getElementById('booking-hero-carousel');
+          if (heroCarousel) {
+            heroCarousel.addEventListener('mouseenter', stopCarousel);
+            heroCarousel.addEventListener('mouseleave', startCarousel);
+          }
+
+          startCarousel();
+        })();
+      </script>
+    {% endif %}
+  </body>
+</html>

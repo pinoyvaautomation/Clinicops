@@ -1,86 +1,506 @@
-{% extends "public_shell.html" %}
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ clinic.name }} Patient Signup</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
 
-{% block title %}{{ clinic.name }} Patient Signup{% endblock %}
-{% block shell_class %}shell--wide{% endblock %}
-{% block hero_eyebrow %}Patient account setup{% endblock %}
-{% block hero_title %}Create your {{ clinic.name }} portal account{% endblock %}
-{% block hero_text %}Set up one patient account to manage bookings, view upcoming visits, and keep your details connected to the clinic. The flow stays simple on desktop, tablet, and mobile so you can finish signup in one pass.{% endblock %}
-{% block hero_meta %}
-  <div class="hero-meta">
-    <span class="pill">Linked to {{ clinic.name }}</span>
-    <span class="pill">Booking-ready after activation</span>
-  </div>
-{% endblock %}
-{% block hero_points %}
-  <div class="hero-points">
-    <div class="point">
-      <strong>Manage appointments in one place</strong>
-      <p>Use the patient portal to review upcoming visits and keep contact details current.</p>
-    </div>
-    <div class="point">
-      <strong>Verification keeps access secure</strong>
-      <p>New accounts are activated through email verification before sign-in is enabled.</p>
-    </div>
-  </div>
-{% endblock %}
-{% block panel_title %}Create patient account{% endblock %}
-{% block panel_intro %}
-  <p class="panel-copy">Use your personal details for this clinic. After signup, we will send a verification email before the account becomes active.</p>
-{% endblock %}
-{% block panel_body %}
-  {% if verification_sent %}
-    <div class="flash flash--success">
-      Verification email sent. Please check your inbox to activate your account.
-      <a class="inline-link" href="{% url 'resend-verification' %}?email={{ form.email.value|urlencode }}">Resend verification</a>
-    </div>
-  {% endif %}
+      :root {
+        --patient-primary: #00488a;
+        --patient-primary-strong: #003d76;
+        --patient-secondary: #ffd126;
+        --patient-accent: #fefefd;
+        --patient-ink: #0b0b0b;
+        --patient-muted: #475467;
+        --patient-line: rgba(11, 11, 11, 0.12);
+        --patient-panel-line: rgba(11, 11, 11, 0.18);
+        --patient-success: #166534;
+        --patient-success-bg: #ecfdf3;
+        --patient-danger: #b42318;
+        --patient-danger-bg: #fff2f1;
+      }
 
-  <form method="post" class="stack-form">
-    {% csrf_token %}
-    {{ form.non_field_errors }}
+      * { box-sizing: border-box; }
+      html { background: var(--patient-accent); }
+      body.patient-signup-page {
+        margin: 0;
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--patient-ink);
+        background: var(--patient-accent);
+        overflow: hidden;
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.035em;
+      }
+      a {
+        color: var(--patient-primary);
+      }
 
-    <div class="field-grid">
-      <div class="field">
-        <label for="id_first_name">First name</label>
-        {{ form.first_name }}
-        {{ form.first_name.errors }}
-      </div>
-      <div class="field">
-        <label for="id_last_name">Last name</label>
-        {{ form.last_name }}
-        {{ form.last_name.errors }}
-      </div>
-      <div class="field">
-        <label for="id_email">Email</label>
-        {{ form.email }}
-        {{ form.email.errors }}
-      </div>
-      <div class="field">
-        <label for="id_phone">Phone</label>
-        {{ form.phone }}
-        {{ form.phone.errors }}
-      </div>
-      <div class="field field--wide">
-        <label for="id_dob">Date of birth</label>
-        {{ form.dob }}
-        {{ form.dob.errors }}
-      </div>
-      <div class="field">
-        <label for="id_password">Password</label>
-        {{ form.password }}
-        {{ form.password.errors }}
-      </div>
-      <div class="field">
-        <label for="id_confirm_password">Confirm password</label>
-        {{ form.confirm_password }}
-        {{ form.confirm_password.errors }}
-      </div>
-    </div>
+      body.patient-signup-page .public-nav {
+        width: 100%;
+        margin: 0;
+        top: 0;
+        padding: 18px clamp(18px, 4vw, 42px);
+        border: none;
+        border-bottom: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 0;
+        box-shadow: none;
+        background: rgba(254, 254, 253, 0.98);
+        backdrop-filter: none;
+      }
+      body.patient-signup-page .public-brand {
+        gap: 16px;
+      }
+      body.patient-signup-page .public-brand__mark {
+        width: 58px;
+        height: 58px;
+        border-radius: 999px;
+        background: var(--patient-ink);
+        color: var(--patient-accent);
+        font-size: 1rem;
+      }
+      body.patient-signup-page .public-brand__name {
+        color: var(--patient-ink);
+        font-size: 1.18rem;
+      }
+      body.patient-signup-page .public-brand__tag {
+        color: rgba(11, 11, 11, 0.78);
+        font-size: 13px;
+      }
+      body.patient-signup-page .public-nav__links .cta {
+        min-width: 170px;
+        min-height: 56px;
+        padding: 12px 28px;
+        border-radius: 8px;
+        background: var(--patient-ink);
+        color: var(--patient-accent);
+        border: 1px solid var(--patient-ink);
+        box-shadow: none;
+        font-size: 0.98rem;
+      }
+      body.patient-signup-page .public-nav__links .cta:hover {
+        background: var(--patient-primary);
+        border-color: var(--patient-primary);
+        box-shadow: none;
+        transform: none;
+      }
 
-    <button class="submit" type="submit">Create account</button>
-  </form>
+      .page {
+        flex: 1;
+        width: 100%;
+        overflow: hidden;
+      }
+      .shell {
+        height: calc(100vh - 95px);
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      }
+      .hero {
+        padding: clamp(34px, 5vw, 52px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, var(--patient-primary) 0%, var(--patient-primary-strong) 100%);
+      }
+      .hero-carousel {
+        position: relative;
+        width: min(100%, 780px);
+        min-height: 260px;
+      }
+      .hero-slide {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 14px;
+        padding: 36px 38px 48px;
+        border-radius: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background:
+          radial-gradient(circle at right bottom, rgba(255, 209, 38, 0.14), transparent 40%),
+          linear-gradient(135deg, rgba(17, 26, 48, 0.97) 0%, rgba(35, 43, 67, 0.95) 52%, rgba(27, 63, 70, 0.97) 100%);
+        opacity: 0;
+        transform: translateY(14px) scale(0.985);
+        pointer-events: none;
+        transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .hero-slide.active {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .hero-slide strong {
+        font-size: clamp(1.55rem, 2.5vw, 2.55rem);
+        color: var(--patient-accent);
+      }
+      .hero-slide p {
+        margin: 0;
+        max-width: 620px;
+        color: rgba(254, 254, 253, 0.9);
+        font-size: 1.04rem;
+        line-height: 1.72;
+      }
+      .hero-dots {
+        position: absolute;
+        right: 28px;
+        bottom: 22px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .hero-dot {
+        width: 10px;
+        height: 10px;
+        border: none;
+        border-radius: 999px;
+        background: rgba(254, 254, 253, 0.26);
+        cursor: pointer;
+        transition: transform 0.16s ease, background 0.16s ease;
+      }
+      .hero-dot.active {
+        transform: scale(1.08);
+        background: var(--patient-secondary);
+      }
 
-  <div class="action-row">
-    <a class="button button--secondary" href="{% url 'login' %}">Already have an account? Sign in</a>
-  </div>
-{% endblock %}
+      .signup-panel {
+        background: var(--patient-accent);
+        padding: clamp(28px, 4vw, 54px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow-y: auto;
+      }
+      .signup-card {
+        width: min(100%, 520px);
+        padding: 32px 34px;
+        border: 1px solid var(--patient-panel-line);
+        border-radius: 4px;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(11, 11, 11, 0.02);
+        margin: auto 0;
+      }
+      .signup-card h2 {
+        margin: 0 0 10px;
+        font-size: 2rem;
+        color: var(--patient-ink);
+      }
+      .signup-card p {
+        margin: 0;
+        color: var(--patient-muted);
+        font-size: 1rem;
+        line-height: 1.7;
+      }
+      .flash {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border: 1px solid rgba(22, 101, 52, 0.16);
+        border-radius: 8px;
+        background: var(--patient-success-bg);
+        color: var(--patient-success);
+        font-size: 14px;
+        line-height: 1.6;
+      }
+      .stack-form,
+      form {
+        margin-top: 22px;
+        display: grid;
+        gap: 16px;
+      }
+      .field-grid {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .field-grid .field--wide {
+        grid-column: 1 / -1;
+      }
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+      label {
+        display: block;
+        color: var(--patient-ink);
+        font-size: 0.96rem;
+        font-weight: 700;
+      }
+      input {
+        width: 100%;
+        min-height: 50px;
+        padding: 12px 14px;
+        border: 1px solid rgba(11, 11, 11, 0.24);
+        border-radius: 6px;
+        background: #fff;
+        color: var(--patient-ink);
+        font: inherit;
+      }
+      input:focus {
+        outline: none;
+        border-color: var(--patient-primary);
+        box-shadow: 0 0 0 3px rgba(0, 72, 138, 0.12);
+      }
+      .errorlist {
+        margin: 6px 0 0;
+        padding: 10px 12px;
+        list-style: none;
+        border-radius: 8px;
+        background: var(--patient-danger-bg);
+        color: var(--patient-danger);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .submit,
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 54px;
+        padding: 0 18px;
+        border-radius: 6px;
+        border: 1px solid transparent;
+        font: inherit;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .submit {
+        background: var(--patient-primary);
+        border-color: var(--patient-primary);
+        color: var(--patient-accent);
+      }
+      .submit:hover {
+        background: var(--patient-primary-strong);
+        border-color: var(--patient-primary-strong);
+      }
+      .button--secondary {
+        background: #fff;
+        color: var(--patient-ink);
+        border-color: rgba(11, 11, 11, 0.18);
+      }
+      .action-row {
+        margin-top: 18px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+      }
+
+      @media (max-width: 980px) {
+        body.patient-signup-page {
+          overflow: auto;
+        }
+        .page {
+          overflow: visible;
+        }
+        .shell {
+          height: auto;
+          grid-template-columns: 1fr;
+        }
+        .signup-panel {
+          order: 1;
+          overflow: visible;
+        }
+        .hero {
+          order: 2;
+        }
+      }
+      @media (max-width: 900px) {
+        body.patient-signup-page .public-nav {
+          padding: 14px 16px;
+        }
+        body.patient-signup-page .public-nav__links {
+          right: 16px;
+        }
+      }
+      @media (max-width: 720px) {
+        .hero {
+          padding: 28px 20px;
+        }
+        .hero-carousel {
+          min-height: 206px;
+        }
+        .hero-slide {
+          padding: 24px 22px 38px;
+          border-radius: 24px;
+        }
+        .signup-panel {
+          padding: 24px 16px;
+        }
+        .signup-card {
+          padding: 26px 20px;
+        }
+      }
+      @media (max-width: 640px) {
+        .field-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 560px) {
+        body.patient-signup-page .public-brand {
+          gap: 12px;
+        }
+        body.patient-signup-page .public-brand__mark {
+          width: 48px;
+          height: 48px;
+        }
+        body.patient-signup-page .public-nav__links .cta {
+          min-width: 0;
+          width: 100%;
+          justify-content: center;
+        }
+        .hero-slide strong {
+          font-size: 1.26rem;
+        }
+        .signup-card h2 {
+          font-size: 1.72rem;
+        }
+      }
+    </style>
+  </head>
+  <body class="patient-signup-page">
+    {% include "core/partials/public_nav.html" %}
+    <main class="page">
+      <section class="shell">
+        <article class="hero">
+          <div class="hero-carousel" id="patient-signup-hero-carousel" aria-label="Patient signup highlights">
+            <div class="hero-slide active" data-slide>
+              <strong>Create one patient account for {{ clinic.name }}</strong>
+              <p>Set up a secure clinic-linked login so you can manage bookings and keep your details in one place.</p>
+            </div>
+            <div class="hero-slide" data-slide>
+              <strong>Manage appointments from one portal</strong>
+              <p>Use the patient portal to review upcoming visits, track booking details, and stay connected with the clinic.</p>
+            </div>
+            <div class="hero-slide" data-slide>
+              <strong>Verification keeps access secure</strong>
+              <p>New patient accounts are activated through email verification before sign-in is enabled.</p>
+            </div>
+            <div class="hero-dots" aria-label="Patient signup highlight navigation">
+              <button type="button" class="hero-dot active" data-slide-dot aria-label="Show first highlight"></button>
+              <button type="button" class="hero-dot" data-slide-dot aria-label="Show second highlight"></button>
+              <button type="button" class="hero-dot" data-slide-dot aria-label="Show third highlight"></button>
+            </div>
+          </div>
+        </article>
+
+        <section class="signup-panel">
+          <article class="signup-card">
+            <h2>Create patient account</h2>
+            <p>Use your personal details for this clinic. After signup, we will send a verification email before the account becomes active.</p>
+
+            {% if verification_sent %}
+              <div class="flash">
+                Verification email sent. Please check your inbox to activate your account.
+                <a href="{% url 'resend-verification' %}?email={{ form.email.value|urlencode }}">Resend verification</a>
+              </div>
+            {% endif %}
+
+            <form method="post">
+              {% csrf_token %}
+              {{ form.non_field_errors }}
+
+              <div class="field-grid">
+                <div class="field">
+                  <label for="id_first_name">First name</label>
+                  {{ form.first_name }}
+                  {{ form.first_name.errors }}
+                </div>
+                <div class="field">
+                  <label for="id_last_name">Last name</label>
+                  {{ form.last_name }}
+                  {{ form.last_name.errors }}
+                </div>
+                <div class="field">
+                  <label for="id_email">Email</label>
+                  {{ form.email }}
+                  {{ form.email.errors }}
+                </div>
+                <div class="field">
+                  <label for="id_phone">Phone</label>
+                  {{ form.phone }}
+                  {{ form.phone.errors }}
+                </div>
+                <div class="field field--wide">
+                  <label for="id_dob">Date of birth</label>
+                  {{ form.dob }}
+                  {{ form.dob.errors }}
+                </div>
+                <div class="field">
+                  <label for="id_password">Password</label>
+                  {{ form.password }}
+                  {{ form.password.errors }}
+                </div>
+                <div class="field">
+                  <label for="id_confirm_password">Confirm password</label>
+                  {{ form.confirm_password }}
+                  {{ form.confirm_password.errors }}
+                </div>
+              </div>
+
+              <button class="submit" type="submit">Create account</button>
+            </form>
+
+            <div class="action-row">
+              <a class="button button--secondary" href="{% url 'login' %}">Already have an account? Sign in</a>
+            </div>
+          </article>
+        </section>
+      </section>
+    </main>
+    <script>
+      (function() {
+        const slides = Array.from(document.querySelectorAll('[data-slide]'));
+        const dots = Array.from(document.querySelectorAll('[data-slide-dot]'));
+        if (!slides.length || slides.length !== dots.length) return;
+
+        let activeIndex = 0;
+        let timer = null;
+
+        function showSlide(index) {
+          activeIndex = index;
+          slides.forEach(function(slide, slideIndex) {
+            slide.classList.toggle('active', slideIndex === index);
+          });
+          dots.forEach(function(dot, dotIndex) {
+            dot.classList.toggle('active', dotIndex === index);
+          });
+        }
+
+        function startCarousel() {
+          stopCarousel();
+          timer = window.setInterval(function() {
+            showSlide((activeIndex + 1) % slides.length);
+          }, 4600);
+        }
+
+        function stopCarousel() {
+          if (timer) {
+            window.clearInterval(timer);
+            timer = null;
+          }
+        }
+
+        dots.forEach(function(dot, index) {
+          dot.addEventListener('click', function() {
+            showSlide(index);
+            startCarousel();
+          });
+        });
+
+        const heroCarousel = document.getElementById('patient-signup-hero-carousel');
+        if (heroCarousel) {
+          heroCarousel.addEventListener('mouseenter', stopCarousel);
+          heroCarousel.addEventListener('mouseleave', startCarousel);
+        }
+
+        startCarousel();
+      })();
+    </script>
+  </body>
+</html>
