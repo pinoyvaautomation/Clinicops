@@ -15,7 +15,7 @@ def user_roles(request):
     user = request.user
     brand_context = {
         'public_brand_name': getattr(settings, 'PUBLIC_BRAND_NAME', 'ClinicOps'),
-        'public_brand_color': getattr(settings, 'PUBLIC_BRAND_COLOR', '#0f5132'),
+        'public_brand_color': getattr(settings, 'PUBLIC_BRAND_COLOR', '#00488a'),
         'public_logo_url': getattr(settings, 'PUBLIC_LOGO_URL', ''),
         'google_oauth_enabled': getattr(settings, 'GOOGLE_OAUTH_ENABLED', False),
     }
