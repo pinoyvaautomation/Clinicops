@@ -1,0 +1,13 @@
+ClinicOps platform alert
+
+A new clinic owner signup was recorded.
+
+Clinic: {{ clinic.name }}
+Owner: {{ owner_name }}
+Owner email: {{ owner_email }}
+Timezone: {{ clinic.timezone_label }}
+Plan status: {{ plan_mode }}
+
+The owner verification email has already been sent.
+
+ClinicOps

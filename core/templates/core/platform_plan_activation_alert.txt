@@ -1,0 +1,13 @@
+ClinicOps platform alert
+
+A clinic selected a {{ plan_mode }} plan during signup.
+
+Clinic: {{ clinic.name }}
+Owner: {{ owner_name }}
+Owner email: {{ owner_email }}
+Plan: {{ plan.name }}
+Plan type: {{ plan_mode }}
+Subscription status: {{ status_label }}
+
+{% if billing_url %}Billing link: {{ billing_url }}
+{% endif %}ClinicOps

@@ -1,0 +1,18 @@
+<p><strong>ClinicOps platform alert</strong></p>
+
+<p>A clinic selected a <strong>{{ plan_mode }}</strong> plan during signup.</p>
+
+<ul>
+  <li><strong>Clinic:</strong> {{ clinic.name }}</li>
+  <li><strong>Owner:</strong> {{ owner_name }}</li>
+  <li><strong>Owner email:</strong> {{ owner_email }}</li>
+  <li><strong>Plan:</strong> {{ plan.name }}</li>
+  <li><strong>Plan type:</strong> {{ plan_mode }}</li>
+  <li><strong>Subscription status:</strong> {{ status_label }}</li>
+</ul>
+
+{% if billing_url %}
+  <p><a href="{{ billing_url }}">Open billing</a></p>
+{% endif %}
+
+<p>ClinicOps</p>

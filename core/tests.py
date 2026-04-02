@@ -1493,6 +1493,104 @@ class FreemiumPlanTests(TestCase):
         self.assertEqual(subscription.status, ClinicSubscription.Status.ACTIVE)
         self.assertTrue(subscription.paypal_subscription_id.startswith('LOCAL-'))
 
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        PLATFORM_ALERT_EMAILS=['ops@example.com'],
+    )
+    def test_clinic_signup_sends_platform_alert(self):
+        response = self.client.post(
+            reverse('clinic-signup'),
+            data={
+                'clinic_name': 'Alert Clinic',
+                'timezone': 'Asia/Manila',
+                'admin_first_name': 'Maria',
+                'admin_last_name': 'Santos',
+                'admin_email': 'owner@alertclinic.com',
+                'password': 'SecurePass123!',
+                'confirm_password': 'SecurePass123!',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 2)
+        verification_email, platform_alert = mail.outbox
+        self.assertEqual(verification_email.to, ['owner@alertclinic.com'])
+        self.assertEqual(platform_alert.to, ['ops@example.com'])
+        self.assertIn('new clinic signup', platform_alert.subject.lower())
+        self.assertIn('Alert Clinic', platform_alert.body)
+        self.assertIn('owner@alertclinic.com', platform_alert.body)
+        self.assertIn('Pending selection', platform_alert.body)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        PLATFORM_ALERT_EMAILS=['ops@example.com'],
+    )
+    def test_signup_activate_free_plan_sends_platform_alert(self):
+        free_plan = Plan.objects.create(
+            name='Free Trial',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_reminders=False,
+        )
+        session = self.client.session
+        session['signup_clinic_id'] = self.clinic.id
+        session.save()
+
+        response = self.client.post(
+            reverse('signup-activate'),
+            data=json.dumps({'clinic_id': self.clinic.id, 'plan_id': free_plan.id}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        platform_alert = mail.outbox[0]
+        self.assertEqual(platform_alert.to, ['ops@example.com'])
+        self.assertIn('free plan selected', platform_alert.subject.lower())
+        self.assertIn('Freemium Clinic', platform_alert.body)
+        self.assertIn('Free Trial', platform_alert.body)
+        self.assertIn('Plan type: Free', platform_alert.body)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        PLATFORM_ALERT_EMAILS=['ops@example.com'],
+    )
+    def test_signup_activate_paid_plan_sends_platform_alert(self):
+        paid_plan = Plan.objects.create(
+            name='Premium',
+            is_free=False,
+            paypal_plan_id='P-PRO123',
+            interval=Plan.Interval.MONTH,
+            price_cents=2900,
+        )
+        session = self.client.session
+        session['signup_clinic_id'] = self.clinic.id
+        session.save()
+
+        response = self.client.post(
+            reverse('signup-activate'),
+            data=json.dumps(
+                {
+                    'clinic_id': self.clinic.id,
+                    'plan_id': paid_plan.id,
+                    'subscription_id': 'I-PRO123',
+                }
+            ),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        platform_alert = mail.outbox[0]
+        self.assertEqual(platform_alert.to, ['ops@example.com'])
+        self.assertIn('premium plan selected', platform_alert.subject.lower())
+        self.assertIn('Premium', platform_alert.body)
+        self.assertIn('Plan type: Premium', platform_alert.body)
+
     def test_staff_creation_blocks_when_free_limit_is_reached(self):
         free_plan = Plan.objects.create(
             name='Free Seats',

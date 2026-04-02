@@ -216,6 +216,11 @@ SECURITY_ALERT_EMAILS = [
     for email in os.environ.get('SECURITY_ALERT_EMAILS', '').split(',')
     if email.strip()
 ]
+PLATFORM_ALERT_EMAILS = [
+    email.strip()
+    for email in os.environ.get('PLATFORM_ALERT_EMAILS', '').split(',')
+    if email.strip()
+]
 SECURITY_ALERT_COOLDOWN_MINUTES = int(os.environ.get('SECURITY_ALERT_COOLDOWN_MINUTES', '30'))
 RESEND_API_KEY = os.environ.get('RESEND_API_KEY', '')
 PUBLIC_BRAND_NAME = os.environ.get('PUBLIC_BRAND_NAME', 'ClinicOps')

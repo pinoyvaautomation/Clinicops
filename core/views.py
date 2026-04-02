@@ -16,7 +16,7 @@ from django.core.exceptions import ValidationError
 from django.core.mail import EmailMultiAlternatives
 from django.core import signing
 from django.conf import settings
-from django.db import transaction
+from django.db import transaction, DatabaseError
 from django.db.models import Q
 from django.http import HttpResponse, HttpResponseForbidden, JsonResponse, HttpResponseBadRequest
 from django.shortcuts import get_object_or_404, render, redirect
@@ -1468,6 +1468,75 @@ def _send_password_reset_notice_email(request, user, clinic=None):
     )
 
 
+def _platform_alert_recipients():
+    if settings.PLATFORM_ALERT_EMAILS:
+        return settings.PLATFORM_ALERT_EMAILS
+    try:
+        return list(
+            User.objects.filter(is_superuser=True, is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+    except DatabaseError:
+        logger.warning(
+            'ClinicOps platform alert recipients could not be loaded because the database is unavailable.',
+            exc_info=True,
+        )
+        return []
+
+
+def _user_display_name(user):
+    full_name = user.get_full_name().strip()
+    return full_name or user.email or user.username
+
+
+def _send_platform_clinic_signup_alert(*, request, clinic: Clinic, owner_user):
+    recipients = _platform_alert_recipients()
+    if not recipients:
+        return False
+
+    context = {
+        'clinic': clinic,
+        'owner_user': owner_user,
+        'owner_name': _user_display_name(owner_user),
+        'owner_email': owner_user.email,
+        'login_url': request.build_absolute_uri(reverse('login')),
+        'plan_mode': 'Pending selection',
+    }
+    return _send_rendered_email(
+        subject_template='core/platform_clinic_signup_alert_subject.txt',
+        text_template='core/platform_clinic_signup_alert.txt',
+        html_template='core/platform_clinic_signup_alert.html',
+        context=context,
+        recipients=recipients,
+    )
+
+
+def _send_platform_plan_activation_alert(*, request, clinic: Clinic, owner_user, plan: Plan, subscription: ClinicSubscription):
+    recipients = _platform_alert_recipients()
+    if not recipients:
+        return False
+
+    context = {
+        'clinic': clinic,
+        'owner_user': owner_user,
+        'owner_name': _user_display_name(owner_user),
+        'owner_email': owner_user.email,
+        'plan': plan,
+        'plan_mode': 'Free' if plan.is_free else 'Premium',
+        'subscription': subscription,
+        'status_label': subscription.get_status_display(),
+        'billing_url': request.build_absolute_uri(reverse('billing')) if request.user.is_authenticated else '',
+    }
+    return _send_rendered_email(
+        subject_template='core/platform_plan_activation_alert_subject.txt',
+        text_template='core/platform_plan_activation_alert.txt',
+        html_template='core/platform_plan_activation_alert.html',
+        context=context,
+        recipients=recipients,
+    )
+
+
 def _get_user_clinic(user):
     try:
         return user.staff.clinic
@@ -1477,6 +1546,19 @@ def _get_user_clinic(user):
     if patient:
         return patient.clinic
     return None
+
+
+def _get_clinic_owner_user(clinic: Clinic):
+    owner_staff = (
+        Staff.objects.filter(clinic=clinic, user__groups__name='Admin')
+        .select_related('user')
+        .order_by('id')
+        .first()
+    )
+    if owner_staff:
+        return owner_staff.user
+    fallback_staff = Staff.objects.filter(clinic=clinic).select_related('user').order_by('id').first()
+    return fallback_staff.user if fallback_staff else None
 
 
 def _get_active_patient_profile(request):
@@ -2780,6 +2862,7 @@ def clinic_signup(request):
 
                 request.session['signup_clinic_id'] = clinic.id
                 _send_verification_email(request, user, clinic=clinic)
+                _send_platform_clinic_signup_alert(request=request, clinic=clinic, owner_user=user)
                 return render(
                     request,
                     'core/clinic_signup.html',
@@ -4134,6 +4217,10 @@ def signup_activate(request):
     if not plan.is_free and not subscription_id:
         return HttpResponseBadRequest('subscription_id is required for paid plans.')
 
+    previous_subscription = get_current_subscription(clinic)
+    previous_status = previous_subscription.status if previous_subscription else None
+    previous_plan_id = previous_subscription.plan_id if previous_subscription else None
+
     subscription = _activate_selected_plan(
         clinic=clinic,
         plan=plan,
@@ -4141,6 +4228,21 @@ def signup_activate(request):
         last_event_type='FREE_ACTIVATED' if plan.is_free else 'CLIENT_APPROVED',
         sync_event_type='CLIENT_SYNCED',
     )
+
+    if (
+        previous_subscription is None
+        or previous_status != subscription.status
+        or previous_plan_id != subscription.plan_id
+    ):
+        owner_user = _get_clinic_owner_user(clinic)
+        if owner_user is not None:
+            _send_platform_plan_activation_alert(
+                request=request,
+                clinic=clinic,
+                owner_user=owner_user,
+                plan=plan,
+                subscription=subscription,
+            )
 
     return JsonResponse(
         {
