@@ -8,7 +8,7 @@ import json
 
 from django.contrib import messages
 from django.contrib.auth import get_user_model
-from django.contrib.auth.views import LoginView, PasswordChangeView
+from django.contrib.auth.views import LoginView, PasswordChangeView, PasswordResetConfirmView
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.models import Group
 from django.contrib.auth.tokens import default_token_generator
@@ -204,6 +204,28 @@ class ClinicPasswordChangeView(PasswordChangeView):
             identifier=self.request.user.email or self.request.user.username,
             metadata={'source': 'password_change'},
         )
+        return response
+
+
+class ClinicPasswordResetConfirmView(PasswordResetConfirmView):
+    template_name = 'registration/password_reset_confirm.html'
+    success_url = reverse_lazy('password_reset_complete')
+
+    def form_valid(self, form):
+        user = getattr(form, 'user', None)
+        response = super().form_valid(form)
+
+        if user is not None:
+            clinic = _get_user_clinic(user)
+            log_security_event(
+                event_type=SecurityEvent.EventType.PASSWORD_CHANGED,
+                request=self.request,
+                user=user,
+                identifier=user.email or user.username,
+                metadata={'source': 'password_reset'},
+            )
+            _send_password_reset_notice_email(self.request, user, clinic=clinic)
+
         return response
 
 
@@ -1418,6 +1440,29 @@ def _send_staff_welcome_email(request, user, clinic=None):
         subject_template='core/staff_welcome_subject.txt',
         text_template='core/staff_welcome.txt',
         html_template='core/staff_welcome.html',
+        context=context,
+        recipients=[user.email],
+    )
+
+
+def _send_password_reset_notice_email(request, user, clinic=None):
+    if not user.email:
+        return False
+
+    if clinic is None:
+        clinic = _get_user_clinic(user)
+
+    clinic_name = clinic.name if clinic else 'ClinicOps'
+    context = {
+        'user': user,
+        'clinic': clinic,
+        'clinic_name': clinic_name,
+        'login_url': request.build_absolute_uri(reverse('login')),
+    }
+    return _send_rendered_email(
+        subject_template='core/password_reset_notice_subject.txt',
+        text_template='core/password_reset_notice.txt',
+        html_template='core/password_reset_notice.html',
         context=context,
         recipients=[user.email],
     )

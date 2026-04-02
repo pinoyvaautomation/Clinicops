@@ -9,6 +9,7 @@ from unittest.mock import patch
 from django.contrib.admin.sites import AdminSite
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Group
+from django.contrib.auth.tokens import default_token_generator
 from django.contrib.messages import get_messages
 from django.contrib.messages.storage.fallback import FallbackStorage
 from django.core.cache import cache
@@ -20,6 +21,8 @@ from django.db import OperationalError
 from django.test import Client
 from django.test import RequestFactory, TestCase, override_settings
 from django.utils import timezone
+from django.utils.encoding import force_bytes
+from django.utils.http import urlsafe_base64_encode
 from django.urls import reverse
 
 from allauth.core.exceptions import ImmediateHttpResponse
@@ -472,6 +475,57 @@ class SecurityEventTests(TestCase):
         self.assertEqual(event.user, self.user)
         self.assertEqual(event.clinic, self.clinic)
         self.assertEqual(event.ip_address, '203.0.113.12')
+
+    @override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+    def test_password_reset_confirm_sends_notice_email_and_logs_security_event(self):
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        confirm_url = reverse('password_reset_confirm', kwargs={'uidb64': uid, 'token': token})
+
+        setup_response = self.client.get(confirm_url, follow=True)
+        self.assertEqual(setup_response.status_code, 200)
+
+        response = self.client.post(
+            setup_response.request['PATH_INFO'],
+            {
+                'new_password1': 'SaferReset123!',
+                'new_password2': 'SaferReset123!',
+            },
+            HTTP_USER_AGENT='ClinicOps Browser',
+            REMOTE_ADDR='203.0.113.14',
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], reverse('password_reset_complete'))
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, [self.user.email])
+        self.assertIn('password was changed', mail.outbox[0].subject.lower())
+        self.assertIn(reverse('login'), mail.outbox[0].body)
+
+        event = SecurityEvent.objects.filter(
+            event_type=SecurityEvent.EventType.PASSWORD_CHANGED,
+            ip_address='203.0.113.14',
+        ).latest('created_at')
+        self.assertEqual(event.user, self.user)
+        self.assertEqual(event.clinic, self.clinic)
+        self.assertEqual(event.metadata.get('source'), 'password_reset')
+
+    def test_password_pages_include_toggle_assets(self):
+        self.client.force_login(self.user)
+
+        login_response = self.client.get(reverse('login'))
+        self.assertContains(login_response, 'Show password')
+
+        uid = urlsafe_base64_encode(force_bytes(self.user.pk))
+        token = default_token_generator.make_token(self.user)
+        confirm_response = self.client.get(
+            reverse('password_reset_confirm', kwargs={'uidb64': uid, 'token': token}),
+            follow=True,
+        )
+        self.assertContains(confirm_response, 'Show password')
+
+        password_change_response = self.client.get(reverse('password_change'))
+        self.assertContains(password_change_response, 'Show password')
 
     def test_admin_settings_shows_recent_clinic_security_activity(self):
         SecurityEvent.objects.create(

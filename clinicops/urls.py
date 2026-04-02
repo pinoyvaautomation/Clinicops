@@ -19,13 +19,23 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import include, path
 
-from core.views import AdminLoginView, ClinicLoginView, ClinicPasswordChangeView
+from core.views import (
+    AdminLoginView,
+    ClinicLoginView,
+    ClinicPasswordChangeView,
+    ClinicPasswordResetConfirmView,
+)
 
 urlpatterns = [
     path('admin/login/', AdminLoginView.as_view(), name='admin-login'),
     path('admin/', admin.site.urls),
     path('accounts/login/', ClinicLoginView.as_view(), name='login'),
     path('accounts/password_change/', ClinicPasswordChangeView.as_view(), name='password_change'),
+    path(
+        'accounts/reset/<uidb64>/<token>/',
+        ClinicPasswordResetConfirmView.as_view(),
+        name='password_reset_confirm',
+    ),
     path('accounts/', include('django.contrib.auth.urls')),
     path('accounts/', include('allauth.urls')),
     path('', include('core.urls')),
