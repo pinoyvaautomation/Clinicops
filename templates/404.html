@@ -1,15 +1,10 @@
 {% extends "public_shell.html" %}
 
 {% block title %}Page Not Found{% endblock %}
-{% block hero_eyebrow %}Not found{% endblock %}
+{% block hero_eyebrow %}{% endblock %}
 {% block hero_title %}This page is no longer where the link expected{% endblock %}
 {% block hero_text %}The address may be outdated, mistyped, or tied to a page that has moved. The safest next step is to return to the main entry point and navigate from there.{% endblock %}
-{% block hero_meta %}
-  <div class="hero-meta">
-    <span class="pill">404 response</span>
-    <span class="pill">Return to the product entry point</span>
-  </div>
-{% endblock %}
+{% block hero_meta %}{% endblock %}
 {% block panel_title %}Page not found{% endblock %}
 {% block panel_intro %}
   <p class="panel-copy">The page you're looking for doesn't exist or has been moved.</p>
