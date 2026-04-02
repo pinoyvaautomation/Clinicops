@@ -1135,7 +1135,7 @@ class AppointmentLookupTests(TestCase):
         )
 
         self.assertContains(response, 'Appointment details')
-        self.assertContains(response, reverse('appointment-manage', args=[_appointment_manage_token(appointment)]))
+        self.assertContains(response, response.context['manage_url'])
 
 
 class AppointmentSelfServiceTests(TestCase):

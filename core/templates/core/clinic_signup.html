@@ -5,258 +5,276 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ public_brand_name|default:"ClinicOps" }} Signup</title>
     <style>
-      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;700&display=swap');
 
       :root {
-        --brand: {{ public_brand_color|default:"#0f5132" }};
-        --ink: #0f172a;
-        --ink-soft: #334155;
-        --muted: #64748b;
-        --line: rgba(148, 163, 184, 0.22);
-        --panel: rgba(255, 255, 255, 0.94);
-        --danger: #b42318;
-        --danger-bg: #fff2f1;
-        --success: #166534;
-        --success-bg: #ecfdf3;
-        --warning: #9a6700;
-        --warning-bg: #fff8dd;
+        --signup-primary: #00488a;
+        --signup-primary-strong: #003d76;
+        --signup-secondary: #ffd126;
+        --signup-accent: #fefefd;
+        --signup-ink: #0b0b0b;
+        --signup-muted: #475467;
+        --signup-line: rgba(11, 11, 11, 0.12);
+        --signup-panel-line: rgba(11, 11, 11, 0.18);
+        --signup-danger: #b42318;
+        --signup-danger-bg: #fff2f1;
+        --signup-success: #166534;
+        --signup-success-bg: #ecfdf3;
+        --signup-warning: #9a6700;
+        --signup-warning-bg: #fff8dd;
       }
 
       * { box-sizing: border-box; }
-      body {
+      html { background: var(--signup-accent); }
+      body.signup-page {
         margin: 0;
         min-height: 100vh;
         display: flex;
         flex-direction: column;
         font-family: 'IBM Plex Sans', Arial, sans-serif;
-        color: var(--ink);
-        background:
-          radial-gradient(circle at top left, rgba(15, 81, 50, 0.12), transparent 30%),
-          radial-gradient(circle at top right, rgba(15, 23, 42, 0.08), transparent 28%),
-          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+        color: var(--signup-ink);
+        background: var(--signup-accent);
+        overflow: hidden;
       }
       h1, h2, h3, strong {
         font-family: 'Space Grotesk', Arial, sans-serif;
-        letter-spacing: -0.03em;
+        letter-spacing: -0.035em;
       }
       a {
-        color: var(--brand);
+        color: var(--signup-primary);
       }
+
+      body.signup-page .public-nav {
+        width: 100%;
+        margin: 0;
+        top: 0;
+        padding: 18px clamp(18px, 4vw, 42px);
+        border: none;
+        border-bottom: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 0;
+        box-shadow: none;
+        background: rgba(254, 254, 253, 0.98);
+        backdrop-filter: none;
+      }
+      body.signup-page .public-brand {
+        gap: 16px;
+      }
+      body.signup-page .public-brand__mark {
+        width: 58px;
+        height: 58px;
+        border-radius: 999px;
+        background: var(--signup-ink);
+        color: var(--signup-accent);
+        font-size: 1rem;
+      }
+      body.signup-page .public-brand__name {
+        color: var(--signup-ink);
+        font-size: 1.18rem;
+      }
+      body.signup-page .public-brand__tag {
+        color: rgba(11, 11, 11, 0.78);
+        font-size: 13px;
+      }
+      body.signup-page .public-nav__links .cta {
+        min-width: 170px;
+        min-height: 56px;
+        padding: 12px 28px;
+        border-radius: 8px;
+        background: var(--signup-ink);
+        color: var(--signup-accent);
+        border: 1px solid var(--signup-ink);
+        box-shadow: none;
+        font-size: 0.98rem;
+      }
+      body.signup-page .public-nav__links .cta:hover {
+        background: var(--signup-primary);
+        border-color: var(--signup-primary);
+        box-shadow: none;
+        transform: none;
+      }
+
       .page {
         flex: 1;
-        width: min(1180px, calc(100% - 32px));
-        margin: 0 auto;
-        padding: 34px 0 56px;
-      }
-      .shell {
-        display: grid;
-        gap: 18px;
-        grid-template-columns: minmax(0, 1.02fr) minmax(420px, 520px);
-        align-items: stretch;
-      }
-      .hero, .signup-card {
-        border: 1px solid var(--line);
-        border-radius: 30px;
-        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
-      }
-      .hero {
-        padding: 34px;
-        color: #f8fafc;
-        background:
-          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 24%),
-          linear-gradient(135deg, #0f172a 0%, #111827 56%, var(--brand) 160%);
-        position: relative;
+        width: 100%;
         overflow: hidden;
       }
-      .hero::after {
-        content: '';
-        position: absolute;
-        inset: auto -12% -18% auto;
-        width: 280px;
-        height: 280px;
-        border-radius: 999px;
-        background: radial-gradient(circle, rgba(255, 255, 255, 0.12), transparent 66%);
-        pointer-events: none;
+      .shell {
+        height: calc(100vh - 95px);
+        display: grid;
+        grid-template-columns: minmax(0, 1.04fr) minmax(430px, 0.96fr);
       }
-      .eyebrow, .pill {
+      .hero {
+        padding: clamp(34px, 5vw, 52px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(180deg, var(--signup-primary) 0%, var(--signup-primary-strong) 100%);
+      }
+      .hero-carousel {
+        position: relative;
+        width: min(100%, 820px);
+        min-height: 260px;
+      }
+      .hero-slide {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        gap: 14px;
+        padding: 38px 38px 50px;
+        border-radius: 36px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background:
+          radial-gradient(circle at right bottom, rgba(255, 209, 38, 0.14), transparent 40%),
+          linear-gradient(135deg, rgba(17, 26, 48, 0.97) 0%, rgba(35, 43, 67, 0.95) 52%, rgba(27, 63, 70, 0.97) 100%);
+        opacity: 0;
+        transform: translateY(14px) scale(0.985);
+        pointer-events: none;
+        transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22, 1, 0.36, 1);
+      }
+      .hero-slide.active {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+        pointer-events: auto;
+      }
+      .hero-slide strong {
+        font-size: clamp(1.6rem, 2.7vw, 2.7rem);
+        color: var(--signup-accent);
+      }
+      .hero-slide p {
+        margin: 0;
+        max-width: 620px;
+        color: rgba(254, 254, 253, 0.9);
+        font-size: 1.06rem;
+        line-height: 1.72;
+      }
+      .hero-dots {
+        position: absolute;
+        right: 28px;
+        bottom: 22px;
         display: inline-flex;
         align-items: center;
         gap: 8px;
-        min-height: 34px;
-        padding: 7px 12px;
+      }
+      .hero-dot {
+        width: 10px;
+        height: 10px;
+        border: none;
         border-radius: 999px;
-        font-size: 13px;
-        font-weight: 600;
-        background: rgba(255, 255, 255, 0.12);
-        color: #f8fafc;
+        background: rgba(254, 254, 253, 0.26);
+        cursor: pointer;
+        transition: transform 0.16s ease, background 0.16s ease;
       }
-      .hero h1 {
-        margin: 18px 0 12px;
-        font-size: clamp(2.4rem, 5vw, 4.1rem);
-        line-height: 0.96;
+      .hero-dot.active {
+        transform: scale(1.08);
+        background: var(--signup-secondary);
       }
-      .hero p {
-        margin: 0;
-        max-width: 580px;
-        color: rgba(248, 250, 252, 0.78);
-        line-height: 1.7;
-        font-size: 1.04rem;
-      }
-      .hero-meta, .hero-points, .card-footer, .summary-grid {
+
+      .signup-panel {
+        background: var(--signup-accent);
+        padding: clamp(28px, 4vw, 54px);
         display: flex;
-        gap: 10px;
-        flex-wrap: wrap;
-      }
-      .hero-meta {
-        margin-top: 20px;
-      }
-      .hero-points {
-        margin-top: 28px;
-        display: grid;
-        gap: 12px;
-      }
-      .point {
-        padding: 16px;
-        border-radius: 22px;
-        border: 1px solid rgba(255, 255, 255, 0.14);
-        background: rgba(255, 255, 255, 0.08);
-      }
-      .point strong {
-        display: block;
-        margin-bottom: 8px;
-        font-size: 1.08rem;
-      }
-      .point p {
-        margin: 0;
-        font-size: 0.95rem;
-      }
-      .signup-card {
-        background: var(--panel);
-        overflow: hidden;
-      }
-      .signup-head {
-        padding: 26px 26px 14px;
-      }
-      .brand-row {
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        color: var(--ink);
-      }
-      .brand-row img {
-        height: 34px;
-        width: auto;
-      }
-      .brand-mark {
-        width: 42px;
-        height: 42px;
-        border-radius: 14px;
-        background: linear-gradient(135deg, var(--brand), #0f172a);
-        color: #fff;
-        display: inline-flex;
         align-items: center;
         justify-content: center;
-        font-weight: 700;
-        font-size: 1rem;
+        overflow-y: auto;
       }
-      .logo-fallback {
-        display: none;
-      }
-      .brand-row.logo-broken img {
-        display: none;
-      }
-      .brand-row.logo-broken .logo-fallback {
-        display: inline-flex;
+      .signup-card {
+        width: min(100%, 520px);
+        padding: 32px 34px;
+        border: 1px solid var(--signup-panel-line);
+        border-radius: 4px;
+        background: #fff;
+        box-shadow: 0 0 0 3px rgba(11, 11, 11, 0.02);
+        margin: auto 0;
       }
       .step-tabs {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 8px;
-        margin: 18px 0 0;
+        margin-bottom: 20px;
       }
       .step-tab {
         min-height: 44px;
-        border-radius: 14px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        background: rgba(15, 23, 42, 0.04);
-        color: #64748b;
-        font-size: 13px;
-        font-weight: 700;
-        letter-spacing: 0.04em;
-        text-transform: uppercase;
         display: inline-flex;
         align-items: center;
         justify-content: center;
+        border: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 10px;
+        background: rgba(11, 11, 11, 0.03);
+        color: #667085;
+        font-size: 0.78rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
       }
       .step-tab.active {
-        background: rgba(15, 81, 50, 0.1);
-        color: var(--brand);
-        border-color: rgba(15, 81, 50, 0.14);
+        border-color: rgba(0, 72, 138, 0.18);
+        background: rgba(0, 72, 138, 0.08);
+        color: var(--signup-primary);
       }
       .step-tab.done {
-        background: var(--success-bg);
-        color: var(--success);
-        border-color: rgba(22, 101, 52, 0.14);
+        border-color: rgba(22, 101, 52, 0.18);
+        background: rgba(22, 101, 52, 0.08);
+        color: var(--signup-success);
       }
-      .signup-head h2 {
-        margin: 18px 0 8px;
+      .signup-card h2 {
+        margin: 0 0 10px;
         font-size: 2rem;
+        color: var(--signup-ink);
       }
-      .signup-head p {
+      .signup-card p {
         margin: 0;
-        color: var(--muted);
-        line-height: 1.6;
-      }
-      .signup-body {
-        padding: 0 26px 26px;
+        color: var(--signup-muted);
+        font-size: 1rem;
+        line-height: 1.7;
       }
       .flash, .banner {
         margin-top: 16px;
         padding: 12px 14px;
-        border-radius: 16px;
         border: 1px solid rgba(180, 35, 24, 0.18);
-        background: var(--danger-bg);
-        color: var(--danger);
+        border-radius: 8px;
+        background: var(--signup-danger-bg);
+        color: var(--signup-danger);
         font-size: 14px;
         font-weight: 600;
       }
       .banner {
-        margin-top: 0;
         background: #fff;
-        color: var(--ink-soft);
-        border-color: rgba(148, 163, 184, 0.18);
+        border-color: rgba(11, 11, 11, 0.12);
+        color: var(--signup-muted);
         font-weight: 500;
       }
       .banner strong {
         display: block;
         margin-bottom: 6px;
-        color: var(--ink);
+        color: var(--signup-ink);
       }
       .banner.success {
-        background: var(--success-bg);
+        background: var(--signup-success-bg);
         border-color: rgba(22, 101, 52, 0.16);
+        color: var(--signup-success);
       }
-      .banner.success strong,
-      .banner.success {
-        color: var(--success);
+      .banner.success strong {
+        color: var(--signup-success);
       }
       .banner.warning {
-        background: var(--warning-bg);
+        background: var(--signup-warning-bg);
         border-color: rgba(154, 103, 0, 0.16);
+        color: var(--signup-warning);
       }
-      .banner.warning strong,
-      .banner.warning {
-        color: var(--warning);
+      .banner.warning strong {
+        color: var(--signup-warning);
       }
       form {
-        margin-top: 18px;
+        margin-top: 22px;
         display: grid;
-        gap: 12px;
+        gap: 16px;
       }
       .field-grid {
         display: grid;
-        gap: 14px;
         grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
       }
       .field {
         display: grid;
@@ -267,53 +285,54 @@
       }
       label {
         display: block;
-        color: var(--ink-soft);
-        font-size: 13px;
-        font-weight: 600;
+        color: var(--signup-ink);
+        font-size: 0.96rem;
+        font-weight: 700;
       }
       input, select {
         width: 100%;
-        min-height: 48px;
-        border: 1px solid rgba(148, 163, 184, 0.28);
-        border-radius: 14px;
+        min-height: 50px;
         padding: 12px 14px;
-        font: inherit;
+        border: 1px solid rgba(11, 11, 11, 0.24);
+        border-radius: 6px;
         background: #fff;
-        color: var(--ink);
+        color: var(--signup-ink);
+        font: inherit;
       }
       input:focus, select:focus {
         outline: none;
-        border-color: var(--brand);
-        box-shadow: 0 0 0 4px rgba(15, 81, 50, 0.08);
+        border-color: var(--signup-primary);
+        box-shadow: 0 0 0 3px rgba(0, 72, 138, 0.12);
       }
       .help {
-        margin-top: 8px;
-        color: var(--muted);
-        font-size: 13px;
-        line-height: 1.5;
+        margin-top: 4px;
+        color: var(--signup-muted);
+        font-size: 0.9rem;
+        line-height: 1.55;
       }
       .errorlist {
-        margin: 8px 0 0;
+        margin: 6px 0 0;
         padding: 10px 12px;
         list-style: none;
-        border-radius: 14px;
-        background: var(--danger-bg);
-        color: var(--danger);
+        border-radius: 8px;
+        background: var(--signup-danger-bg);
+        color: var(--signup-danger);
         font-size: 13px;
         font-weight: 600;
       }
       .submit {
-        margin-top: 4px;
         width: 100%;
-        min-height: 52px;
-        border: none;
-        border-radius: 16px;
-        background: linear-gradient(135deg, var(--brand), #0f172a);
-        color: #fff;
-        font-size: 0.98rem;
+        min-height: 54px;
+        border: 1px solid var(--signup-primary);
+        border-radius: 6px;
+        background: var(--signup-primary);
+        color: var(--signup-accent);
+        font-size: 1rem;
         font-weight: 700;
-        letter-spacing: 0.04em;
         cursor: pointer;
+      }
+      .submit:hover {
+        background: var(--signup-primary-strong);
       }
       .summary-grid {
         margin-top: 16px;
@@ -323,39 +342,21 @@
       }
       .summary-card {
         padding: 14px;
-        border-radius: 18px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
+        border: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 10px;
         background: #fff;
       }
       .summary-card .kicker {
-        color: var(--muted);
+        color: var(--signup-muted);
         font-size: 12px;
         font-weight: 700;
-        letter-spacing: 0.06em;
         text-transform: uppercase;
+        letter-spacing: 0.08em;
       }
       .summary-card strong {
         display: block;
         margin-top: 8px;
         font-size: 1rem;
-        line-height: 1.4;
-      }
-      .payment-shell {
-        margin-top: 18px;
-        padding: 16px;
-        border-radius: 20px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
-        background: linear-gradient(180deg, #fff, #f8fafc);
-      }
-      #paypal-button-container {
-        margin-top: 16px;
-      }
-      #signup-error,
-      #signup-success {
-        margin-top: 16px;
-      }
-      #signup-success a {
-        font-weight: 700;
       }
       .plans-inline {
         margin-top: 18px;
@@ -368,8 +369,8 @@
         align-items: center;
         gap: 14px;
         padding: 12px 14px;
-        border-radius: 16px;
-        border: 1px solid rgba(148, 163, 184, 0.18);
+        border: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 10px;
         background: #fff;
       }
       .plan-row strong {
@@ -377,116 +378,149 @@
         font-size: 0.98rem;
       }
       .plan-row span {
-        color: var(--muted);
+        color: var(--signup-muted);
         font-size: 13px;
       }
-      .card-footer {
+      .payment-shell {
         margin-top: 18px;
+        padding: 16px;
+        border: 1px solid rgba(11, 11, 11, 0.12);
+        border-radius: 10px;
+        background: linear-gradient(180deg, #fff, #f8fbff);
+      }
+      #paypal-button-container {
+        margin-top: 16px;
+      }
+      #signup-error,
+      #signup-success {
+        margin-top: 16px;
+      }
+      #signup-success a {
+        font-weight: 700;
+      }
+      .card-footer {
+        margin-top: 22px;
         display: grid;
-        gap: 10px;
+        gap: 8px;
       }
       .support-link {
-        color: var(--brand);
+        color: var(--signup-ink);
         text-decoration: none;
-        font-weight: 600;
+        font-weight: 700;
       }
       .support-link:hover {
-        text-decoration: underline;
+        color: var(--signup-primary);
       }
       .muted {
-        color: var(--muted);
-        font-size: 14px;
+        color: var(--signup-muted);
+        font-size: 0.95rem;
+        line-height: 1.6;
       }
+
       @media (max-width: 980px) {
+        body.signup-page {
+          overflow: auto;
+        }
+        .page {
+          overflow: visible;
+        }
         .shell {
+          height: auto;
           grid-template-columns: 1fr;
         }
-        .signup-card {
+        .signup-panel {
           order: 1;
+          overflow: visible;
         }
         .hero {
           order: 2;
         }
       }
-      @media (max-width: 820px) {
-        .hero-points {
-          display: none;
+      @media (max-width: 900px) {
+        body.signup-page .public-nav {
+          padding: 14px 16px;
         }
-        .hero h1 {
-          font-size: clamp(2rem, 8vw, 3rem);
-        }
-        .hero p {
-          font-size: 1rem;
+        body.signup-page .public-nav__links {
+          right: 16px;
         }
       }
-      @media (max-width: 680px) {
+      @media (max-width: 720px) {
+        .hero {
+          padding: 28px 20px;
+        }
+        .hero-carousel {
+          min-height: 204px;
+        }
+        .hero-slide {
+          padding: 24px 22px 38px;
+          border-radius: 24px;
+        }
+        .signup-panel {
+          padding: 24px 16px;
+        }
+        .signup-card {
+          padding: 26px 20px;
+        }
+      }
+      @media (max-width: 640px) {
         .field-grid,
         .summary-grid {
           grid-template-columns: 1fr;
         }
       }
       @media (max-width: 560px) {
-        .page {
-          width: calc(100% - 24px);
-          padding-top: 22px;
-          padding-bottom: 40px;
+        body.signup-page .public-brand {
+          gap: 12px;
         }
-        .hero, .signup-card {
-          border-radius: 24px;
+        body.signup-page .public-brand__mark {
+          width: 48px;
+          height: 48px;
         }
-        .hero,
-        .signup-head,
-        .signup-body {
-          padding-left: 20px;
-          padding-right: 20px;
+        body.signup-page .public-nav__links .cta {
+          min-width: 0;
+          width: 100%;
+          justify-content: center;
+        }
+        .hero-slide strong {
+          font-size: 1.3rem;
+        }
+        .signup-card h2 {
+          font-size: 1.72rem;
         }
       }
     </style>
   </head>
-  <body>
+  <body class="signup-page">
     {% include "core/partials/public_nav.html" %}
     <main class="page">
       <section class="shell">
         <article class="hero">
-          <div class="eyebrow">Clinic Onboarding</div>
-          <h1>Set up your clinic and move straight into billing.</h1>
-          <p>The signup flow now follows the same focused pattern as sign in: create the clinic owner account first, then switch the action card into subscription activation once the account is ready.</p>
-          <div class="hero-meta">
-            <span class="pill">Two-step setup</span>
-            <span class="pill">Free or Premium plans</span>
-          </div>
-
-          <div class="hero-points">
-            <div class="point">
+          <div class="hero-carousel" id="signup-hero-carousel" aria-label="ClinicOps signup highlights">
+            <div class="hero-slide active" data-slide>
               <strong>Create the clinic owner account</strong>
-              <p>Add the clinic name, timezone, and owner credentials before any payment step becomes available.</p>
+              <p>Add the clinic name, timezone, and owner credentials first so the clinic starts on a clean, secure setup path.</p>
             </div>
-            <div class="point">
-              <strong>Switch into plan activation automatically</strong>
-              <p>After account creation, the same card changes into the plan step instead of sending the user to a different-looking layout.</p>
+            <div class="hero-slide" data-slide>
+              <strong>Activate Free or Premium plans</strong>
+              <p>After the owner account is created, the same panel switches into plan activation without sending users into a different layout.</p>
             </div>
-            <div class="point">
+            <div class="hero-slide" data-slide>
               <strong>Verify email before first login</strong>
-              <p>The owner still receives a verification email, so the security flow stays consistent with the rest of the product.</p>
+              <p>The owner still receives a verification email, so the security flow stays consistent with the rest of ClinicOps.</p>
+            </div>
+            <div class="hero-dots" aria-label="Signup highlight navigation">
+              <button type="button" class="hero-dot active" data-slide-dot aria-label="Show first highlight"></button>
+              <button type="button" class="hero-dot" data-slide-dot aria-label="Show second highlight"></button>
+              <button type="button" class="hero-dot" data-slide-dot aria-label="Show third highlight"></button>
             </div>
           </div>
         </article>
 
-        <article class="signup-card">
-          <div class="signup-head">
-            <div class="brand-row{% if public_logo_url %}{% else %} logo-broken{% endif %}">
-              {% if public_logo_url %}
-                <img src="{{ public_logo_url }}" alt="{{ public_brand_name|default:'ClinicOps' }} logo" onerror="this.closest('.brand-row').classList.add('logo-broken')">
-                <span class="brand-mark logo-fallback">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
-              {% else %}
-                <span class="brand-mark">{{ public_brand_name|default:"ClinicOps"|slice:":2"|upper }}</span>
-              {% endif %}
-              <strong>{{ public_brand_name|default:"ClinicOps" }}</strong>
-            </div>
-
+        <section class="signup-panel">
+          <article class="signup-card">
             <div class="step-tabs" aria-label="Signup progress">
               <div class="step-tab {% if clinic %}done{% else %}active{% endif %}">Account</div>
-              <div class="step-tab {% if clinic %}active{% endif %} {% if not clinic %}locked{% endif %}">Payment</div>
+              <div class="step-tab {% if clinic %}active{% endif %}">Payment</div>
             </div>
 
             {% if clinic %}
@@ -496,9 +530,7 @@
               <h2>Create clinic account</h2>
               <p>Set up the clinic owner details first. Payment unlocks immediately after the clinic account is created.</p>
             {% endif %}
-          </div>
 
-          <div class="signup-body">
             {% if not clinic %}
               {% if form.non_field_errors %}
                 {% for error in form.non_field_errors %}
@@ -528,7 +560,6 @@
                     {{ form.admin_first_name }}
                     {{ form.admin_first_name.errors }}
                   </div>
-
                   <div class="field">
                     <label for="{{ form.admin_last_name.id_for_label }}">Owner last name</label>
                     {{ form.admin_last_name }}
@@ -549,7 +580,6 @@
                     {{ form.password }}
                     {{ form.password.errors }}
                   </div>
-
                   <div class="field">
                     <label for="{{ form.confirm_password.id_for_label }}">Confirm password</label>
                     {{ form.confirm_password }}
@@ -615,7 +645,7 @@
                 <div class="payment-shell">
                   <form id="csrf-form">{% csrf_token %}</form>
 
-                  <div class="field" style="padding:0; border:none; background:transparent;">
+                  <div class="field">
                     <label for="plan">Subscription plan</label>
                     <select id="plan">
                       {% for plan in plans %}
@@ -651,8 +681,8 @@
               {% endif %}
               <div class="muted">{% if clinic %}Billing lives in the payment step above. After activation and verification, the clinic owner can sign in.{% else %}Payment stays locked until the clinic owner account is created successfully.{% endif %}</div>
             </div>
-          </div>
-        </article>
+          </article>
+        </section>
       </section>
     </main>
 
@@ -821,6 +851,54 @@
       </script>
     {% endif %}
 
-    {% include "core/partials/site_footer.html" %}
+    <script>
+      (function() {
+        const slides = Array.from(document.querySelectorAll('[data-slide]'));
+        const dots = Array.from(document.querySelectorAll('[data-slide-dot]'));
+        if (!slides.length || slides.length !== dots.length) return;
+
+        let activeIndex = 0;
+        let timer = null;
+
+        function showSlide(index) {
+          activeIndex = index;
+          slides.forEach(function(slide, slideIndex) {
+            slide.classList.toggle('active', slideIndex === index);
+          });
+          dots.forEach(function(dot, dotIndex) {
+            dot.classList.toggle('active', dotIndex === index);
+          });
+        }
+
+        function startCarousel() {
+          stopCarousel();
+          timer = window.setInterval(function() {
+            showSlide((activeIndex + 1) % slides.length);
+          }, 4600);
+        }
+
+        function stopCarousel() {
+          if (timer) {
+            window.clearInterval(timer);
+            timer = null;
+          }
+        }
+
+        dots.forEach(function(dot, index) {
+          dot.addEventListener('click', function() {
+            showSlide(index);
+            startCarousel();
+          });
+        });
+
+        const heroCarousel = document.getElementById('signup-hero-carousel');
+        if (heroCarousel) {
+          heroCarousel.addEventListener('mouseenter', stopCarousel);
+          heroCarousel.addEventListener('mouseleave', startCarousel);
+        }
+
+        startCarousel();
+      })();
+    </script>
   </body>
 </html>
