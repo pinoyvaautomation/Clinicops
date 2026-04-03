@@ -1,45 +1,51 @@
-# ClinicOps QA Checklist
+# ClinicOps Full QA Checklist
 
-Use this checklist before staging or production deploys.
+Use this checklist before staging demos, release candidates, and production deploys. It is written to validate the current ClinicOps MVP from the UI, role, and flow perspective.
 
-## 1. Preflight
+## 1. Test Setup
 
-- [ ] Pull latest code and install dependencies if needed.
-- [ ] Apply migrations.
+- [ ] Pull latest code
+- [ ] Install dependencies if needed
+- [ ] Apply migrations
 
 ```powershell
 python manage.py migrate
 ```
 
-- [ ] Confirm the app starts locally.
+- [ ] Start the app locally if testing on local
 
 ```powershell
 python manage.py runserver
 ```
 
-- [ ] Confirm you have test data for:
-  - [ ] clinic owner account
-  - [ ] staff account
-  - [ ] patient account
+- [ ] Confirm these test accounts or equivalent data exist:
+  - [ ] superadmin
+  - [ ] clinic owner on `Free`
+  - [ ] clinic owner on `Premium`
+  - [ ] Front Desk staff
+  - [ ] Doctor staff
+  - [ ] Nurse staff
+  - [ ] patient portal account
+  - [ ] booked patient without portal account
   - [ ] clinic with active subscription
   - [ ] clinic with inactive subscription
 
 ## 2. Automated Checks
 
-- [ ] Run unit tests.
+- [ ] Run unit tests
 
 ```powershell
 python manage.py test core
 ```
 
-- [ ] Run Django checks.
+- [ ] Run Django checks
 
 ```powershell
 python manage.py check
 python manage.py makemigrations --check --dry-run
 ```
 
-- [ ] Run deploy checks with production-shaped values.
+- [ ] Run deploy checks with production-shaped values
 
 ```powershell
 $env:DEBUG='false'
@@ -53,175 +59,363 @@ $env:PAYPAL_WEBHOOK_ID='replace-with-real-paypal-webhook-id'
 python manage.py check --deploy
 ```
 
-## 3. Public Auth Pages
+## 3. Auth And Recovery UI
 
-- [ ] Open `/accounts/login/`
-  - [ ] layout loads correctly
-  - [ ] `Sign up` button in top nav works
-  - [ ] invalid credentials show an error
+Review these pages for layout, branding, spacing, hero split, and form usability:
 
-- [ ] Open `/signup/`
-  - [ ] signup page uses branded shell
-  - [ ] step 1 account form submits
-  - [ ] page switches into payment state after clinic creation
+- [ ] `/accounts/login/`
+- [ ] `/signup/`
+- [ ] `/accounts/password_reset/`
+- [ ] `/accounts/password_reset/done/`
+- [ ] `/resend-verification/`
+- [ ] `/accounts/2fa/setup/`
+- [ ] `/accounts/2fa/verify/`
+- [ ] `/accounts/password_change/`
 
-- [ ] Open `/accounts/password_reset/`
-  - [ ] branded reset page loads
-  - [ ] reset request submits without template errors
+Validate:
 
-- [ ] Open password reset email link flow
-  - [ ] password reset confirm page loads
-  - [ ] valid link updates password
-  - [ ] invalid or expired link shows safe error state
+- [ ] flat branded header is consistent
+- [ ] left hero occupies the correct half-screen width on desktop
+- [ ] right form panel is the only desktop scroll area
+- [ ] form fields align cleanly
+- [ ] password eye toggle works on all password inputs
+- [ ] Google sign-in button renders correctly
+- [ ] top nav CTA buttons work
 
-- [ ] Open `/resend-verification/`
-  - [ ] branded resend verification page loads
-  - [ ] resend success state renders correctly
+Functional checks:
 
-- [ ] Test verify email flow
-  - [ ] valid link shows success state
-  - [ ] invalid link shows recovery path
+- [ ] valid login succeeds
+- [ ] invalid login shows a clear error
+- [ ] password reset request completes without template errors
+- [ ] password reset email arrives
+- [ ] password reset confirmation email arrives after password change
+- [ ] resend verification flow works
+- [ ] active user can reset password
+- [ ] inactive or unverified flow remains safe
 
-- [ ] Visit a missing URL
-  - [ ] branded 404 page renders
+## 4. Two-Factor Authentication
 
-## 4. Public Booking Flow
+- [ ] superadmin login requires 2FA
+- [ ] 2FA setup page shows QR code and manual key
+- [ ] valid TOTP code verifies successfully
+- [ ] invalid TOTP code shows an error
+- [ ] recovery codes are generated
+- [ ] recovery code login works
+- [ ] used recovery code cannot be reused
+- [ ] clinic admin can enable optional 2FA from settings
+- [ ] disable 2FA flow works
+- [ ] related audit/security events appear
 
-- [ ] Open a clinic booking page for an active clinic
-  - [ ] appointment type selector works
-  - [ ] slot list updates after changing service
-  - [ ] form validation errors render correctly
+## 5. Plan, Signup, And Billing
 
-- [ ] Submit a valid booking
-  - [ ] booking success page shows clinic, staff, service, time, and confirmation code
-  - [ ] appointment lookup link works
+- [ ] `Free` and `Premium` plans are visible and understandable on `/signup/`
+- [ ] new clinic owner signup sends platform alert email
+- [ ] `Free` activation completes without PayPal
+- [ ] `Premium` activation completes with PayPal sandbox flow
+- [ ] plan activation sends platform alert email
+- [ ] billing page shows current plan correctly
+- [ ] `Free` usage-left counters render
+- [ ] `Premium` displays unlimited behavior correctly
 
-- [ ] Open `/appointments/lookup/`
-  - [ ] valid email + confirmation code returns appointment details
-  - [ ] invalid values show an error message
+Free enforcement:
 
-- [ ] Open a booking page for an inactive clinic subscription
-  - [ ] booking blocked page renders
-  - [ ] copy tells the patient to contact the clinic directly
+- [ ] block staff creation after limit
+- [ ] block service creation after limit
+- [ ] block appointments after monthly limit
+- [ ] upgrade messaging is visible and understandable
 
-## 5. Patient Signup Flow
+Premium validation:
 
-- [ ] Open clinic patient signup page
-  - [ ] branded shell loads
-  - [ ] form fields and errors render correctly
+- [ ] additional staff creation allowed
+- [ ] additional services allowed
+- [ ] additional appointments allowed
 
-- [ ] Submit a new patient signup
-  - [ ] success page renders
-  - [ ] verification email messaging is correct
+## 6. Portal Shell And Navigation
 
-- [ ] Submit signup with existing linked patient email
-  - [ ] safe validation error is shown
+Desktop and tablet:
 
-- [ ] Submit signup with existing user not yet linked to clinic
-  - [ ] account links successfully
+- [ ] top bar layout is correct
+- [ ] search is usable
+- [ ] notification bell renders correctly
+- [ ] messages icon renders correctly
+- [ ] avatar/profile menu works
+- [ ] expanded sidebar layout is correct
+- [ ] collapsed sidebar layout is correct
+- [ ] collapsed tooltips appear in front of content
+- [ ] collapse/expand button aligns correctly
+- [ ] sidebar utility accordion works
 
-## 6. Clinic Portal Smoke Test
+Mobile:
 
-- [ ] Log in as clinic owner
-  - [ ] dashboard loads
-  - [ ] top nav works on desktop
-  - [ ] mobile menu works in responsive mode
+- [ ] drawer opens and closes
+- [ ] nav items remain accessible
+- [ ] profile and notification actions remain usable
 
-- [ ] Staff management
-  - [ ] add staff modal opens
-  - [ ] edit staff modal opens
-  - [ ] create staff saves successfully
-  - [ ] edit staff saves successfully
-  - [ ] toast notification appears with the right name
+## 7. Dashboard And Core Portal Pages
 
-- [ ] Services management
-  - [ ] add service modal opens
-  - [ ] edit service modal opens
-  - [ ] modal fits on laptop-sized screen
-  - [ ] create service saves successfully
-  - [ ] edit service saves successfully
-  - [ ] toast notification appears with the right service name
+- [ ] `/dashboard/` loads for owner and staff
+- [ ] `/calendar/` loads
+- [ ] `/staff/` loads
+- [ ] `/services/` loads
+- [ ] `/patients/` loads
+- [ ] `/appointments/` loads
+- [ ] `/billing/` loads
+- [ ] `/settings/` loads
+- [ ] `/security-audit/` loads for allowed role only
+- [ ] `/messages/` loads for allowed role only
 
-- [ ] Appointments
-  - [ ] create appointment modal opens
-  - [ ] appointment saves successfully
-  - [ ] appointment list updates correctly
+Validate for each page:
 
-- [ ] Patients
-  - [ ] patient list loads
-  - [ ] patient edit page works
+- [ ] current tab title is correct in top bar
+- [ ] layout does not overflow
+- [ ] cards and actions are aligned
+- [ ] empty states are readable
 
-- [ ] Settings and password change
-  - [ ] password change page loads with branded layout
-  - [ ] password change succeeds
+## 8. Staff, Service, And Appointment Management
 
-## 7. Billing and Subscription
+Staff:
 
-- [ ] Clinic signup payment flow works in PayPal sandbox
-- [ ] Billing page activate flow works
-- [ ] Billing sync action works
-- [ ] Subscription status updates correctly in portal
+- [ ] add staff works
+- [ ] edit staff works
+- [ ] active staff creation sends welcome email
+- [ ] inactive staff creation sends verification email
+- [ ] invalid email format is blocked
 
-- [ ] PayPal webhook handling
-  - [ ] valid webhook updates local subscription status
-  - [ ] duplicate webhook does not double-process
-  - [ ] webhook event is recorded in the database
+Services:
 
-- [ ] Subscription gating
-  - [ ] active subscription allows booking
-  - [ ] inactive subscription blocks booking
+- [ ] add service works
+- [ ] edit service works
+- [ ] service modal fits laptop screens
 
-## 8. Responsive Review
+Appointments:
 
-Check at these viewport sizes in browser dev tools:
+- [ ] create appointment works
+- [ ] update appointment works
+- [ ] history view works
+- [ ] appointment details are correct
+- [ ] notification is created for relevant changes
+
+## 9. Public Booking, Manage, And Waitlist
+
+Booking page:
+
+- [ ] `/clinic/<slug>/` uses the refreshed branded shell
+- [ ] service change refreshes slots
+- [ ] booking form validates correctly
+- [ ] booking success page renders correctly
+- [ ] confirmation code appears
+- [ ] booking confirmation email arrives
+
+Lookup and manage:
+
+- [ ] `/appointments/lookup/` matches booking email + confirmation code
+- [ ] valid appointment opens manage page
+- [ ] invalid values show safe error
+- [ ] patient can cancel from manage link
+- [ ] patient can reschedule from manage link
+- [ ] patient can send clinic message from manage page
+
+Waitlist:
+
+- [ ] waitlist form appears when no slots are available
+- [ ] waitlist submission succeeds
+- [ ] waitlist appears in staff waitlist page
+
+Embed:
+
+- [ ] embed iframe loads on external page
+- [ ] embedded booking can submit successfully
+- [ ] embed success state works
+
+## 10. Patient Signup And Portal
+
+- [ ] `/clinic/<slug>/patient-signup/` uses the refreshed shell
+- [ ] patient signup succeeds for new patient
+- [ ] patient verification messaging is correct
+- [ ] existing patient linking behavior is correct
+- [ ] patient portal login succeeds
+- [ ] patient portal layout works
+
+## 11. Messaging
+
+Owner controls:
+
+- [ ] clinic owner can open messaging permissions in settings
+- [ ] owner can set role access for:
+  - [ ] Admin
+  - [ ] Doctor
+  - [ ] Nurse
+  - [ ] FrontDesk
+- [ ] settings save correctly
+
+Staff inbox:
+
+- [ ] allowed role can open `/messages/`
+- [ ] disallowed role is blocked
+- [ ] unread count shows in top nav
+- [ ] message preview dropdown works
+- [ ] opening a thread shows full conversation history
+- [ ] staff reply stays in the same thread
+- [ ] patient reply stays in the same thread
+- [ ] owner/clinic email receives patient message alert
+
+Patient side:
+
+- [ ] patient can start a new portal thread
+- [ ] patient can reply to existing thread
+- [ ] staff reply sends patient email notice
+- [ ] appointment-manage message joins the same appointment thread
+
+## 12. Notifications And Search
+
+Notifications:
+
+- [ ] bell badge updates
+- [ ] preview dropdown works
+- [ ] clicking notification opens destination
+- [ ] opening notification marks it read
+
+Search:
+
+- [ ] top search is visible for allowed roles
+- [ ] exact confirmation code redirects directly
+- [ ] grouped preview dropdown appears
+- [ ] appointments and patients are grouped correctly
+- [ ] search results page works
+- [ ] role scoping prevents unauthorized results
+
+## 13. Security And Audit
+
+Security guard:
+
+- [ ] repeated failed logins trigger rate limit
+- [ ] branded guard page renders cleanly
+- [ ] security alert email goes to `SECURITY_ALERT_EMAILS` or superuser fallback
+
+Audit:
+
+- [ ] clinic access activity appears in settings
+- [ ] full security audit page loads for clinic admin
+- [ ] user filter works
+- [ ] role filter works
+- [ ] event filter works
+- [ ] date filter works
+- [ ] IP is captured
+- [ ] country is captured when proxy header is available
+
+Access rules:
+
+- [ ] admin can add IP whitelist rule
+- [ ] admin can add IP block rule
+- [ ] admin can add country block rule
+
+## 14. Email Deliverability
+
+Validate real delivery for:
+
+- [ ] verification email
+- [ ] resend verification email
+- [ ] staff welcome email
+- [ ] password reset email
+- [ ] password reset confirmation email
+- [ ] platform signup alert email
+- [ ] platform plan activation alert email
+- [ ] security alert email
+- [ ] patient messaging notice email
+- [ ] clinic messaging alert email
+
+Check:
+
+- [ ] sender uses correct `DEFAULT_FROM_EMAIL`
+- [ ] messages are not landing in spam for test accounts
+- [ ] subject lines and branding are correct
+
+## 15. Public Page Visual Consistency
+
+Review these pages for consistent shell, color, spacing, and hero behavior:
+
+- [ ] login
+- [ ] signup
+- [ ] password reset
+- [ ] password reset done
+- [ ] resend verification
+- [ ] booking
+- [ ] booking success
+- [ ] patient signup
+- [ ] patient signup success
+- [ ] appointment lookup
+- [ ] appointment manage
+- [ ] 404
+- [ ] security guard
+- [ ] 2FA setup
+- [ ] 2FA verify
+- [ ] recovery pages
+
+Confirm:
+
+- [ ] no stray hero chips remain where they were removed
+- [ ] no old green shell remains
+- [ ] left hero width is consistent
+- [ ] mobile stack behavior is consistent
+
+## 16. Responsive QA
+
+Check these viewport sizes:
 
 - [ ] `390 x 844`
 - [ ] `768 x 1024`
 - [ ] `1024 x 768`
+- [ ] `1440 x 900`
 
-Review these pages at each size:
+Review:
 
 - [ ] login
-- [ ] clinic signup
+- [ ] signup
 - [ ] password reset
-- [ ] resend verification
-- [ ] patient signup
 - [ ] booking
-- [ ] booking success
-- [ ] appointment lookup
-- [ ] clinic dashboard
-- [ ] staff page
-- [ ] services page
+- [ ] patient signup
+- [ ] dashboard
+- [ ] appointments
+- [ ] staff
+- [ ] services
+- [ ] billing
+- [ ] settings
+- [ ] messages
 
-Verify:
+Validate:
 
-- [ ] nav is usable
-- [ ] cards do not overflow horizontally
-- [ ] modals fit in viewport
-- [ ] buttons remain visible
-- [ ] forms are readable and submit normally
+- [ ] no horizontal overflow
+- [ ] only intended panels scroll
+- [ ] buttons stay visible
+- [ ] forms remain readable
+- [ ] sidebars/drawers are usable
+- [ ] modals fit the viewport
 
-## 9. Regression Watch List
-
-Check specifically for:
+## 17. Regression Watch List
 
 - [ ] broken redirects after submit
 - [ ] missing CSRF token errors
-- [ ] stale success messages or duplicate toasts
-- [ ] modal forms not reopening on validation errors
-- [ ] PayPal subscription mismatch after webhook events
-- [ ] booking lookup not matching confirmation code
-- [ ] pages rendering old unbranded layout unexpectedly
+- [ ] old layout unexpectedly rendering
+- [ ] duplicate emails being sent
+- [ ] duplicate notifications being created
+- [ ] stale unread counts
+- [ ] message thread splitting unexpectedly
+- [ ] PayPal activation mismatch
+- [ ] search preview overlay clipping
+- [ ] collapsed sidebar tooltip clipping
+- [ ] 2FA session handoff issues
 
-## 10. Release Sign-off
+## 18. Release Sign-off
 
-- [ ] All automated checks passed
-- [ ] Manual smoke test passed
-- [ ] Responsive review passed
-- [ ] Billing sandbox test passed
-- [ ] No blocker bugs found
+- [ ] automated checks passed
+- [ ] manual smoke test passed
+- [ ] UI/UX review passed
+- [ ] responsive review passed
+- [ ] email delivery review passed
+- [ ] billing sandbox test passed
+- [ ] no blocker bugs found
 
-Release tested by: __________________
+Tested by: __________________
 
 Date tested: __________________
 
