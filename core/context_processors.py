@@ -4,6 +4,16 @@ from django.conf import settings
 from django.db import DatabaseError
 from django.utils import timezone
 
+from .messaging import (
+    build_thread_preview_rows,
+    message_threads_for_patient,
+    message_threads_for_staff,
+    thread_meta_for_patient,
+    thread_meta_for_staff,
+    thread_title_for_patient,
+    thread_title_for_staff,
+    user_can_view_messages,
+)
 from .models import Notification, Patient, Staff
 from .plan_limits import clinic_can_use_notifications, clinic_usage_summary
 
@@ -35,6 +45,9 @@ def user_roles(request):
     unread_notifications = 0
     notification_preview = []
     notifications_enabled = True
+    unread_messages = 0
+    message_preview = []
+    messages_enabled = False
     plan_usage = None
 
     try:
@@ -45,6 +58,7 @@ def user_roles(request):
                 avatar_url = staff.avatar.url
             plan_usage = clinic_usage_summary(clinic)
             notifications_enabled = clinic_can_use_notifications(clinic, usage=plan_usage)
+            messages_enabled = user_can_view_messages(user, clinic)
             if notifications_enabled:
                 latest_notifications = list(
                     Notification.objects.filter(recipient=user)
@@ -68,6 +82,15 @@ def user_roles(request):
                     }
                     for item in latest_notifications
                 ]
+            if messages_enabled:
+                latest_threads = list(message_threads_for_staff(clinic)[:60])
+                unread_messages, message_preview = build_thread_preview_rows(
+                    user=user,
+                    threads=latest_threads,
+                    limit=5,
+                    title_fn=thread_title_for_staff,
+                    meta_fn=thread_meta_for_staff,
+                )
         except Staff.DoesNotExist:
             patient_profiles = (
                 Patient.objects.filter(user=user)
@@ -91,6 +114,15 @@ def user_roles(request):
                 clinic = patient.clinic
                 if patient.avatar:
                     avatar_url = patient.avatar.url
+                messages_enabled = True
+                latest_threads = list(message_threads_for_patient(patient)[:60])
+                unread_messages, message_preview = build_thread_preview_rows(
+                    user=user,
+                    threads=latest_threads,
+                    limit=5,
+                    title_fn=thread_title_for_patient,
+                    meta_fn=thread_meta_for_patient,
+                )
     except DatabaseError:
         clinic = None
         avatar_url = None
@@ -100,6 +132,9 @@ def user_roles(request):
         unread_notifications = 0
         notification_preview = []
         notifications_enabled = True
+        unread_messages = 0
+        message_preview = []
+        messages_enabled = False
         plan_usage = None
 
     return {
@@ -114,6 +149,9 @@ def user_roles(request):
         'nav_notifications_enabled': notifications_enabled,
         'nav_notifications_unread_count': unread_notifications,
         'nav_notification_preview': notification_preview,
+        'nav_messages_enabled': messages_enabled,
+        'nav_messages_unread_count': unread_messages,
+        'nav_message_preview': message_preview,
         'nav_plan_usage': plan_usage,
         'nav_can_search': can_staff_search and is_staff_user,
         'nav_can_manage_waitlist': can_manage_waitlist and is_staff_user,

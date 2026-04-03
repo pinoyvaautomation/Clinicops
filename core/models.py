@@ -19,6 +19,13 @@ class Clinic(models.Model):
     timezone = models.CharField(max_length=64, default='UTC')
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=32, blank=True, null=True)
+    owner_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='owned_clinics',
+        blank=True,
+        null=True,
+    )
     logo_url = models.URLField(blank=True, null=True)
     brand_color = models.CharField(max_length=7, default='#1d4ed8')
     is_active = models.BooleanField(default=True)
@@ -378,6 +385,170 @@ class Notification(models.Model):
         self.is_read = True
         self.read_at = when or timezone.now()
         self.save(update_fields=['is_read', 'read_at'])
+
+
+class ClinicMessagingPermission(models.Model):
+    class Role(models.TextChoices):
+        ADMIN = 'Admin', 'Admin'
+        DOCTOR = 'Doctor', 'Doctor'
+        NURSE = 'Nurse', 'Nurse'
+        FRONT_DESK = 'FrontDesk', 'Front Desk'
+
+    class AccessLevel(models.TextChoices):
+        NONE = 'none', 'No access'
+        VIEW_ONLY = 'view', 'View only'
+        REPLY = 'reply', 'View and reply'
+
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.CASCADE,
+        related_name='messaging_permissions',
+    )
+    role = models.CharField(max_length=32, choices=Role.choices)
+    access_level = models.CharField(
+        max_length=16,
+        choices=AccessLevel.choices,
+        default=AccessLevel.NONE,
+    )
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['role']
+        constraints = [
+            models.UniqueConstraint(fields=['clinic', 'role'], name='uniq_clinic_messaging_role'),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.clinic.name} · {self.get_role_display()} ({self.get_access_level_display()})'
+
+
+class MessageThread(models.Model):
+    class Status(models.TextChoices):
+        OPEN = 'open', 'Open'
+        CLOSED = 'closed', 'Closed'
+
+    class Source(models.TextChoices):
+        APPOINTMENT = 'appointment', 'Appointment link'
+        PORTAL = 'portal', 'Patient portal'
+
+    class SenderType(models.TextChoices):
+        PATIENT = 'patient', 'Patient'
+        STAFF = 'staff', 'Staff'
+        SYSTEM = 'system', 'System'
+
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.CASCADE,
+        related_name='message_threads',
+    )
+    patient = models.ForeignKey(
+        Patient,
+        on_delete=models.CASCADE,
+        related_name='message_threads',
+    )
+    appointment = models.ForeignKey(
+        Appointment,
+        on_delete=models.SET_NULL,
+        related_name='message_threads',
+        blank=True,
+        null=True,
+    )
+    subject = models.CharField(max_length=140, blank=True)
+    source = models.CharField(
+        max_length=16,
+        choices=Source.choices,
+        default=Source.PORTAL,
+    )
+    status = models.CharField(
+        max_length=16,
+        choices=Status.choices,
+        default=Status.OPEN,
+    )
+    last_message_sender_type = models.CharField(
+        max_length=16,
+        choices=SenderType.choices,
+        default=SenderType.PATIENT,
+    )
+    last_message_excerpt = models.CharField(max_length=180, blank=True)
+    last_message_at = models.DateTimeField(auto_now_add=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-last_message_at', '-created_at']
+        indexes = [
+            models.Index(fields=['clinic', 'status', '-last_message_at']),
+            models.Index(fields=['patient', '-last_message_at']),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['appointment'],
+                condition=models.Q(appointment__isnull=False),
+                name='uniq_message_thread_per_appointment',
+            ),
+        ]
+
+    def __str__(self) -> str:
+        label = self.subject or f'Messages for {self.patient}'
+        return f'{self.clinic.name} · {label}'
+
+
+class Message(models.Model):
+    class SenderType(models.TextChoices):
+        PATIENT = 'patient', 'Patient'
+        STAFF = 'staff', 'Staff'
+        SYSTEM = 'system', 'System'
+
+    thread = models.ForeignKey(
+        MessageThread,
+        on_delete=models.CASCADE,
+        related_name='messages',
+    )
+    sender_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='sent_thread_messages',
+        blank=True,
+        null=True,
+    )
+    sender_type = models.CharField(max_length=16, choices=SenderType.choices)
+    sender_label = models.CharField(max_length=150, blank=True)
+    body = secured_fields.EncryptedTextField()
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['thread', 'created_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.get_sender_type_display()} message in thread {self.thread_id}'
+
+
+class MessageThreadReadState(models.Model):
+    thread = models.ForeignKey(
+        MessageThread,
+        on_delete=models.CASCADE,
+        related_name='read_states',
+    )
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name='message_thread_read_states',
+    )
+    last_read_at = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['thread', 'user'], name='uniq_thread_read_state'),
+        ]
+        indexes = [
+            models.Index(fields=['user', 'last_read_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.user} read thread {self.thread_id}'
 
 
 class PayPalWebhookEvent(models.Model):

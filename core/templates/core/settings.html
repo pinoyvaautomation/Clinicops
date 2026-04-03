@@ -445,6 +445,46 @@
             </div>
           {% endif %}
 
+          {% if can_manage_messaging_permissions %}
+            <div class="profile-line">
+              <span class="label">Messaging permissions</span>
+              <strong>{% if is_clinic_owner %}Clinic owner controls{% else %}Available{% endif %}</strong>
+              <p class="note" style="margin-top: 10px;">Decide which staff roles can open the clinic inbox and which roles can only review messages without replying.</p>
+              <form method="post" style="margin-top: 14px;">
+                {% csrf_token %}
+                <input type="hidden" name="settings_action" value="messaging-permissions">
+                {% if messaging_permissions_saved %}
+                  <p class="note" style="margin: 0 0 12px; color: #0f766e; font-weight: 700;">Messaging permissions saved.</p>
+                {% endif %}
+                <div class="field-grid">
+                  <div class="field-block">
+                    <label for="{{ messaging_permissions_form.admin_access.id_for_label }}">Admin</label>
+                    {{ messaging_permissions_form.admin_access }}
+                    {{ messaging_permissions_form.admin_access.errors }}
+                  </div>
+                  <div class="field-block">
+                    <label for="{{ messaging_permissions_form.doctor_access.id_for_label }}">Doctor</label>
+                    {{ messaging_permissions_form.doctor_access }}
+                    {{ messaging_permissions_form.doctor_access.errors }}
+                  </div>
+                  <div class="field-block">
+                    <label for="{{ messaging_permissions_form.nurse_access.id_for_label }}">Nurse</label>
+                    {{ messaging_permissions_form.nurse_access }}
+                    {{ messaging_permissions_form.nurse_access.errors }}
+                  </div>
+                  <div class="field-block">
+                    <label for="{{ messaging_permissions_form.frontdesk_access.id_for_label }}">Front Desk</label>
+                    {{ messaging_permissions_form.frontdesk_access }}
+                    {{ messaging_permissions_form.frontdesk_access.errors }}
+                  </div>
+                </div>
+                <div class="actions" style="margin-top: 12px;">
+                  <button class="btn-ghost" type="submit">Save messaging access</button>
+                </div>
+              </form>
+            </div>
+          {% endif %}
+
           {% if clinic and clinic.slug and profile_type == 'staff' %}
             <div class="profile-line link-box">
               <span class="label">Public booking link</span>

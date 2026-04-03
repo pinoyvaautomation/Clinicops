@@ -1,0 +1,11 @@
+<p><strong>ClinicOps secure messaging alert</strong></p>
+<p>A patient sent a new message to <strong>{{ clinic.name }}</strong>.</p>
+<ul>
+  <li><strong>Clinic:</strong> {{ clinic.name }}</li>
+  <li><strong>Patient:</strong> {{ patient_name }}</li>
+  {% if thread.appointment_id %}<li><strong>Appointment code:</strong> {{ thread.appointment.confirmation_code }}</li>{% endif %}
+  <li><strong>Subject:</strong> {{ thread.subject|default:"Secure patient message" }}</li>
+</ul>
+<p><strong>Latest message</strong></p>
+<p>{{ message.body|linebreaksbr }}</p>
+<p><a href="{{ inbox_url }}">Open the clinic inbox</a></p>

@@ -1,0 +1,426 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Messages</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: {{ clinic.brand_color|default:"#0ea5a6" }};
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.22);
+        --panel: rgba(255, 255, 255, 0.94);
+        --danger: #b91c1c;
+        --info-bg: #eff6ff;
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 166, 0.12), transparent 30%),
+          linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
+      }
+      .wrap {
+        max-width: 1280px;
+        margin: 0 auto;
+        padding: 22px 24px 56px;
+      }
+      .hero, .panel, .thread-card, .compose-card {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 26px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at bottom right, rgba(255, 255, 255, 0.14), transparent 26%),
+          linear-gradient(135deg, #0f172a 0%, #111827 60%, var(--brand) 160%);
+      }
+      .eyebrow, .pill {
+        display: inline-flex;
+        align-items: center;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .eyebrow, .pill {
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero h1 {
+        margin: 16px 0 12px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1;
+      }
+      .hero p { margin: 0; line-height: 1.6; color: rgba(248, 250, 252, 0.78); }
+      .hero-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      .flash {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 16px;
+        font-weight: 600;
+      }
+      .flash--success {
+        background: #ecfdf5;
+        color: #166534;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: minmax(300px, 360px) minmax(0, 1fr);
+        gap: 18px;
+        margin-top: 18px;
+      }
+      .panel, .thread-card, .compose-card {
+        background: var(--panel);
+      }
+      .panel {
+        padding: 20px;
+      }
+      .compose-card {
+        padding: 18px;
+        margin-bottom: 18px;
+      }
+      .thread-list {
+        display: grid;
+        gap: 12px;
+      }
+      .thread-link {
+        display: block;
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        text-decoration: none;
+        color: var(--ink);
+        background: #fff;
+      }
+      .thread-link.active {
+        border-color: rgba(14, 165, 166, 0.3);
+        background: linear-gradient(180deg, rgba(14, 165, 166, 0.08), rgba(255, 255, 255, 0.96));
+      }
+      .thread-link.unread {
+        box-shadow: inset 3px 0 0 rgba(14, 165, 166, 0.95);
+      }
+      .thread-link strong {
+        display: block;
+        font-size: 1rem;
+      }
+      .thread-link small,
+      .thread-link p,
+      .note {
+        color: var(--muted);
+      }
+      .thread-link p {
+        margin: 10px 0 0;
+        line-height: 1.55;
+      }
+      .thread-meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 10px;
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .thread-card {
+        padding: 24px;
+      }
+      .thread-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        padding-bottom: 18px;
+        border-bottom: 1px solid rgba(148, 163, 184, 0.18);
+      }
+      .thread-head h2 {
+        margin: 10px 0 6px;
+        font-size: clamp(1.8rem, 3vw, 2.4rem);
+      }
+      .thread-conversation {
+        display: grid;
+        gap: 14px;
+        margin-top: 18px;
+      }
+      .message-row {
+        max-width: min(720px, 100%);
+        padding: 16px;
+        border-radius: 20px;
+        border: 1px solid rgba(148, 163, 184, 0.16);
+        background: #ffffff;
+      }
+      .message-row.staff {
+        margin-left: auto;
+        background: linear-gradient(180deg, #f8fbff, #eef8f6);
+      }
+      .message-row.patient {
+        background: linear-gradient(180deg, #ffffff, #f8fafc);
+      }
+      .message-row__meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .message-row__body {
+        line-height: 1.65;
+        white-space: pre-wrap;
+      }
+      .reply-card {
+        margin-top: 20px;
+        padding-top: 18px;
+        border-top: 1px solid rgba(148, 163, 184, 0.18);
+      }
+      .field {
+        display: grid;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .field:first-child { margin-top: 0; }
+      label {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--ink);
+      }
+      input, textarea, select {
+        width: 100%;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        font: inherit;
+        color: var(--ink);
+        background: #fff;
+      }
+      textarea { min-height: 120px; resize: vertical; }
+      .actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+      }
+      .btn, .btn-ghost {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 18px;
+        border-radius: 16px;
+        font-weight: 700;
+        text-decoration: none;
+        cursor: pointer;
+      }
+      .btn {
+        border: 0;
+        color: #fff;
+        background: linear-gradient(135deg, var(--brand), #0f172a);
+      }
+      .btn-ghost {
+        border: 1px solid rgba(148, 163, 184, 0.24);
+        color: var(--ink);
+        background: #fff;
+      }
+      .empty {
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px dashed rgba(148, 163, 184, 0.36);
+        background: linear-gradient(180deg, #fff, #f8fafc);
+      }
+      @media (max-width: 980px) {
+        .grid {
+          grid-template-columns: 1fr;
+        }
+      }
+      @media (max-width: 640px) {
+        .wrap { padding: 18px 16px 44px; }
+        .hero, .panel, .thread-card, .compose-card { border-radius: 22px; }
+      }
+    </style>
+  </head>
+  <body>
+    {% with current='messages' %}
+      {% include "core/partials/top_nav.html" %}
+    {% endwith %}
+    <main class="wrap">
+      <section class="hero">
+        <div class="eyebrow">{% if profile_type == 'staff' %}Clinic inbox{% else %}Patient messages{% endif %}</div>
+        <h1>{% if profile_type == 'staff' %}Secure conversations with patients{% else %}Secure messages with {{ clinic.name }}{% endif %}</h1>
+        <p>
+          {% if profile_type == 'staff' %}
+            Reply to patient questions in one place without relying on external chat apps. Messages sent from booked patients and portal users land in the same clinic inbox.
+          {% else %}
+            Ask follow-up questions, review replies from the clinic, and keep appointment conversations inside one secure thread. Do not use messaging for emergencies.
+          {% endif %}
+        </p>
+        <div class="hero-meta">
+          <span class="pill">{{ clinic.name }}</span>
+          <span class="pill">{{ current_local_time|date:"g:i A" }} local time</span>
+          {% if can_manage_permissions %}
+            <span class="pill">Clinic owner controls access</span>
+          {% endif %}
+        </div>
+        {% if status_banner %}
+          <div class="flash {{ status_banner.0 }}">{{ status_banner.1 }}</div>
+        {% endif %}
+      </section>
+
+      <section class="grid">
+        <aside class="panel">
+          {% if profile_type == 'patient' %}
+            <div class="compose-card">
+              <strong>Start a new conversation</strong>
+              <p class="note" style="margin-top: 8px;">Send a secure message to the clinic team without leaving the portal.</p>
+              <form method="post" style="margin-top: 14px;">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="new-thread">
+                {{ compose_form.non_field_errors }}
+                <div class="field">
+                  <label for="{{ compose_form.subject.id_for_label }}">Subject</label>
+                  {{ compose_form.subject }}
+                  {{ compose_form.subject.errors }}
+                </div>
+                <div class="field">
+                  <label for="{{ compose_form.body.id_for_label }}">Message</label>
+                  {{ compose_form.body }}
+                  {{ compose_form.body.errors }}
+                </div>
+                <div class="actions">
+                  <button class="btn" type="submit">Send message</button>
+                </div>
+              </form>
+            </div>
+          {% elif can_manage_permissions %}
+            <div class="empty" style="margin-bottom: 18px;">
+              <strong>Messaging access follows owner settings</strong>
+              <p class="note" style="margin: 8px 0 0;">Update role access from <a href="{% url 'settings' %}" style="color:#0f766e;font-weight:700;text-decoration:none;">Account settings</a> when you need to switch roles between reply and view-only.</p>
+            </div>
+          {% endif %}
+
+          <div class="thread-list">
+            {% for row in thread_rows %}
+              <a class="thread-link{% if selected_thread and row.thread.id == selected_thread.id %} active{% endif %}{% if row.is_unread %} unread{% endif %}" href="{% url 'messages-thread' row.thread.id %}">
+                <strong>{{ row.title }}</strong>
+                <div class="thread-meta">
+                  <span>{{ row.meta }}</span>
+                  <span>{{ row.updated_local|date:"M j, g:i A" }}</span>
+                </div>
+                {% if row.thread.last_message_excerpt %}
+                  <p>{{ row.thread.last_message_excerpt }}</p>
+                {% endif %}
+              </a>
+            {% empty %}
+              <div class="empty">
+                <strong>No conversations yet</strong>
+                <p class="note" style="margin: 8px 0 0;">
+                  {% if profile_type == 'staff' %}
+                    Patient messages from the portal or appointment self-service page will appear here.
+                  {% else %}
+                    Start a conversation with the clinic when you have a question about your care or appointments.
+                  {% endif %}
+                </p>
+              </div>
+            {% endfor %}
+          </div>
+        </aside>
+
+        <section class="thread-card">
+          {% if selected_thread %}
+            <div class="thread-head">
+              <div>
+                <div class="eyebrow">{% if selected_thread.appointment_id %}Appointment thread{% else %}Secure thread{% endif %}</div>
+                <h2>{{ selected_thread_title }}</h2>
+                <p class="note">
+                  {% if selected_thread.appointment_id %}
+                    Linked to {{ selected_thread.appointment.confirmation_code }}{% if selected_thread.appointment.appointment_type %} · {{ selected_thread.appointment.appointment_type.name }}{% endif %}.
+                  {% else %}
+                    {{ selected_thread_meta }}
+                  {% endif %}
+                </p>
+              </div>
+              <div class="pill">{{ selected_thread.get_status_display }}</div>
+            </div>
+
+            <div class="thread-conversation">
+              {% for item in selected_messages %}
+                <article class="message-row {{ item.sender_type }}">
+                  <div class="message-row__meta">
+                    <strong>{{ item.sender_label|default:item.get_sender_type_display }}</strong>
+                    <span>{{ item.created_at|date:"M j, g:i A" }}</span>
+                  </div>
+                  <div class="message-row__body">{{ item.body }}</div>
+                </article>
+              {% empty %}
+                <div class="empty">
+                  <strong>No messages yet</strong>
+                  <p class="note" style="margin: 8px 0 0;">The thread exists, but no one has sent the first message yet.</p>
+                </div>
+              {% endfor %}
+            </div>
+
+            {% if can_reply %}
+              <div class="reply-card">
+                <strong>Reply</strong>
+                <p class="note" style="margin-top: 8px;">Messages stay inside ClinicOps and should not be used for emergencies.</p>
+                <form method="post" style="margin-top: 14px;">
+                  {% csrf_token %}
+                  <input type="hidden" name="action" value="reply">
+                  {{ reply_form.non_field_errors }}
+                  <div class="field">
+                    <label for="{{ reply_form.body.id_for_label }}">Message</label>
+                    {{ reply_form.body }}
+                    {{ reply_form.body.errors }}
+                  </div>
+                  <div class="actions">
+                    <button class="btn" type="submit">Send reply</button>
+                    {% if profile_type == 'patient' %}
+                      <a class="btn-ghost" href="{% url 'patient-portal' %}">Back to portal</a>
+                    {% endif %}
+                  </div>
+                </form>
+              </div>
+            {% else %}
+              <div class="reply-card">
+                <div class="empty">
+                  <strong>View-only access</strong>
+                  <p class="note" style="margin: 8px 0 0;">The clinic owner configured this role for read-only message access.</p>
+                </div>
+              </div>
+            {% endif %}
+          {% else %}
+            <div class="empty">
+              <strong>Select a conversation</strong>
+              <p class="note" style="margin: 8px 0 0;">
+                {% if profile_type == 'staff' %}
+                  Patient messages will open here once a thread is selected.
+                {% else %}
+                  Start a new conversation from the left panel to open the secure message thread here.
+                {% endif %}
+              </p>
+            </div>
+          {% endif %}
+        </section>
+      </section>
+    </main>
+    {% include "core/partials/site_footer.html" %}
+  </body>
+</html>

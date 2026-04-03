@@ -1245,6 +1245,14 @@
         </span>
         <span class="nav-link__label">Appointments</span>
       </a>
+      {% if nav_messages_enabled %}
+        <a class="nav-link {% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}" aria-label="Messages" data-tooltip="Messages">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6.75 6.75h10.5A2.25 2.25 0 0 1 19.5 9v5.25a2.25 2.25 0 0 1-2.25 2.25H11.5l-3.75 3v-3H6.75A2.25 2.25 0 0 1 4.5 14.25V9a2.25 2.25 0 0 1 2.25-2.25Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 10.25h7M8.5 13h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="nav-link__label">Messages</span>
+        </a>
+      {% endif %}
       {% if nav_can_manage_waitlist %}
         <a class="nav-link {% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}" aria-label="Waitlist" data-tooltip="Waitlist">
           <span class="nav-link__icon" aria-hidden="true">
@@ -1286,6 +1294,14 @@
         </span>
         <span class="nav-link__label">Portal</span>
       </a>
+      {% if nav_messages_enabled %}
+        <a class="nav-link {% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}" aria-label="Messages" data-tooltip="Messages">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M6.75 6.75h10.5A2.25 2.25 0 0 1 19.5 9v5.25a2.25 2.25 0 0 1-2.25 2.25H11.5l-3.75 3v-3H6.75A2.25 2.25 0 0 1 4.5 14.25V9a2.25 2.25 0 0 1 2.25-2.25Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 10.25h7M8.5 13h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+          </span>
+          <span class="nav-link__label">Messages</span>
+        </a>
+      {% endif %}
       {% if nav_patient_multi %}
         <a class="nav-link" href="#" id="clinic-switch-btn" aria-label="Switch clinic" data-tooltip="Switch clinic">
           <span class="nav-link__icon" aria-hidden="true">
@@ -1391,6 +1407,68 @@
         </span>
         Search
       </a>
+    {% endif %}
+    {% if nav_messages_enabled %}
+      <div class="nav-popover">
+        <button
+          type="button"
+          class="notification-btn{% if request.resolver_match.url_name == 'messages' or request.resolver_match.url_name == 'messages-thread' %} active{% endif %}"
+          id="message-btn"
+          aria-label="Messages"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="message-menu"
+          title="Messages"
+        >
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M6.75 6.75h10.5A2.25 2.25 0 0 1 19.5 9v5.25a2.25 2.25 0 0 1-2.25 2.25H11.5l-3.75 3v-3H6.75A2.25 2.25 0 0 1 4.5 14.25V9a2.25 2.25 0 0 1 2.25-2.25Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+            <path d="M8.5 10.25h7M8.5 13h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+          {% if nav_messages_unread_count %}
+            <span class="notification-badge">
+              {% if nav_messages_unread_count > 99 %}99+{% else %}{{ nav_messages_unread_count }}{% endif %}
+            </span>
+          {% endif %}
+        </button>
+        <div class="notification-menu" id="message-menu">
+          <div class="notification-menu__header">
+            <div>
+              <strong>Messages</strong>
+              <span>{{ nav_messages_unread_count }} unread</span>
+            </div>
+            <a href="{% url 'messages' %}">View all</a>
+          </div>
+          {% if nav_message_preview %}
+            <div class="notification-menu__list">
+              {% for item in nav_message_preview %}
+                <a class="notification-item{% if item.is_unread %} unread{% endif %}" href="{{ item.url }}">
+                  <div class="notification-item__meta">
+                    <strong>{{ item.title }}</strong>
+                    <span class="notification-item__time">{{ item.created_at_label }}</span>
+                  </div>
+                  {% if item.meta %}
+                    <div class="notification-item__body">{{ item.meta }}</div>
+                  {% endif %}
+                  {% if item.body %}
+                    <div class="notification-item__body">{{ item.body|truncatechars:110 }}</div>
+                  {% endif %}
+                  {% if item.is_unread %}
+                    <span class="notification-item__pill info">Unread</span>
+                  {% endif %}
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="notification-menu__empty">
+              <strong>No messages yet</strong>
+              <span>New patient conversations and replies will appear here first.</span>
+            </div>
+          {% endif %}
+          <div class="notification-menu__footer">
+            <a href="{% url 'messages' %}">Open inbox</a>
+          </div>
+        </div>
+      </div>
     {% endif %}
     {% if nav_is_staff and nav_notifications_enabled %}
       <div class="nav-popover">
@@ -1527,6 +1605,9 @@
       <a class="{% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
       <a class="{% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">Calendar</a>
       <a class="{% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}">Appointments</a>
+      {% if nav_messages_enabled %}
+        <a class="{% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}">Messages</a>
+      {% endif %}
       {% if nav_can_manage_waitlist %}
         <a class="{% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}">Waitlist</a>
       {% endif %}
@@ -1538,6 +1619,9 @@
       {% endif %}
     {% else %}
       <a class="{% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}">Portal</a>
+      {% if nav_messages_enabled %}
+        <a class="{% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}">Messages</a>
+      {% endif %}
       {% if nav_patient_multi %}
         <a href="#" id="clinic-switch-btn-drawer">Switch clinic</a>
       {% endif %}
@@ -1590,10 +1674,12 @@
 
     const avatarBtn = document.getElementById('avatar-btn');
     const avatarMenu = document.getElementById('avatar-menu');
+    const messageBtn = document.getElementById('message-btn');
+    const messageMenu = document.getElementById('message-menu');
     const notificationBtn = document.getElementById('notification-btn');
     const notificationMenu = document.getElementById('notification-menu');
 
-    if (!avatarBtn && !notificationBtn) return;
+    if (!avatarBtn && !notificationBtn && !messageBtn) return;
 
     function closeMenu(button, menu) {
       if (!button || !menu) return;
@@ -1601,9 +1687,15 @@
       button.setAttribute('aria-expanded', 'false');
     }
 
-    function openMenu(button, menu, otherButton, otherMenu) {
+    function closeAllMenus() {
+      closeMenu(avatarBtn, avatarMenu);
+      closeMenu(messageBtn, messageMenu);
+      closeMenu(notificationBtn, notificationMenu);
+    }
+
+    function openMenu(button, menu) {
       if (!button || !menu) return;
-      closeMenu(otherButton, otherMenu);
+      closeAllMenus();
       menu.classList.add('open');
       button.setAttribute('aria-expanded', 'true');
     }
@@ -1615,7 +1707,16 @@
       if (avatarMenu.classList.contains('open')) {
         closeMenu(avatarBtn, avatarMenu);
       } else {
-        openMenu(avatarBtn, avatarMenu, notificationBtn, notificationMenu);
+        openMenu(avatarBtn, avatarMenu);
+      }
+    });
+
+    messageBtn?.addEventListener('click', function(e) {
+      e.stopPropagation();
+      if (messageMenu.classList.contains('open')) {
+        closeMenu(messageBtn, messageMenu);
+      } else {
+        openMenu(messageBtn, messageMenu);
       }
     });
 
@@ -1624,13 +1725,16 @@
       if (notificationMenu.classList.contains('open')) {
         closeMenu(notificationBtn, notificationMenu);
       } else {
-        openMenu(notificationBtn, notificationMenu, avatarBtn, avatarMenu);
+        openMenu(notificationBtn, notificationMenu);
       }
     });
 
     document.addEventListener('click', function(e) {
       if (avatarMenu && avatarBtn && !avatarMenu.contains(e.target) && !avatarBtn.contains(e.target)) {
         closeMenu(avatarBtn, avatarMenu);
+      }
+      if (messageMenu && messageBtn && !messageMenu.contains(e.target) && !messageBtn.contains(e.target)) {
+        closeMenu(messageBtn, messageMenu);
       }
       if (
         notificationMenu &&
@@ -1644,8 +1748,7 @@
 
     document.addEventListener('keydown', function(event) {
       if (event.key === 'Escape') {
-        closeMenu(avatarBtn, avatarMenu);
-        closeMenu(notificationBtn, notificationMenu);
+        closeAllMenus();
       }
     });
   })();

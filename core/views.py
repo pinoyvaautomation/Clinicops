@@ -49,6 +49,9 @@ from .forms import (
     StaffMemberUpdateForm,
     AppointmentTypeForm,
     ClinicAuthenticationForm,
+    MessagingRolePermissionForm,
+    MessageComposeForm,
+    MessageReplyForm,
     TwoFactorTokenForm,
     WaitlistEntryForm,
 )
@@ -56,7 +59,10 @@ from .models import (
     Appointment,
     AppointmentType,
     Clinic,
+    ClinicMessagingPermission,
     ClinicSubscription,
+    Message,
+    MessageThread,
     Notification,
     PayPalWebhookEvent,
     Patient,
@@ -64,6 +70,30 @@ from .models import (
     SecurityEvent,
     Staff,
     WaitlistEntry,
+)
+from .messaging import (
+    append_message,
+    build_thread_preview_rows,
+    clinic_messaging_access_map,
+    clinic_owner_user,
+    create_patient_portal_thread,
+    get_or_create_appointment_thread,
+    mark_thread_read,
+    message_threads_for_patient,
+    message_threads_for_staff,
+    messaging_role_rows,
+    patient_display_name,
+    read_map_for_user,
+    staff_display_name,
+    thread_meta_for_patient,
+    thread_meta_for_staff,
+    thread_is_unread_for_user,
+    thread_title_for_patient,
+    thread_title_for_staff,
+    user_can_manage_messaging_settings,
+    user_can_reply_messages,
+    user_can_view_messages,
+    user_is_clinic_owner,
 )
 from .notifications import create_clinic_notifications
 from .plan_limits import (
@@ -1537,6 +1567,65 @@ def _send_platform_plan_activation_alert(*, request, clinic: Clinic, owner_user,
     )
 
 
+def _clinic_message_alert_recipients(clinic: Clinic) -> list[str]:
+    recipients = []
+    owner_user = clinic_owner_user(clinic)
+    if owner_user and owner_user.email:
+        recipients.append(owner_user.email)
+    if clinic.email:
+        recipients.append(clinic.email)
+    # Messaging alerts are clinic-facing, so keep the recipient list tight and deduplicated.
+    return list(dict.fromkeys(recipients))
+
+
+def _thread_url_for_patient(request, thread: MessageThread) -> str:
+    if thread.patient.user_id:
+        return request.build_absolute_uri(reverse('messages-thread', args=[thread.id]))
+    if thread.appointment_id:
+        return _appointment_manage_url(request, thread.appointment)
+    return request.build_absolute_uri(reverse('clinic-booking-slug', args=[thread.clinic.slug]))
+
+
+def _send_clinic_message_alert(*, request, thread: MessageThread, message):
+    recipients = _clinic_message_alert_recipients(thread.clinic)
+    if not recipients:
+        return False
+    context = {
+        'thread': thread,
+        'message': message,
+        'clinic': thread.clinic,
+        'patient': thread.patient,
+        'patient_name': patient_display_name(thread.patient),
+        'inbox_url': request.build_absolute_uri(reverse('messages-thread', args=[thread.id])),
+    }
+    return _send_rendered_email(
+        subject_template='core/clinic_message_alert_subject.txt',
+        text_template='core/clinic_message_alert.txt',
+        html_template='core/clinic_message_alert.html',
+        context=context,
+        recipients=recipients,
+    )
+
+
+def _send_patient_message_notice(*, request, thread: MessageThread, message):
+    if not thread.patient.email:
+        return False
+    context = {
+        'thread': thread,
+        'message': message,
+        'clinic': thread.clinic,
+        'patient': thread.patient,
+        'message_url': _thread_url_for_patient(request, thread),
+    }
+    return _send_rendered_email(
+        subject_template='core/patient_message_notice_subject.txt',
+        text_template='core/patient_message_notice.txt',
+        html_template='core/patient_message_notice.html',
+        context=context,
+        recipients=[thread.patient.email],
+    )
+
+
 def _get_user_clinic(user):
     try:
         return user.staff.clinic
@@ -1549,14 +1638,9 @@ def _get_user_clinic(user):
 
 
 def _get_clinic_owner_user(clinic: Clinic):
-    owner_staff = (
-        Staff.objects.filter(clinic=clinic, user__groups__name='Admin')
-        .select_related('user')
-        .order_by('id')
-        .first()
-    )
-    if owner_staff:
-        return owner_staff.user
+    owner_user = clinic_owner_user(clinic)
+    if owner_user:
+        return owner_user
     fallback_staff = Staff.objects.filter(clinic=clinic).select_related('user').order_by('id').first()
     return fallback_staff.user if fallback_staff else None
 
@@ -2201,6 +2285,7 @@ def _appointment_manage_status_message(status: str | None) -> tuple[str, str] | 
         'intake-saved': ('flash--success', 'Your intake form and consent details were saved.'),
         'rescheduled': ('flash--success', 'Your appointment was rescheduled successfully.'),
         'cancelled': ('flash--success', 'Your appointment was cancelled.'),
+        'message-sent': ('flash--success', 'Your message was sent to the clinic.'),
     }
     return messages_map.get(status or '')
 
@@ -2240,6 +2325,8 @@ def appointment_manage(request, token: str):
     cancel_form = AppointmentSelfServiceCancelForm(
         initial={'cancel_reason': appointment.cancel_reason or ''},
     )
+    message_thread = MessageThread.objects.filter(appointment=appointment).select_related('patient', 'clinic').first()
+    message_form = MessageReplyForm(prefix='message')
 
     if request.method == 'POST':
         action = request.POST.get('action') or ''
@@ -2291,6 +2378,9 @@ def appointment_manage(request, token: str):
                         'intake_form': intake_form,
                         'reschedule_form': reschedule_form,
                         'cancel_form': cancel_form,
+                        'message_form': message_form,
+                        'message_thread': message_thread,
+                        'thread_messages': list(message_thread.messages.select_related('sender_user').order_by('created_at')) if message_thread else [],
                         'manage_url': _appointment_manage_url(request, appointment),
                     },
                 )
@@ -2345,6 +2435,9 @@ def appointment_manage(request, token: str):
                         'intake_form': intake_form,
                         'reschedule_form': reschedule_form,
                         'cancel_form': cancel_form,
+                        'message_form': message_form,
+                        'message_thread': message_thread,
+                        'thread_messages': list(message_thread.messages.select_related('sender_user').order_by('created_at')) if message_thread else [],
                         'manage_url': _appointment_manage_url(request, appointment),
                     },
                 )
@@ -2362,6 +2455,24 @@ def appointment_manage(request, token: str):
                     detail_copy='If you still need an appointment, you can return to the clinic booking page to choose a new slot.',
                 )
                 return redirect(f"{_appointment_manage_path(appointment)}?status=cancelled")
+        elif action == 'message':
+            message_form = MessageReplyForm(request.POST, prefix='message')
+            if message_form.is_valid():
+                message_thread = get_or_create_appointment_thread(appointment)
+                patient_sender = appointment.patient.user if appointment.patient.user_id else None
+                message = append_message(
+                    message_thread,
+                    sender_type=Message.SenderType.PATIENT,
+                    sender_user=patient_sender,
+                    sender_label=patient_display_name(appointment.patient),
+                    body=message_form.cleaned_data['body'],
+                )
+                _send_clinic_message_alert(request=request, thread=message_thread, message=message)
+                return redirect(f"{_appointment_manage_path(appointment)}?status=message-sent")
+
+    thread_messages = []
+    if message_thread is not None:
+        thread_messages = list(message_thread.messages.select_related('sender_user').order_by('created_at'))
 
     return render(
         request,
@@ -2375,6 +2486,9 @@ def appointment_manage(request, token: str):
             'intake_form': intake_form,
             'reschedule_form': reschedule_form,
             'cancel_form': cancel_form,
+            'message_form': message_form,
+            'message_thread': message_thread,
+            'thread_messages': thread_messages,
             'manage_url': _appointment_manage_url(request, appointment),
         },
     )
@@ -2421,6 +2535,177 @@ def appointment_lookup(request):
             'appointment_local': appointment_local,
             'error_message': error_message,
             'manage_url': manage_url,
+        },
+    )
+
+
+def _message_status_banner(status: str | None) -> tuple[str, str] | None:
+    status_map = {
+        'sent': ('flash--success', 'Your message was sent.'),
+        'thread-created': ('flash--success', 'Your conversation was started successfully.'),
+    }
+    return status_map.get(status or '')
+
+
+def _message_list_rows(threads, *, user, tz, title_fn, meta_fn):
+    thread_ids = [thread.id for thread in threads]
+    read_map = read_map_for_user(user, thread_ids)
+    rows = []
+    for thread in threads:
+        rows.append(
+            {
+                'thread': thread,
+                'title': title_fn(thread),
+                'meta': meta_fn(thread),
+                'updated_local': timezone.localtime(thread.last_message_at, tz),
+                'is_unread': thread_is_unread_for_user(thread, user, read_map),
+            }
+        )
+    return rows
+
+
+@login_required
+def messages_view(request, thread_id: int | None = None):
+    staff = None
+    patient = None
+    clinic = None
+    profile_type = None
+
+    try:
+        staff = request.user.staff
+        clinic = staff.clinic
+        profile_type = 'staff'
+    except Staff.DoesNotExist:
+        patient, profiles = _get_active_patient_profile(request)
+        if not patient:
+            return HttpResponseForbidden('Messaging access requires a staff or patient profile.')
+        clinic = patient.clinic
+        profile_type = 'patient'
+
+    tz = ZoneInfo(clinic.timezone or 'UTC')
+    status_banner = _message_status_banner(request.GET.get('status'))
+    selected_thread = None
+    reply_form = MessageReplyForm(prefix='reply')
+    compose_form = MessageComposeForm(prefix='compose')
+    can_reply = False
+    can_manage_permissions = False
+
+    if profile_type == 'staff':
+        if not user_can_view_messages(request.user, clinic):
+            return HttpResponseForbidden('This staff role does not have messaging access.')
+        threads = list(message_threads_for_staff(clinic))
+        thread_rows = _message_list_rows(
+            threads,
+            user=request.user,
+            tz=tz,
+            title_fn=thread_title_for_staff,
+            meta_fn=thread_meta_for_staff,
+        )
+        can_reply = user_can_reply_messages(request.user, clinic)
+        can_manage_permissions = user_can_manage_messaging_settings(request.user, clinic)
+    else:
+        threads = list(message_threads_for_patient(patient))
+        thread_rows = _message_list_rows(
+            threads,
+            user=request.user,
+            tz=tz,
+            title_fn=thread_title_for_patient,
+            meta_fn=thread_meta_for_patient,
+        )
+        can_reply = True
+        can_manage_permissions = False
+
+    if thread_id:
+        selected_thread = get_object_or_404(
+            MessageThread.objects.select_related('patient', 'clinic', 'appointment__appointment_type'),
+            pk=thread_id,
+        )
+        if profile_type == 'staff':
+            if selected_thread.clinic_id != clinic.id:
+                return HttpResponseForbidden('Thread access denied for this clinic.')
+        else:
+            if selected_thread.patient_id != patient.id:
+                return HttpResponseForbidden('Thread access denied for this patient.')
+    elif threads:
+        selected_thread = threads[0]
+
+    if request.method == 'POST':
+        action = request.POST.get('action') or ''
+        if profile_type == 'patient' and action == 'new-thread':
+            compose_form = MessageComposeForm(request.POST, prefix='compose')
+            if compose_form.is_valid():
+                new_thread = create_patient_portal_thread(
+                    patient=patient,
+                    subject=compose_form.cleaned_data['subject'],
+                    body=compose_form.cleaned_data['body'],
+                    sender_user=request.user,
+                )
+                mark_thread_read(new_thread, request.user)
+                first_message = new_thread.messages.first()
+                if first_message:
+                    _send_clinic_message_alert(request=request, thread=new_thread, message=first_message)
+                return redirect(f"{reverse('messages-thread', args=[new_thread.id])}?status=thread-created")
+        elif action == 'reply' and selected_thread is not None:
+            reply_form = MessageReplyForm(request.POST, prefix='reply')
+            if reply_form.is_valid():
+                if profile_type == 'staff':
+                    if not can_reply:
+                        return HttpResponseForbidden('This staff role is view-only for messaging.')
+                    message = append_message(
+                        selected_thread,
+                        sender_type=Message.SenderType.STAFF,
+                        sender_user=request.user,
+                        sender_label=staff_display_name(request.user),
+                        body=reply_form.cleaned_data['body'],
+                    )
+                    mark_thread_read(selected_thread, request.user)
+                    _send_patient_message_notice(request=request, thread=selected_thread, message=message)
+                else:
+                    if selected_thread.status != MessageThread.Status.OPEN:
+                        return HttpResponseForbidden('This conversation is closed.')
+                    message = append_message(
+                        selected_thread,
+                        sender_type=Message.SenderType.PATIENT,
+                        sender_user=request.user,
+                        sender_label=patient_display_name(patient),
+                        body=reply_form.cleaned_data['body'],
+                    )
+                    mark_thread_read(selected_thread, request.user)
+                    _send_clinic_message_alert(request=request, thread=selected_thread, message=message)
+                return redirect(f"{reverse('messages-thread', args=[selected_thread.id])}?status=sent")
+
+    selected_messages = []
+    selected_thread_title = ''
+    selected_thread_meta = ''
+    if selected_thread is not None:
+        mark_thread_read(selected_thread, request.user)
+        selected_messages = list(selected_thread.messages.select_related('sender_user').order_by('created_at'))
+        if profile_type == 'staff':
+            selected_thread_title = thread_title_for_staff(selected_thread)
+            selected_thread_meta = thread_meta_for_staff(selected_thread)
+        else:
+            selected_thread_title = thread_title_for_patient(selected_thread)
+            selected_thread_meta = thread_meta_for_patient(selected_thread)
+
+    return render(
+        request,
+        'core/messages.html',
+        {
+            'clinic': clinic,
+            'patient': patient,
+            'staff_profile': staff,
+            'profile_type': profile_type,
+            'thread_rows': thread_rows,
+            'selected_thread': selected_thread,
+            'selected_thread_title': selected_thread_title,
+            'selected_thread_meta': selected_thread_meta,
+            'selected_messages': selected_messages,
+            'reply_form': reply_form,
+            'compose_form': compose_form,
+            'status_banner': status_banner,
+            'can_reply': can_reply,
+            'can_manage_permissions': can_manage_permissions,
+            'current_local_time': timezone.localtime(timezone.now(), tz),
         },
     )
 
@@ -2506,15 +2791,41 @@ def settings_view(request):
         except Exception:
             avatar_url = None
 
-    success = False
+    avatar_saved = False
+    messaging_permissions_saved = False
+    messaging_form = None
+
+    can_manage_messaging_permissions = bool(
+        clinic and profile_type == 'staff' and user_can_manage_messaging_settings(request.user, clinic)
+    )
+    if can_manage_messaging_permissions:
+        messaging_form = MessagingRolePermissionForm(initial_access=clinic_messaging_access_map(clinic))
+
     if request.method == 'POST':
-        form = AvatarUploadForm(request.POST, request.FILES)
-        if form.is_valid() and profile is not None:
-            avatar = form.cleaned_data.get('avatar')
-            if avatar:
-                profile.avatar = avatar
-                profile.save(update_fields=['avatar'])
-                success = True
+        settings_action = request.POST.get('settings_action') or 'avatar'
+        if settings_action == 'messaging-permissions' and can_manage_messaging_permissions:
+            messaging_form = MessagingRolePermissionForm(
+                request.POST,
+                initial_access=clinic_messaging_access_map(clinic),
+            )
+            form = AvatarUploadForm()
+            if messaging_form.is_valid():
+                for role, access_level in messaging_form.cleaned_role_access_map().items():
+                    ClinicMessagingPermission.objects.update_or_create(
+                        clinic=clinic,
+                        role=role,
+                        defaults={'access_level': access_level},
+                    )
+                messaging_permissions_saved = True
+                messaging_form = MessagingRolePermissionForm(initial_access=clinic_messaging_access_map(clinic))
+        else:
+            form = AvatarUploadForm(request.POST, request.FILES)
+            if form.is_valid() and profile is not None:
+                avatar = form.cleaned_data.get('avatar')
+                if avatar:
+                    profile.avatar = avatar
+                    profile.save(update_fields=['avatar'])
+                    avatar_saved = True
     else:
         form = AvatarUploadForm()
 
@@ -2553,11 +2864,16 @@ def settings_view(request):
             'clinic': clinic,
             'groups': groups,
             'avatar_form': form,
-            'avatar_saved': success,
+            'avatar_saved': avatar_saved,
             'avatar_url': avatar_url,
             'profile_type': profile_type,
             'can_manage_booking_embed': can_manage_booking_embed,
             'can_view_clinic_security_activity': can_view_clinic_security_activity,
+            'can_manage_messaging_permissions': can_manage_messaging_permissions,
+            'messaging_permissions_form': messaging_form,
+            'messaging_permissions_saved': messaging_permissions_saved,
+            'messaging_role_rows': messaging_role_rows(clinic) if clinic and profile_type == 'staff' else [],
+            'is_clinic_owner': bool(clinic and user_is_clinic_owner(request.user, clinic)),
             'booking_public_url': booking_public_url,
             'booking_embed_url': booking_embed_url,
             'booking_embed_code': booking_embed_code,
@@ -2859,6 +3175,8 @@ def clinic_signup(request):
                 admin_group = Group.objects.filter(name='Admin').first()
                 if admin_group:
                     user.groups.add(admin_group)
+                clinic.owner_user = user
+                clinic.save(update_fields=['owner_user'])
 
                 request.session['signup_clinic_id'] = clinic.id
                 _send_verification_email(request, user, clinic=clinic)

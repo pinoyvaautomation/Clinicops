@@ -39,7 +39,10 @@ from .models import (
     Appointment,
     AppointmentType,
     Clinic,
+    ClinicMessagingPermission,
     ClinicSubscription,
+    Message,
+    MessageThread,
     Notification,
     PayPalWebhookEvent,
     Patient,
@@ -2232,3 +2235,159 @@ class PortalSearchTests(TestCase):
         response = self.client.get(reverse('portal-search'), {'q': 'Jamie'})
 
         self.assertEqual(response.status_code, 403)
+
+
+@override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend')
+class MessagingFeatureTests(TestCase):
+    def setUp(self):
+        self.admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.nurse_group, _ = Group.objects.get_or_create(name='Nurse')
+
+        self.clinic = Clinic.objects.create(name='Messaging Clinic', timezone='UTC')
+        self.owner_user = User.objects.create_user(
+            username='owner@messages.com',
+            email='owner@messages.com',
+            password='password123',
+            first_name='Owner',
+            last_name='User',
+        )
+        self.owner_user.groups.add(self.admin_group)
+        self.owner_staff = Staff.objects.create(user=self.owner_user, clinic=self.clinic)
+        self.clinic.owner_user = self.owner_user
+        self.clinic.save(update_fields=['owner_user'])
+
+        self.nurse_user = User.objects.create_user(
+            username='nurse@messages.com',
+            email='nurse@messages.com',
+            password='password123',
+            first_name='Nurse',
+            last_name='User',
+        )
+        self.nurse_user.groups.add(self.nurse_group)
+        Staff.objects.create(user=self.nurse_user, clinic=self.clinic)
+
+        self.patient_user = User.objects.create_user(
+            username='patient@messages.com',
+            email='patient@messages.com',
+            password='password123',
+            first_name='Patient',
+            last_name='User',
+        )
+        self.patient = Patient.objects.create(
+            user=self.patient_user,
+            clinic=self.clinic,
+            first_name='Patient',
+            last_name='User',
+            email='patient@messages.com',
+            phone='555-0191',
+        )
+        start = timezone.now() + timedelta(days=2)
+        self.appointment = Appointment.objects.create(
+            clinic=self.clinic,
+            staff=self.owner_staff,
+            patient=self.patient,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+        )
+
+    def test_owner_can_update_messaging_role_permissions(self):
+        self.client.force_login(self.owner_user)
+
+        response = self.client.post(
+            reverse('settings'),
+            data={
+                'settings_action': 'messaging-permissions',
+                'admin_access': 'reply',
+                'doctor_access': 'reply',
+                'nurse_access': 'none',
+                'frontdesk_access': 'reply',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            ClinicMessagingPermission.objects.filter(
+                clinic=self.clinic,
+                role='Nurse',
+                access_level='none',
+            ).exists()
+        )
+
+    def test_nurse_without_message_access_cannot_open_inbox(self):
+        ClinicMessagingPermission.objects.update_or_create(
+            clinic=self.clinic,
+            role='Nurse',
+            defaults={'access_level': 'none'},
+        )
+        self.client.force_login(self.nurse_user)
+
+        response = self.client.get(reverse('messages'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_patient_can_start_thread_and_owner_receives_email_alert(self):
+        self.client.force_login(self.patient_user)
+
+        response = self.client.post(
+            reverse('messages'),
+            data={
+                'action': 'new-thread',
+                'compose-subject': 'Question before my visit',
+                'compose-body': 'Can I bring my previous lab result?',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        thread = MessageThread.objects.get(patient=self.patient)
+        self.assertEqual(thread.subject, 'Question before my visit')
+        self.assertEqual(thread.messages.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['owner@messages.com'])
+        self.assertIn('Can I bring my previous lab result?', mail.outbox[0].body)
+
+    def test_staff_reply_sends_patient_message_notice(self):
+        self.client.force_login(self.patient_user)
+        self.client.post(
+            reverse('messages'),
+            data={
+                'action': 'new-thread',
+                'compose-subject': 'Question before my visit',
+                'compose-body': 'Can I bring my previous lab result?',
+            },
+        )
+        thread = MessageThread.objects.get(patient=self.patient)
+        mail.outbox.clear()
+
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            reverse('messages-thread', args=[thread.id]),
+            data={
+                'action': 'reply',
+                'reply-body': 'Yes, please bring any previous records you want reviewed.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(thread.messages.count(), 2)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['patient@messages.com'])
+        self.assertIn('previous records', mail.outbox[0].body)
+
+    def test_appointment_manage_message_creates_thread_and_owner_alert(self):
+        token = _appointment_manage_token(self.appointment)
+
+        response = self.client.post(
+            reverse('appointment-manage', args=[token]),
+            data={
+                'action': 'message',
+                'message-body': 'I need to confirm if fasting is required.',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        thread = MessageThread.objects.get(appointment=self.appointment)
+        self.assertEqual(thread.messages.count(), 1)
+        self.assertEqual(thread.last_message_sender_type, MessageThread.SenderType.PATIENT)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['owner@messages.com'])
+        self.assertIn('fasting is required', mail.outbox[0].body)

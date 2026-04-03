@@ -9,7 +9,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .image_uploads import prepare_avatar_upload
-from .models import Appointment, AppointmentType, Patient, Staff, WaitlistEntry
+from .models import Appointment, AppointmentType, ClinicMessagingPermission, Patient, Staff, WaitlistEntry
 from .timezones import get_timezone_choices
 
 
@@ -258,6 +258,64 @@ class WaitlistEntryForm(forms.ModelForm):
         if start and end and end < start:
             self.add_error('preferred_end_date', 'Preferred end date must be on or after the start date.')
         return cleaned
+
+
+class MessagingRolePermissionForm(forms.Form):
+    admin_access = forms.ChoiceField(choices=ClinicMessagingPermission.AccessLevel.choices)
+    doctor_access = forms.ChoiceField(choices=ClinicMessagingPermission.AccessLevel.choices)
+    nurse_access = forms.ChoiceField(choices=ClinicMessagingPermission.AccessLevel.choices)
+    frontdesk_access = forms.ChoiceField(choices=ClinicMessagingPermission.AccessLevel.choices)
+
+    def __init__(self, *args, initial_access=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        initial_access = initial_access or {}
+        field_map = {
+            'admin_access': 'Admin',
+            'doctor_access': 'Doctor',
+            'nurse_access': 'Nurse',
+            'frontdesk_access': 'FrontDesk',
+        }
+        for field_name, role in field_map.items():
+            self.fields[field_name].initial = initial_access.get(role, '')
+
+    def cleaned_role_access_map(self) -> dict[str, str]:
+        return {
+            'Admin': self.cleaned_data['admin_access'],
+            'Doctor': self.cleaned_data['doctor_access'],
+            'Nurse': self.cleaned_data['nurse_access'],
+            'FrontDesk': self.cleaned_data['frontdesk_access'],
+        }
+
+
+class MessageComposeForm(forms.Form):
+    subject = forms.CharField(max_length=140)
+    body = forms.CharField(widget=forms.Textarea(attrs={'rows': 5}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['subject'].widget.attrs.update(
+            {
+                'placeholder': 'Question about my visit',
+                'maxlength': '140',
+            }
+        )
+        self.fields['body'].widget.attrs.update(
+            {
+                'placeholder': 'Write your message to the clinic team.',
+            }
+        )
+
+
+class MessageReplyForm(forms.Form):
+    body = forms.CharField(widget=forms.Textarea(attrs={'rows': 4}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['body'].widget.attrs.update(
+            {
+                'placeholder': 'Write a reply...',
+            }
+        )
 
 
 class ClinicSignupForm(forms.Form):

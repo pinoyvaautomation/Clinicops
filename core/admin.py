@@ -10,7 +10,11 @@ from .models import (
     AppointmentType,
     AdminBranding,
     Clinic,
+    ClinicMessagingPermission,
     ClinicSubscription,
+    Message,
+    MessageThread,
+    MessageThreadReadState,
     Patient,
     Plan,
     SecurityAccessRule,
@@ -95,7 +99,7 @@ class ClinicScopedAdmin(admin.ModelAdmin):
 
 @admin.register(Clinic)
 class ClinicAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
-    list_display = ('name', 'slug', 'timezone', 'email', 'phone', 'brand_color', 'is_active', 'created_at')
+    list_display = ('name', 'slug', 'owner_user', 'timezone', 'email', 'phone', 'brand_color', 'is_active', 'created_at')
     list_filter = ('is_active', 'timezone')
     search_fields = ('name', 'slug', 'email', 'phone')
 
@@ -338,6 +342,52 @@ class ClinicSubscriptionAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
     list_display = ('clinic', 'plan', 'status', 'paypal_subscription_id', 'created_at')
     list_filter = ('status', 'plan')
     search_fields = ('clinic__name', 'paypal_subscription_id')
+
+
+@admin.register(ClinicMessagingPermission)
+class ClinicMessagingPermissionAdmin(ClinicScopedAdmin, admin.ModelAdmin):
+    list_display = ('clinic', 'role', 'access_level', 'updated_at')
+    list_filter = ('clinic', 'role', 'access_level')
+    search_fields = ('clinic__name',)
+
+
+@admin.register(MessageThread)
+class MessageThreadAdmin(ClinicScopedAdmin, admin.ModelAdmin):
+    list_display = ('clinic', 'patient', 'subject', 'appointment', 'status', 'last_message_sender_type', 'last_message_at')
+    list_filter = ('clinic', 'status', 'source', 'last_message_sender_type')
+    search_fields = ('subject', 'patient__id')
+
+
+@admin.register(Message)
+class MessageAdmin(ClinicScopedAdmin, admin.ModelAdmin):
+    list_display = ('thread', 'sender_type', 'sender_user', 'sender_label', 'created_at')
+    list_filter = ('sender_type', 'created_at')
+    search_fields = ('thread__subject', 'sender_label')
+
+    def get_queryset(self, request) -> QuerySet:
+        qs = admin.ModelAdmin.get_queryset(self, request).select_related('thread', 'sender_user')
+        if request.user.is_superuser:
+            return qs
+        clinic = self._get_user_clinic(request)
+        if not clinic:
+            return qs.none()
+        return qs.filter(thread__clinic=clinic)
+
+
+@admin.register(MessageThreadReadState)
+class MessageThreadReadStateAdmin(ClinicScopedAdmin, admin.ModelAdmin):
+    list_display = ('thread', 'user', 'last_read_at')
+    list_filter = ('last_read_at',)
+    search_fields = ('user__username', 'user__email')
+
+    def get_queryset(self, request) -> QuerySet:
+        qs = admin.ModelAdmin.get_queryset(self, request).select_related('thread', 'user')
+        if request.user.is_superuser:
+            return qs
+        clinic = self._get_user_clinic(request)
+        if not clinic:
+            return qs.none()
+        return qs.filter(thread__clinic=clinic)
 
 
 @admin.register(AdminBranding)

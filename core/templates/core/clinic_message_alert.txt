@@ -1,0 +1,14 @@
+ClinicOps secure messaging alert
+
+A patient sent a new message to {{ clinic.name }}.
+
+Clinic: {{ clinic.name }}
+Patient: {{ patient_name }}
+{% if thread.appointment_id %}Appointment code: {{ thread.appointment.confirmation_code }}
+{% endif %}Subject: {{ thread.subject|default:"Secure patient message" }}
+
+Latest message:
+{{ message.body }}
+
+Open the inbox:
+{{ inbox_url }}

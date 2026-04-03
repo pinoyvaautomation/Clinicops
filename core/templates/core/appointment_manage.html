@@ -171,6 +171,37 @@
       <div class="flash flash--info" style="margin-top: 16px;">This appointment can no longer be changed online. If you still need help, contact the clinic directly.</div>
     {% endif %}
 
+    <div class="section-card" style="margin-top: 16px;">
+      <h3>Message the clinic</h3>
+      <p>Use this secure page to ask follow-up questions about this booking. Do not use messaging for emergencies.</p>
+      {% if thread_messages %}
+        <div class="detail-list" style="margin-top: 14px;">
+          {% for item in thread_messages %}
+            <div class="detail-row" style="display:block;">
+              <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap;">
+                <strong>{{ item.sender_label|default:item.get_sender_type_display }}</strong>
+                <span class="detail-label">{{ item.created_at|date:"M j, g:i A" }}</span>
+              </div>
+              <div style="margin-top:8px;white-space:pre-line;">{{ item.body }}</div>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <div class="flash flash--info" style="margin-top: 14px;">No message thread yet. The first message you send here will open a secure conversation with the clinic.</div>
+      {% endif %}
+      <form method="post" class="stack-form" style="margin-top: 14px;">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="message">
+        {{ message_form.non_field_errors }}
+        <div class="field">
+          <label for="{{ message_form.body.id_for_label }}">Your message</label>
+          {{ message_form.body }}
+          {{ message_form.body.errors }}
+        </div>
+        <button class="submit" type="submit">Send message to clinic</button>
+      </form>
+    </div>
+
     <div class="action-row">
       <a class="button button--secondary" href="{% url 'appointment-lookup' %}">Open lookup page</a>
       <a class="button button--secondary" href="{% url 'clinic-booking-slug' appointment.clinic.slug %}">Book another appointment</a>

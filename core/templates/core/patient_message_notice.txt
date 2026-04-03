@@ -1,0 +1,11 @@
+{{ clinic.name }} sent you a new secure message in ClinicOps.
+
+Subject: {{ thread.subject|default:"Clinic message" }}
+
+Latest message:
+{{ message.body }}
+
+Open the secure thread:
+{{ message_url }}
+
+Do not use ClinicOps messaging for emergencies.
