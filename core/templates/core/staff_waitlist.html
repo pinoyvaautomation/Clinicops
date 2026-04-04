@@ -142,13 +142,16 @@
         font-size: 13px;
         font-weight: 700;
       }
-      select,
-      button {
+      .filters select,
+      .filters button,
+      .waitlist-actions select,
+      .waitlist-actions button {
         min-height: 46px;
         border-radius: 14px;
         font: inherit;
       }
-      select {
+      .filters select,
+      .waitlist-actions select {
         width: 100%;
         border: 1px solid rgba(148, 163, 184, 0.24);
         background: #fff;
@@ -156,7 +159,8 @@
         color: var(--ink);
       }
       .button,
-      button {
+      .filters button,
+      .waitlist-actions button {
         display: inline-flex;
         align-items: center;
         justify-content: center;
@@ -169,7 +173,8 @@
         cursor: pointer;
       }
       .button.primary,
-      button.primary {
+      .filters button.primary,
+      .waitlist-actions button.primary {
         border-color: transparent;
         background: linear-gradient(135deg, #0f766e, #0f172a);
         color: #fff;
