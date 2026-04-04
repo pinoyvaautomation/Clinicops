@@ -551,6 +551,64 @@ class MessageThreadReadState(models.Model):
         return f'{self.user} read thread {self.thread_id}'
 
 
+class HelpRequest(models.Model):
+    class RequestType(models.TextChoices):
+        SUPPORT = 'support', 'Support request'
+        FEATURE = 'feature', 'Feature request'
+
+    class Status(models.TextChoices):
+        NEW = 'new', 'New'
+        IN_REVIEW = 'in_review', 'In review'
+        PLANNED = 'planned', 'Planned'
+        RESOLVED = 'resolved', 'Resolved'
+        CLOSED = 'closed', 'Closed'
+
+    class Priority(models.TextChoices):
+        LOW = 'low', 'Low'
+        MEDIUM = 'medium', 'Medium'
+        HIGH = 'high', 'High'
+        URGENT = 'urgent', 'Urgent'
+
+    clinic = models.ForeignKey(
+        Clinic,
+        on_delete=models.CASCADE,
+        related_name='help_requests',
+    )
+    submitted_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='help_requests',
+        blank=True,
+        null=True,
+    )
+    request_type = models.CharField(max_length=16, choices=RequestType.choices)
+    status = models.CharField(max_length=16, choices=Status.choices, default=Status.NEW)
+    category = models.CharField(max_length=32, blank=True)
+    priority = models.CharField(max_length=16, choices=Priority.choices, default=Priority.MEDIUM)
+    subject = models.CharField(max_length=140)
+    details = secured_fields.EncryptedTextField()
+    business_impact = secured_fields.EncryptedTextField(blank=True, null=True)
+    page_url = models.CharField(max_length=255, blank=True)
+    user_agent = models.CharField(max_length=255, blank=True)
+    reporter_name = models.CharField(max_length=150, blank=True)
+    reporter_email = models.EmailField(blank=True)
+    staff_role = models.CharField(max_length=32, blank=True)
+    internal_notes = secured_fields.EncryptedTextField(blank=True, null=True)
+    resolved_at = models.DateTimeField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['clinic', 'request_type', 'status', '-created_at']),
+            models.Index(fields=['submitted_by', '-created_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.get_request_type_display()} - {self.subject}'
+
+
 class PayPalWebhookEvent(models.Model):
     class ProcessingStatus(models.TextChoices):
         RECEIVED = 'received', 'Received'

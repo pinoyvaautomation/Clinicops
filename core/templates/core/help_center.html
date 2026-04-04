@@ -1,0 +1,442 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Help And Feedback</title>
+    <style>
+      @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap');
+
+      :root {
+        --brand: {{ clinic.brand_color|default:"#0ea5a6" }};
+        --ink: #0f172a;
+        --ink-soft: #334155;
+        --muted: #64748b;
+        --line: rgba(148, 163, 184, 0.22);
+        --panel: rgba(255, 255, 255, 0.94);
+        --bg: linear-gradient(180deg, #f8fbff 0%, #eef6f4 100%);
+      }
+
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: 'IBM Plex Sans', Arial, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 166, 0.12), transparent 30%),
+          var(--bg);
+      }
+      h1, h2, h3, strong {
+        font-family: 'Space Grotesk', Arial, sans-serif;
+        letter-spacing: -0.03em;
+      }
+      .wrap {
+        max-width: 1160px;
+        margin: 0 auto;
+        padding: 22px 24px 56px;
+      }
+      .hero, .panel, .card {
+        border: 1px solid var(--line);
+        border-radius: 26px;
+        box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
+      }
+      .hero {
+        padding: 28px;
+        color: #f8fafc;
+        background:
+          radial-gradient(circle at top right, rgba(255, 255, 255, 0.16), transparent 26%),
+          linear-gradient(135deg, #0f172a 0%, #111827 60%, var(--brand) 160%);
+      }
+      .hero-grid, .content-grid {
+        display: grid;
+        gap: 16px;
+      }
+      .hero-grid {
+        grid-template-columns: minmax(0, 1.5fr) minmax(280px, 1fr);
+      }
+      .content-grid {
+        margin-top: 18px;
+        grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.88fr);
+      }
+      .eyebrow, .pill, .status-pill, .request-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        min-height: 34px;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .eyebrow, .pill {
+        color: #f8fafc;
+        background: rgba(255, 255, 255, 0.12);
+      }
+      .hero h1 {
+        margin: 16px 0 10px;
+        font-size: clamp(2rem, 4vw, 3rem);
+        line-height: 1;
+      }
+      .hero p, .note, .meta {
+        margin: 0;
+        line-height: 1.6;
+      }
+      .hero p { color: rgba(248, 250, 252, 0.78); }
+      .hero-meta, .hero-actions, .inline-actions, .status-row {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+      .hero-meta { margin-top: 18px; }
+      .hero-actions { margin-top: 22px; }
+      .hero-box {
+        padding: 20px;
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: rgba(255, 255, 255, 0.08);
+      }
+      .kicker {
+        margin-bottom: 10px;
+        color: rgba(248, 250, 252, 0.64);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+      .hero-box strong {
+        display: block;
+        font-size: 1.65rem;
+      }
+      .panel, .card {
+        padding: 24px;
+        background: var(--panel);
+      }
+      .panel h2, .card h2 {
+        margin: 0 0 8px;
+      }
+      .stack {
+        display: grid;
+        gap: 16px;
+      }
+      form {
+        margin: 0;
+        display: grid;
+        gap: 14px;
+      }
+      .field-row {
+        display: grid;
+        gap: 14px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+      .field {
+        display: grid;
+        gap: 8px;
+      }
+      label {
+        color: var(--ink);
+        font-size: 0.92rem;
+        font-weight: 700;
+      }
+      input, select, textarea {
+        width: 100%;
+        padding: 12px 14px;
+        border: 1px solid rgba(148, 163, 184, 0.28);
+        border-radius: 14px;
+        background: #fff;
+        color: var(--ink);
+        font: inherit;
+      }
+      textarea {
+        resize: vertical;
+        min-height: 120px;
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: none;
+        border-color: rgba(14, 165, 166, 0.42);
+        box-shadow: 0 0 0 3px rgba(14, 165, 166, 0.12);
+      }
+      .help {
+        color: var(--muted);
+        font-size: 0.92rem;
+        line-height: 1.55;
+      }
+      .field-errors,
+      .errorlist {
+        margin: 0;
+        padding: 10px 12px;
+        list-style: none;
+        border-radius: 12px;
+        background: #fff2f1;
+        color: #b42318;
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .btn, .btn-ghost, .btn-brand {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 46px;
+        padding: 11px 16px;
+        border-radius: 14px;
+        border: 1px solid transparent;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      .btn { background: #fff; color: var(--ink); border-color: var(--line); }
+      .btn-ghost { background: rgba(255, 255, 255, 0.9); color: var(--ink-soft); border-color: var(--line); }
+      .btn-brand { color: #fff; background: linear-gradient(135deg, var(--brand), #0f172a); }
+      .banner {
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(14, 165, 166, 0.18);
+        background: rgba(236, 254, 255, 0.9);
+        color: #0f766e;
+      }
+      .banner strong {
+        display: block;
+        margin-bottom: 4px;
+      }
+      .request-list {
+        display: grid;
+        gap: 12px;
+        margin-top: 14px;
+      }
+      .request-card {
+        padding: 16px;
+        border-radius: 18px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      .request-card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 1rem;
+      }
+      .status-pill.new { background: rgba(37, 99, 235, 0.12); color: #1d4ed8; }
+      .status-pill.in_review { background: rgba(245, 158, 11, 0.16); color: #b45309; }
+      .status-pill.planned { background: rgba(99, 102, 241, 0.14); color: #4338ca; }
+      .status-pill.resolved { background: rgba(16, 185, 129, 0.14); color: #047857; }
+      .status-pill.closed { background: rgba(15, 23, 42, 0.08); color: #334155; }
+      .request-pill.support { background: rgba(14, 165, 166, 0.12); color: #0f766e; }
+      .request-pill.feature { background: rgba(124, 58, 237, 0.12); color: #6d28d9; }
+      .meta {
+        color: var(--muted);
+        font-size: 0.92rem;
+      }
+      .empty {
+        padding: 18px;
+        border-radius: 18px;
+        border: 1px dashed rgba(148, 163, 184, 0.28);
+        color: var(--muted);
+        background: rgba(248, 250, 252, 0.8);
+      }
+      .subtle-box {
+        margin-top: 14px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: rgba(248, 250, 252, 0.84);
+      }
+      @media (max-width: 980px) {
+        .hero-grid, .content-grid { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 640px) {
+        .field-row { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 560px) {
+        .wrap { padding: 18px 16px 44px; }
+        .hero, .panel, .card { border-radius: 22px; }
+        .hero-actions, .inline-actions { flex-direction: column; align-items: stretch; }
+        .hero-actions .btn,
+        .hero-actions .btn-ghost,
+        .inline-actions .btn-brand,
+        .inline-actions .btn-ghost { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    {% with current='help-center' %}
+      {% include "core/partials/top_nav.html" %}
+    {% endwith %}
+    <main class="wrap">
+      <section class="hero">
+        <div class="hero-grid">
+          <div>
+            <div class="eyebrow">Help and feedback</div>
+            <h1>Send support issues and feature ideas from the portal.</h1>
+            <p>ClinicOps already knows which clinic, user role, and workspace this request came from, so your team can report problems or suggest improvements without leaving the product.</p>
+            <div class="hero-meta">
+              <span class="pill">{{ clinic.name }}</span>
+              <span class="pill">{{ current_local_time|date:"g:i A" }} local time</span>
+              <span class="pill">Product support and roadmap feedback</span>
+            </div>
+            <div class="hero-actions">
+              <a class="btn" href="{% url 'dashboard' %}">Back to dashboard</a>
+              <a class="btn-ghost" href="{% url 'messages' %}">Open messages</a>
+            </div>
+          </div>
+          <div class="hero-box">
+            <div class="kicker">How this works</div>
+            <strong>One place for support and requests</strong>
+            <p>Support issues go to the operational inbox so you can respond quickly. Feature requests stay separate so they can be grouped, reviewed, and planned without losing clinic context.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="content-grid">
+        <div class="stack">
+          {% if status_notice %}
+            <div class="banner">
+              <strong>{{ status_notice.1 }}</strong>
+              <div>We attached the clinic, role, and page context automatically.</div>
+            </div>
+          {% endif %}
+
+          <article class="card">
+            <h2>Report a technical or workflow issue</h2>
+            <p class="note">Use this when something is broken, confusing, or blocking the clinic team from completing work.</p>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="help_action" value="support-request">
+              {{ support_form.page_url }}
+              <div class="field-row">
+                <div class="field">
+                  <label for="{{ support_form.category.id_for_label }}">Issue type</label>
+                  {{ support_form.category }}
+                  {{ support_form.category.errors }}
+                </div>
+                <div class="field">
+                  <label for="{{ support_form.priority.id_for_label }}">Severity</label>
+                  {{ support_form.priority }}
+                  {{ support_form.priority.errors }}
+                </div>
+              </div>
+              <div class="field">
+                <label for="{{ support_form.subject.id_for_label }}">Short subject</label>
+                {{ support_form.subject }}
+                {{ support_form.subject.errors }}
+              </div>
+              <div class="field">
+                <label for="{{ support_form.details.id_for_label }}">What happened</label>
+                {{ support_form.details }}
+                {{ support_form.details.errors }}
+              </div>
+              <div class="help">Include what you expected to happen, what actually happened, and any repeatable steps if possible.</div>
+              <div class="inline-actions">
+                <button class="btn-brand" type="submit">Send support request</button>
+              </div>
+            </form>
+          </article>
+
+          <article class="card">
+            <h2>Request a feature or improvement</h2>
+            <p class="note">Use this when the clinic needs a new capability, a better workflow, or a cleaner way to do repeated tasks.</p>
+            <form method="post">
+              {% csrf_token %}
+              <input type="hidden" name="help_action" value="feature-request">
+              {{ feature_form.page_url }}
+              <div class="field-row">
+                <div class="field">
+                  <label for="{{ feature_form.category.id_for_label }}">Feature area</label>
+                  {{ feature_form.category }}
+                  {{ feature_form.category.errors }}
+                </div>
+                <div class="field">
+                  <label for="{{ feature_form.priority.id_for_label }}">Priority</label>
+                  {{ feature_form.priority }}
+                  {{ feature_form.priority.errors }}
+                </div>
+              </div>
+              <div class="field">
+                <label for="{{ feature_form.subject.id_for_label }}">Short request</label>
+                {{ feature_form.subject }}
+                {{ feature_form.subject.errors }}
+              </div>
+              <div class="field">
+                <label for="{{ feature_form.details.id_for_label }}">What the clinic needs</label>
+                {{ feature_form.details }}
+                {{ feature_form.details.errors }}
+              </div>
+              <div class="field">
+                <label for="{{ feature_form.business_impact.id_for_label }}">Clinic impact</label>
+                {{ feature_form.business_impact }}
+                {{ feature_form.business_impact.errors }}
+              </div>
+              <div class="help">Explain how this request would save time, reduce manual work, improve patient experience, or help a role such as Front Desk, Doctor, or Nurse.</div>
+              <div class="inline-actions">
+                <button class="btn-brand" type="submit">Send feature request</button>
+              </div>
+            </form>
+          </article>
+        </div>
+
+        <aside class="panel">
+          <h2>{% if is_help_admin_scope %}Recent requests from this clinic{% else %}Your recent requests{% endif %}</h2>
+          <p class="note">These entries are also available in Django admin for the platform team, along with status tracking and internal notes.</p>
+
+          <div class="subtle-box">
+            <strong>Context attached automatically</strong>
+            <div class="meta" style="margin-top: 8px;">Clinic name, user account, staff role, current page reference, and browser details are captured with each submission.</div>
+          </div>
+
+          <div class="request-list">
+            {% for item in help_requests %}
+              <article class="request-card">
+                <div class="status-row">
+                  <span class="request-pill {{ item.request_type }}">{{ item.get_request_type_display }}</span>
+                  <span class="status-pill {{ item.status }}">{{ item.get_status_display }}</span>
+                </div>
+                <strong>{{ item.subject }}</strong>
+                <div class="meta">
+                  {{ item.created_at|date:"M j, g:i A" }}
+                  {% if item.staff_role %} &middot; {{ item.staff_role }}{% endif %}
+                  {% if item.priority %} &middot; {{ item.get_priority_display }} priority{% endif %}
+                </div>
+                {% if item.page_url %}
+                  <p class="meta" style="margin-top: 8px;">Page: {{ item.page_url|truncatechars:92 }}</p>
+                {% endif %}
+              </article>
+            {% empty %}
+              <div class="empty">
+                No requests submitted yet. When your clinic team reports an issue or suggests a feature, the history will appear here.
+              </div>
+            {% endfor %}
+          </div>
+        </aside>
+      </section>
+    </main>
+    {% include "core/partials/site_footer.html" %}
+    <script>
+      (function() {
+        const currentUrl = window.location.href;
+        const referrer = document.referrer;
+
+        function pickSourcePage() {
+          if (!referrer) {
+            return currentUrl;
+          }
+          try {
+            const referrerUrl = new URL(referrer);
+            if (referrerUrl.origin !== window.location.origin) {
+              return currentUrl;
+            }
+            if (referrerUrl.pathname === window.location.pathname) {
+              return currentUrl;
+            }
+            return referrerUrl.href;
+          } catch (error) {
+            return currentUrl;
+          }
+        }
+
+        const sourcePage = pickSourcePage();
+        document.querySelectorAll('input[name$="page_url"]').forEach(function(input) {
+          input.value = sourcePage;
+        });
+      })();
+    </script>
+  </body>
+</html>

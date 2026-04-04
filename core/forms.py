@@ -9,7 +9,7 @@ from django.conf import settings
 from django.utils import timezone
 
 from .image_uploads import prepare_avatar_upload
-from .models import Appointment, AppointmentType, ClinicMessagingPermission, Patient, Staff, WaitlistEntry
+from .models import Appointment, AppointmentType, ClinicMessagingPermission, HelpRequest, Patient, Staff, WaitlistEntry
 from .timezones import get_timezone_choices
 
 
@@ -314,6 +314,75 @@ class MessageReplyForm(forms.Form):
         self.fields['body'].widget.attrs.update(
             {
                 'placeholder': 'Write a reply...',
+            }
+        )
+
+
+class SupportRequestForm(forms.Form):
+    category = forms.ChoiceField(
+        choices=[
+            ('technical', 'Technical issue'),
+            ('booking', 'Booking or schedule issue'),
+            ('messaging', 'Messaging or notifications'),
+            ('billing', 'Billing or subscription'),
+            ('account', 'Account or access'),
+            ('other', 'Other'),
+        ]
+    )
+    priority = forms.ChoiceField(choices=HelpRequest.Priority.choices, initial=HelpRequest.Priority.MEDIUM)
+    subject = forms.CharField(max_length=140)
+    details = forms.CharField(widget=forms.Textarea(attrs={'rows': 5}))
+    page_url = forms.CharField(required=False, widget=forms.HiddenInput())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['subject'].widget.attrs.update(
+            {
+                'placeholder': 'Unable to complete a booking update',
+                'maxlength': '140',
+            }
+        )
+        self.fields['details'].widget.attrs.update(
+            {
+                'placeholder': 'Describe what happened, what you expected, and any steps to reproduce the issue.',
+            }
+        )
+
+
+class FeatureRequestForm(forms.Form):
+    category = forms.ChoiceField(
+        choices=[
+            ('workflow', 'Workflow improvement'),
+            ('booking', 'Booking or calendar'),
+            ('patients', 'Patients or intake'),
+            ('messaging', 'Messaging'),
+            ('billing', 'Billing'),
+            ('reports', 'Reports or analytics'),
+            ('other', 'Other'),
+        ]
+    )
+    priority = forms.ChoiceField(choices=HelpRequest.Priority.choices, initial=HelpRequest.Priority.MEDIUM)
+    subject = forms.CharField(max_length=140)
+    details = forms.CharField(widget=forms.Textarea(attrs={'rows': 5}))
+    business_impact = forms.CharField(required=False, widget=forms.Textarea(attrs={'rows': 3}))
+    page_url = forms.CharField(required=False, widget=forms.HiddenInput())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['subject'].widget.attrs.update(
+            {
+                'placeholder': 'Need a better way to hand off tasks between Front Desk and Doctor',
+                'maxlength': '140',
+            }
+        )
+        self.fields['details'].widget.attrs.update(
+            {
+                'placeholder': 'Describe the feature or workflow you need and how the clinic team would use it.',
+            }
+        )
+        self.fields['business_impact'].widget.attrs.update(
+            {
+                'placeholder': 'Explain the clinic impact, such as time saved, fewer no-shows, or fewer manual steps.',
             }
         )
 

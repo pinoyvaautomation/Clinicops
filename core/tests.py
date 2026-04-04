@@ -41,6 +41,7 @@ from .models import (
     Clinic,
     ClinicMessagingPermission,
     ClinicSubscription,
+    HelpRequest,
     Message,
     MessageThread,
     Notification,
@@ -412,6 +413,136 @@ class SettingsEmbedTests(TestCase):
         self.assertContains(response, 'Website embed')
         self.assertContains(response, '?embed=1')
         self.assertContains(response, '&lt;iframe', html=False)
+
+
+@override_settings(
+    EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+    SUPPORT_ALERT_EMAILS=['support@example.com'],
+)
+class HelpCenterTests(TestCase):
+    def setUp(self):
+        self.admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.frontdesk_group, _ = Group.objects.get_or_create(name='FrontDesk')
+
+        self.clinic = Clinic.objects.create(name='Help Clinic', timezone='UTC')
+
+        self.owner_user = User.objects.create_user(
+            username='owner@help.com',
+            email='owner@help.com',
+            password='password123',
+            first_name='Owner',
+            last_name='User',
+        )
+        self.owner_user.groups.add(self.admin_group)
+        Staff.objects.create(user=self.owner_user, clinic=self.clinic)
+
+        self.frontdesk_user = User.objects.create_user(
+            username='frontdesk@help.com',
+            email='frontdesk@help.com',
+            password='password123',
+            first_name='Front',
+            last_name='Desk',
+        )
+        self.frontdesk_user.groups.add(self.frontdesk_group)
+        Staff.objects.create(user=self.frontdesk_user, clinic=self.clinic)
+
+        self.patient_user = User.objects.create_user(
+            username='patient@help.com',
+            email='patient@help.com',
+            password='password123',
+            first_name='Pat',
+            last_name='Ient',
+        )
+        Patient.objects.create(
+            user=self.patient_user,
+            clinic=self.clinic,
+            first_name='Pat',
+            last_name='Ient',
+            email='patient@help.com',
+            phone='555-0161',
+        )
+
+    def test_staff_can_submit_support_request_and_send_alert(self):
+        self.client.force_login(self.frontdesk_user)
+
+        response = self.client.post(
+            reverse('help-center'),
+            data={
+                'help_action': 'support-request',
+                'support-category': 'technical',
+                'support-priority': HelpRequest.Priority.HIGH,
+                'support-subject': 'Unable to save a booking update',
+                'support-details': 'The booking form saves, then returns an error banner.',
+                'support-page_url': 'https://clinicops.test/staff/appointments/15/',
+            },
+            HTTP_USER_AGENT='ClinicOps QA Browser',
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], f"{reverse('help-center')}?status=support-sent")
+        help_request = HelpRequest.objects.get()
+        self.assertEqual(help_request.request_type, HelpRequest.RequestType.SUPPORT)
+        self.assertEqual(help_request.clinic, self.clinic)
+        self.assertEqual(help_request.submitted_by, self.frontdesk_user)
+        self.assertEqual(help_request.staff_role, 'FrontDesk')
+        self.assertEqual(help_request.page_url, 'https://clinicops.test/staff/appointments/15/')
+        self.assertEqual(help_request.user_agent, 'ClinicOps QA Browser')
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['support@example.com'])
+        self.assertIn('Help Clinic', mail.outbox[0].subject)
+
+    def test_staff_can_submit_feature_request(self):
+        self.client.force_login(self.frontdesk_user)
+
+        response = self.client.post(
+            reverse('help-center'),
+            data={
+                'help_action': 'feature-request',
+                'feature-category': 'workflow',
+                'feature-priority': HelpRequest.Priority.MEDIUM,
+                'feature-subject': 'Need a better staff handoff view',
+                'feature-details': 'Front Desk needs a cleaner way to hand off notes to Doctors.',
+                'feature-business_impact': 'Would reduce missed notes and manual follow-ups.',
+                'feature-page_url': 'https://clinicops.test/dashboard/',
+            },
+            HTTP_USER_AGENT='ClinicOps QA Browser',
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response['Location'], f"{reverse('help-center')}?status=feature-sent")
+        help_request = HelpRequest.objects.get()
+        self.assertEqual(help_request.request_type, HelpRequest.RequestType.FEATURE)
+        self.assertIn('reduce missed notes', help_request.business_impact)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['support@example.com'])
+
+    def test_patient_cannot_access_help_center(self):
+        self.client.force_login(self.patient_user)
+
+        response = self.client.get(reverse('help-center'))
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_see_clinic_request_history(self):
+        HelpRequest.objects.create(
+            clinic=self.clinic,
+            submitted_by=self.frontdesk_user,
+            request_type=HelpRequest.RequestType.SUPPORT,
+            category='technical',
+            priority=HelpRequest.Priority.MEDIUM,
+            subject='Printer failed during check-in',
+            details='Printer stopped responding during the morning queue.',
+            reporter_name='Front Desk',
+            reporter_email='frontdesk@help.com',
+            staff_role='FrontDesk',
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('help-center'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Recent requests from this clinic')
+        self.assertContains(response, 'Printer failed during check-in')
 
 
 class SecurityEventTests(TestCase):

@@ -49,9 +49,11 @@ from .forms import (
     StaffMemberUpdateForm,
     AppointmentTypeForm,
     ClinicAuthenticationForm,
+    FeatureRequestForm,
     MessagingRolePermissionForm,
     MessageComposeForm,
     MessageReplyForm,
+    SupportRequestForm,
     TwoFactorTokenForm,
     WaitlistEntryForm,
 )
@@ -61,6 +63,7 @@ from .models import (
     Clinic,
     ClinicMessagingPermission,
     ClinicSubscription,
+    HelpRequest,
     Message,
     MessageThread,
     Notification,
@@ -1515,6 +1518,25 @@ def _platform_alert_recipients():
         return []
 
 
+def _support_alert_recipients():
+    if settings.SUPPORT_ALERT_EMAILS:
+        return settings.SUPPORT_ALERT_EMAILS
+    if settings.PLATFORM_ALERT_EMAILS:
+        return settings.PLATFORM_ALERT_EMAILS
+    try:
+        return list(
+            User.objects.filter(is_superuser=True, is_active=True)
+            .exclude(email='')
+            .values_list('email', flat=True)
+        )
+    except DatabaseError:
+        logger.warning(
+            'ClinicOps support alert recipients could not be loaded because the database is unavailable.',
+            exc_info=True,
+        )
+        return []
+
+
 def _user_display_name(user):
     full_name = user.get_full_name().strip()
     return full_name or user.email or user.username
@@ -1623,6 +1645,30 @@ def _send_patient_message_notice(*, request, thread: MessageThread, message):
         html_template='core/patient_message_notice.html',
         context=context,
         recipients=[thread.patient.email],
+    )
+
+
+def _send_help_request_alert(*, request, help_request: HelpRequest):
+    recipients = _support_alert_recipients()
+    if not recipients:
+        return False
+
+    context = {
+        'help_request': help_request,
+        'clinic': help_request.clinic,
+        'submitted_by': help_request.submitted_by,
+        'request_label': help_request.get_request_type_display(),
+        'priority_label': help_request.get_priority_display(),
+        'status_label': help_request.get_status_display(),
+        'admin_url': request.build_absolute_uri('/admin/core/helprequest/'),
+        'portal_url': request.build_absolute_uri(reverse('help-center')),
+    }
+    return _send_rendered_email(
+        subject_template='core/help_request_alert_subject.txt',
+        text_template='core/help_request_alert.txt',
+        html_template='core/help_request_alert.html',
+        context=context,
+        recipients=recipients,
     )
 
 
@@ -2706,6 +2752,93 @@ def messages_view(request, thread_id: int | None = None):
             'can_reply': can_reply,
             'can_manage_permissions': can_manage_permissions,
             'current_local_time': timezone.localtime(timezone.now(), tz),
+        },
+    )
+
+
+def _help_request_queryset_for_user(user, clinic: Clinic):
+    base_qs = HelpRequest.objects.filter(clinic=clinic).select_related('submitted_by')
+    if _is_admin(user):
+        return base_qs
+    return base_qs.filter(submitted_by=user)
+
+
+def _help_request_status_notice(status: str | None):
+    status_map = {
+        'support-sent': ('success', 'Support request submitted. We received the issue details and clinic context.'),
+        'feature-sent': ('success', 'Feature request submitted. Thank you for sharing what would help your clinic team next.'),
+    }
+    return status_map.get(status)
+
+
+@login_required
+def help_center_view(request):
+    staff, error = _require_staff_portal(request)
+    if error:
+        return error
+
+    clinic = staff.clinic
+    support_form = SupportRequestForm(prefix='support')
+    feature_form = FeatureRequestForm(prefix='feature')
+    status_notice = _help_request_status_notice(request.GET.get('status'))
+    current_page = request.build_absolute_uri()
+    referer = request.META.get('HTTP_REFERER', '')
+
+    if request.method == 'POST':
+        action = request.POST.get('help_action') or ''
+        if action == 'support-request':
+            support_form = SupportRequestForm(request.POST, prefix='support')
+            if support_form.is_valid():
+                help_request = HelpRequest.objects.create(
+                    clinic=clinic,
+                    submitted_by=request.user,
+                    request_type=HelpRequest.RequestType.SUPPORT,
+                    category=support_form.cleaned_data['category'],
+                    priority=support_form.cleaned_data['priority'],
+                    subject=support_form.cleaned_data['subject'],
+                    details=support_form.cleaned_data['details'],
+                    page_url=(support_form.cleaned_data.get('page_url') or referer or current_page)[:255],
+                    user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:255],
+                    reporter_name=_user_display_name(request.user),
+                    reporter_email=request.user.email or '',
+                    staff_role=_staff_role_for_user(request.user) or ('Superuser' if request.user.is_superuser else ''),
+                )
+                _send_help_request_alert(request=request, help_request=help_request)
+                return redirect(f"{reverse('help-center')}?status=support-sent")
+        elif action == 'feature-request':
+            feature_form = FeatureRequestForm(request.POST, prefix='feature')
+            if feature_form.is_valid():
+                help_request = HelpRequest.objects.create(
+                    clinic=clinic,
+                    submitted_by=request.user,
+                    request_type=HelpRequest.RequestType.FEATURE,
+                    category=feature_form.cleaned_data['category'],
+                    priority=feature_form.cleaned_data['priority'],
+                    subject=feature_form.cleaned_data['subject'],
+                    details=feature_form.cleaned_data['details'],
+                    business_impact=feature_form.cleaned_data.get('business_impact') or '',
+                    page_url=(feature_form.cleaned_data.get('page_url') or referer or current_page)[:255],
+                    user_agent=(request.META.get('HTTP_USER_AGENT') or '')[:255],
+                    reporter_name=_user_display_name(request.user),
+                    reporter_email=request.user.email or '',
+                    staff_role=_staff_role_for_user(request.user) or ('Superuser' if request.user.is_superuser else ''),
+                )
+                _send_help_request_alert(request=request, help_request=help_request)
+                return redirect(f"{reverse('help-center')}?status=feature-sent")
+
+    help_requests = list(_help_request_queryset_for_user(request.user, clinic)[:12])
+
+    return render(
+        request,
+        'core/help_center.html',
+        {
+            'clinic': clinic,
+            'support_form': support_form,
+            'feature_form': feature_form,
+            'help_requests': help_requests,
+            'status_notice': status_notice,
+            'current_local_time': timezone.localtime(timezone.now(), ZoneInfo(clinic.timezone or 'UTC')),
+            'is_help_admin_scope': _is_admin(request.user),
         },
     )
 

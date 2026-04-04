@@ -34,6 +34,7 @@ urlpatterns = [
     path('accounts/2fa/disable/', views.two_factor_disable_view, name='two-factor-disable'),
     path('settings/', views.settings_view, name='settings'),
     path('settings/security-audit/', views.security_audit_view, name='security-audit'),
+    path('help/', views.help_center_view, name='help-center'),
     path('messages/', views.messages_view, name='messages'),
     path('messages/<int:thread_id>/', views.messages_view, name='messages-thread'),
     path('search/preview/', views.portal_search_preview, name='portal-search-preview'),

@@ -1327,6 +1327,14 @@
         </span>
         <span class="nav-link__label">Account settings</span>
       </a>
+      {% if nav_is_staff %}
+        <a class="nav-link {% if current == 'help-center' %}active{% endif %}" href="{% url 'help-center' %}" aria-label="Help and feedback" data-tooltip="Help and feedback">
+          <span class="nav-link__icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none"><path d="M9.75 9.25a2.25 2.25 0 1 1 4.23 1.07c-.45.78-1.23 1.13-1.73 1.68-.44.47-.5.82-.5 1.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 17h.01" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M12 20.25c4.56 0 8.25-3.7 8.25-8.25S16.56 3.75 12 3.75 3.75 7.44 3.75 12s3.7 8.25 8.25 8.25Z" stroke="currentColor" stroke-width="1.8"/></svg>
+          </span>
+          <span class="nav-link__label">Help and feedback</span>
+        </a>
+      {% endif %}
       {% if nav_is_admin %}
         <a class="nav-link {% if current == 'security-audit' %}active{% endif %}" href="{% url 'security-audit' %}" aria-label="Security audit" data-tooltip="Security audit">
           <span class="nav-link__icon" aria-hidden="true">
@@ -1565,6 +1573,9 @@
         </div>
         <div class="avatar-actions">
           <a class="primary" href="{% url 'settings' %}">Account settings</a>
+          {% if nav_is_staff %}
+            <a href="{% url 'help-center' %}">Help and feedback</a>
+          {% endif %}
           {% if nav_is_admin %}
             <a href="{% url 'security-audit' %}">Security audit</a>
           {% endif %}
@@ -1630,6 +1641,9 @@
 
   <div class="nav-drawer__footer">
     <a href="{% url 'settings' %}">Account settings</a>
+    {% if nav_is_staff %}
+      <a href="{% url 'help-center' %}">Help and feedback</a>
+    {% endif %}
     {% if nav_is_admin %}
       <a href="{% url 'security-audit' %}">Security audit</a>
     {% endif %}

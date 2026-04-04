@@ -12,6 +12,7 @@ from .models import (
     Clinic,
     ClinicMessagingPermission,
     ClinicSubscription,
+    HelpRequest,
     Message,
     MessageThread,
     MessageThreadReadState,
@@ -388,6 +389,75 @@ class MessageThreadReadStateAdmin(ClinicScopedAdmin, admin.ModelAdmin):
         if not clinic:
             return qs.none()
         return qs.filter(thread__clinic=clinic)
+
+
+@admin.register(HelpRequest)
+class HelpRequestAdmin(ClinicScopedAdmin, admin.ModelAdmin):
+    list_display = (
+        'subject',
+        'request_type',
+        'clinic',
+        'submitted_by',
+        'staff_role',
+        'priority',
+        'status',
+        'created_at',
+    )
+    list_filter = ('request_type', 'priority', 'status', 'clinic', 'category')
+    search_fields = ('subject', 'reporter_name', 'reporter_email', 'page_url')
+    readonly_fields = (
+        'clinic',
+        'submitted_by',
+        'request_type',
+        'category',
+        'priority',
+        'subject',
+        'details',
+        'business_impact',
+        'page_url',
+        'user_agent',
+        'reporter_name',
+        'reporter_email',
+        'staff_role',
+        'created_at',
+        'updated_at',
+    )
+    fieldsets = (
+        (
+            'Request',
+            {
+                'fields': (
+                    'clinic',
+                    'submitted_by',
+                    'request_type',
+                    'category',
+                    'priority',
+                    'status',
+                    'subject',
+                    'details',
+                    'business_impact',
+                ),
+            },
+        ),
+        (
+            'Reporter context',
+            {
+                'fields': (
+                    'reporter_name',
+                    'reporter_email',
+                    'staff_role',
+                    'page_url',
+                    'user_agent',
+                ),
+            },
+        ),
+        (
+            'Internal follow-up',
+            {
+                'fields': ('internal_notes', 'resolved_at', 'created_at', 'updated_at'),
+            },
+        ),
+    )
 
 
 @admin.register(AdminBranding)

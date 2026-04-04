@@ -1,0 +1,29 @@
+ClinicOps received a new {{ request_label|lower }}.
+
+Clinic: {{ clinic.name }}
+Submitted by: {{ reporter_name|default:submitted_by.get_full_name|default:submitted_by.username|default:"Unknown user" }}
+Email: {{ help_request.reporter_email|default:"-" }}
+Role: {{ help_request.staff_role|default:"-" }}
+Priority: {{ priority_label }}
+Status: {{ status_label }}
+Category: {{ help_request.category|default:"-" }}
+Subject: {{ help_request.subject }}
+
+Details:
+{{ help_request.details }}
+
+{% if help_request.business_impact %}
+Business impact:
+{{ help_request.business_impact }}
+
+{% endif %}
+{% if help_request.page_url %}
+Page:
+{{ help_request.page_url }}
+
+{% endif %}
+Open admin queue:
+{{ admin_url }}
+
+Open portal help center:
+{{ portal_url }}
