@@ -55,6 +55,7 @@ from .models import (
     WaitlistEntry,
 )
 from .notifications import create_clinic_notifications
+from .plan_limits import clinic_can_use_messaging, clinic_can_use_waitlist, clinic_usage_summary
 from .social_auth import ClinicSocialAccountAdapter, find_matching_local_user
 from .tasks import send_upcoming_appointment_reminders
 from .two_factor import generate_recovery_codes
@@ -1484,6 +1485,82 @@ class WaitlistFlowTests(TestCase):
         self.assertEqual(entry.email, 'waiting@example.com')
         self.assertEqual(Notification.objects.filter(recipient=user).count(), 1)
 
+    def test_public_booking_hides_waitlist_when_plan_is_free(self):
+        clinic = Clinic.objects.create(name='Free Waitlist Clinic', timezone='UTC')
+        free_plan = Plan.objects.create(
+            name='Free',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        ClinicSubscription.objects.create(
+            clinic=clinic,
+            plan=free_plan,
+            paypal_subscription_id='LOCAL-FREE-WAITLIST',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+        appointment_type = AppointmentType.objects.create(
+            clinic=clinic,
+            name='Consult',
+            duration_minutes=30,
+        )
+
+        response = self.client.get(reverse('clinic-booking', args=[clinic.id]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Waitlist unavailable on this plan')
+        self.assertNotContains(response, 'Join waitlist')
+
+    def test_public_waitlist_post_does_not_create_entry_when_plan_is_free(self):
+        clinic = Clinic.objects.create(name='Free Waitlist Submit Clinic', timezone='UTC')
+        free_plan = Plan.objects.create(
+            name='Free',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        ClinicSubscription.objects.create(
+            clinic=clinic,
+            plan=free_plan,
+            paypal_subscription_id='LOCAL-FREE-WAITLIST-POST',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+        appointment_type = AppointmentType.objects.create(
+            clinic=clinic,
+            name='Consult',
+            duration_minutes=30,
+        )
+
+        response = self.client.post(
+            reverse('clinic-booking', args=[clinic.id]),
+            data={
+                'form_action': 'waitlist',
+                'type': appointment_type.id,
+                'waitlist-first_name': 'Waiting',
+                'waitlist-last_name': 'Patient',
+                'waitlist-email': 'waiting@example.com',
+                'waitlist-phone': '555-9999',
+                'waitlist-preferred_start_date': timezone.localdate().isoformat(),
+                'waitlist-preferred_end_date': timezone.localdate().isoformat(),
+                'waitlist-notes': 'Any afternoon slot works.',
+                'waitlist-consent_to_contact': 'on',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Waitlist access is available on the clinic Premium plan')
+        self.assertEqual(WaitlistEntry.objects.filter(clinic=clinic).count(), 0)
+
     def test_admin_can_review_and_update_waitlist(self):
         clinic = Clinic.objects.create(name='Waitlist Portal Clinic', timezone='UTC')
         admin_user = User.objects.create_user(
@@ -1520,6 +1597,41 @@ class WaitlistFlowTests(TestCase):
         self.assertEqual(update.status_code, 200)
         entry.refresh_from_db()
         self.assertEqual(entry.status, WaitlistEntry.Status.CONTACTED)
+
+    def test_staff_waitlist_shows_premium_lock_for_free_plan(self):
+        clinic = Clinic.objects.create(name='Waitlist Locked Clinic', timezone='UTC')
+        free_plan = Plan.objects.create(
+            name='Free',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        ClinicSubscription.objects.create(
+            clinic=clinic,
+            plan=free_plan,
+            paypal_subscription_id='LOCAL-WAITLIST-LOCK',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+        admin_user = User.objects.create_user(
+            username='waitlist-lock-admin@example.com',
+            email='waitlist-lock-admin@example.com',
+            password='password',
+        )
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        admin_user.groups.add(admin_group)
+        Staff.objects.create(user=admin_user, clinic=clinic)
+        self.client.force_login(admin_user)
+
+        response = self.client.get(reverse('staff-waitlist'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Waitlist is available on Premium')
+        self.assertContains(response, reverse('billing'))
 
 
 class SubscriptionGateTests(TestCase):
@@ -1609,6 +1721,8 @@ class FreemiumPlanTests(TestCase):
             service_limit=3,
             monthly_appointment_limit=50,
             includes_reminders=False,
+            includes_messaging=False,
+            includes_waitlist=False,
         )
         session = self.client.session
         session['signup_clinic_id'] = self.clinic.id
@@ -1669,6 +1783,8 @@ class FreemiumPlanTests(TestCase):
             service_limit=3,
             monthly_appointment_limit=50,
             includes_reminders=False,
+            includes_messaging=False,
+            includes_waitlist=False,
         )
         session = self.client.session
         session['signup_clinic_id'] = self.clinic.id
@@ -1734,6 +1850,8 @@ class FreemiumPlanTests(TestCase):
             staff_limit=1,
             service_limit=3,
             monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
         )
         self._activate_plan(free_plan)
         self.client.force_login(self.admin_user)
@@ -1763,6 +1881,8 @@ class FreemiumPlanTests(TestCase):
             staff_limit=2,
             service_limit=3,
             monthly_appointment_limit=1,
+            includes_messaging=False,
+            includes_waitlist=False,
         )
         self._activate_plan(free_plan)
         appointment_type = AppointmentType.objects.create(
@@ -1820,6 +1940,8 @@ class FreemiumPlanTests(TestCase):
             service_limit=3,
             monthly_appointment_limit=50,
             includes_reminders=False,
+            includes_messaging=False,
+            includes_waitlist=False,
         )
         self._activate_plan(free_plan)
         patient = Patient.objects.create(
@@ -1853,6 +1975,8 @@ class FreemiumPlanTests(TestCase):
             service_limit=3,
             monthly_appointment_limit=50,
             includes_notifications=False,
+            includes_messaging=False,
+            includes_waitlist=False,
         )
         self._activate_plan(free_plan)
 
@@ -1863,6 +1987,27 @@ class FreemiumPlanTests(TestCase):
         )
 
         self.assertEqual(Notification.objects.filter(clinic=self.clinic).count(), 0)
+
+    def test_free_plan_disables_messaging_and_waitlist_features(self):
+        free_plan = Plan.objects.create(
+            name='Free Core',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        self._activate_plan(free_plan)
+
+        usage = clinic_usage_summary(self.clinic)
+
+        self.assertFalse(usage['messaging_enabled'])
+        self.assertFalse(usage['waitlist_enabled'])
+        self.assertFalse(clinic_can_use_messaging(self.clinic, usage=usage))
+        self.assertFalse(clinic_can_use_waitlist(self.clinic, usage=usage))
 
 
 class NotificationCenterTests(TestCase):
@@ -2463,6 +2608,58 @@ class MessagingFeatureTests(TestCase):
 
         self.assertEqual(response.status_code, 403)
 
+    def test_free_plan_staff_inbox_shows_premium_lock(self):
+        free_plan = Plan.objects.create(
+            name='Free',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        ClinicSubscription.objects.create(
+            clinic=self.clinic,
+            plan=free_plan,
+            paypal_subscription_id='LOCAL-MESSAGE-LOCK',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('messages'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Messages is available on Premium')
+        self.assertContains(response, reverse('billing'))
+
+    def test_owner_settings_show_messaging_premium_notice_on_free_plan(self):
+        free_plan = Plan.objects.create(
+            name='Free',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        ClinicSubscription.objects.create(
+            clinic=self.clinic,
+            plan=free_plan,
+            paypal_subscription_id='LOCAL-MESSAGE-SETTINGS',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('settings'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Secure clinic messaging and role-based inbox controls are available on the Premium plan')
+        self.assertContains(response, reverse('billing'))
+
     def test_patient_can_start_thread_and_owner_receives_email_alert(self):
         self.client.force_login(self.patient_user)
 
@@ -2511,6 +2708,31 @@ class MessagingFeatureTests(TestCase):
         self.assertEqual(mail.outbox[0].to, ['patient@messages.com'])
         self.assertIn('previous records', mail.outbox[0].body)
 
+    def test_appointment_manage_hides_messaging_when_plan_is_free(self):
+        free_plan = Plan.objects.create(
+            name='Free',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        ClinicSubscription.objects.create(
+            clinic=self.clinic,
+            plan=free_plan,
+            paypal_subscription_id='LOCAL-MESSAGE-MANAGE',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+
+        response = self.client.get(reverse('appointment-manage', args=[_appointment_manage_token(self.appointment)]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'This clinic keeps secure portal messaging on its Premium plan')
+        self.assertNotContains(response, 'Send message to clinic')
+
     def test_appointment_manage_message_creates_thread_and_owner_alert(self):
         token = _appointment_manage_token(self.appointment)
 
@@ -2529,3 +2751,35 @@ class MessagingFeatureTests(TestCase):
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ['owner@messages.com'])
         self.assertIn('fasting is required', mail.outbox[0].body)
+
+    def test_appointment_manage_message_post_is_blocked_when_plan_is_free(self):
+        free_plan = Plan.objects.create(
+            name='Free',
+            is_free=True,
+            price_cents=0,
+            interval=Plan.Interval.MONTH,
+            staff_limit=2,
+            service_limit=3,
+            monthly_appointment_limit=50,
+            includes_messaging=False,
+            includes_waitlist=False,
+        )
+        ClinicSubscription.objects.create(
+            clinic=self.clinic,
+            plan=free_plan,
+            paypal_subscription_id='LOCAL-MESSAGE-POST',
+            status=ClinicSubscription.Status.ACTIVE,
+        )
+        token = _appointment_manage_token(self.appointment)
+
+        response = self.client.post(
+            reverse('appointment-manage', args=[token]),
+            data={
+                'action': 'message',
+                'message-body': 'Can I still send this?',
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Secure clinic messaging is available on the clinic Premium plan')
+        self.assertFalse(MessageThread.objects.filter(appointment=self.appointment).exists())

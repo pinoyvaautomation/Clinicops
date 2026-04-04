@@ -579,7 +579,7 @@
               </form>
             {% endif %}
 
-            {% if appointment_types and slot_count == 0 and waitlist_form %}
+            {% if appointment_types and slot_count == 0 and waitlist_enabled and waitlist_form %}
               <div class="section-card">
                 <h3>Join the waitlist</h3>
                 <p>If the schedule is full, leave your contact details and preferred dates so the clinic can reach out if a slot opens.</p>
@@ -639,6 +639,13 @@
                   </div>
                   <button class="submit" type="submit">Join waitlist</button>
                 </form>
+              </div>
+            {% endif %}
+
+            {% if appointment_types and slot_count == 0 and not waitlist_enabled %}
+              <div class="section-card">
+                <h3>Waitlist unavailable on this plan</h3>
+                <p>{{ waitlist_notice|default:"This clinic keeps waitlist management on its Premium plan. Contact the clinic directly if you want to be notified when a slot opens." }}</p>
               </div>
             {% endif %}
           </article>

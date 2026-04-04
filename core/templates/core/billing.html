@@ -385,11 +385,12 @@
                       {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} billed every {{ plan.interval }}.
                       Includes {{ plan.staff_limit }} staff seats, {{ plan.service_limit }} services, and {{ plan.monthly_appointment_limit }} appointments per month.
                       {% if not plan.includes_reminders %}Reminder automation stays on Premium.{% endif %}
+                      {% if not plan.includes_messaging or not plan.includes_waitlist %} Messaging and waitlist stay on Premium.{% endif %}
                     </p>
                   {% else %}
                     <p>
                       {{ plan.currency }} {{ plan.price_dollars|floatformat:2 }} billed every {{ plan.interval }}.
-                      Unlimited staff, services, and appointments with reminders{% if plan.includes_notifications %}, notifications{% endif %}{% if plan.includes_custom_branding %}, and branding{% endif %}.
+                      Unlimited staff, services, and appointments with reminders{% if plan.includes_notifications %}, notifications{% endif %}{% if plan.includes_messaging %}, secure messaging{% endif %}{% if plan.includes_waitlist %}, waitlist recovery{% endif %}{% if plan.includes_custom_branding %}, and branding{% endif %}.
                     </p>
                   {% endif %}
                 </div>

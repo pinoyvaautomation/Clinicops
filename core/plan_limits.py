@@ -85,7 +85,7 @@ def _appointment_month_window(clinic):
 
 
 def clinic_usage_summary(clinic):
-    """Plan notes: compute Free usage and Premium unlimited messaging in one place."""
+    """Plan notes: compute plan-backed limits and feature flags in one place."""
     subscription = get_current_subscription(clinic)
     plan = subscription.plan if subscription else None
     tz, month_start_local, next_month_local = _appointment_month_window(clinic)
@@ -127,6 +127,8 @@ def clinic_usage_summary(clinic):
         'is_premium': bool(plan and not plan.is_free),
         'reminders_enabled': True if not plan else plan.includes_reminders,
         'notifications_enabled': True if not plan else plan.includes_notifications,
+        'messaging_enabled': True if not plan else plan.includes_messaging,
+        'waitlist_enabled': True if not plan else plan.includes_waitlist,
         'custom_branding_enabled': True if not plan else plan.includes_custom_branding,
         'month_window_label': month_start_local.strftime('%B %Y'),
         'staff': _usage_item(label='staff seat', used=staff_used, limit=staff_limit),
@@ -175,6 +177,18 @@ def clinic_can_use_notifications(clinic, *, usage=None) -> bool:
     """Plan notes: notification storage and bell visibility should resolve through this flag."""
     usage = usage or clinic_usage_summary(clinic)
     return usage['notifications_enabled']
+
+
+def clinic_can_use_messaging(clinic, *, usage=None) -> bool:
+    """Plan notes: secure patient/staff inbox access is Premium-only once plans are enforced."""
+    usage = usage or clinic_usage_summary(clinic)
+    return usage['messaging_enabled']
+
+
+def clinic_can_use_waitlist(clinic, *, usage=None) -> bool:
+    """Plan notes: waitlist capture and the staff queue should resolve through one flag."""
+    usage = usage or clinic_usage_summary(clinic)
+    return usage['waitlist_enabled']
 
 
 def clinic_can_use_custom_branding(clinic, *, usage=None) -> bool:

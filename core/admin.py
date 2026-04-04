@@ -278,10 +278,20 @@ class PlanAdmin(SimpleHistoryAdmin):
         'monthly_appointment_limit_display',
         'includes_reminders',
         'includes_notifications',
+        'includes_messaging',
+        'includes_waitlist',
         'includes_custom_branding',
         'is_active',
     )
-    list_filter = ('is_free', 'interval', 'is_active', 'includes_reminders', 'includes_notifications')
+    list_filter = (
+        'is_free',
+        'interval',
+        'is_active',
+        'includes_reminders',
+        'includes_notifications',
+        'includes_messaging',
+        'includes_waitlist',
+    )
     search_fields = ('name', 'paypal_plan_id')
     fieldsets = (
         (
@@ -308,7 +318,13 @@ class PlanAdmin(SimpleHistoryAdmin):
         (
             'Included features',
             {
-                'fields': ('includes_reminders', 'includes_notifications', 'includes_custom_branding'),
+                'fields': (
+                    'includes_reminders',
+                    'includes_notifications',
+                    'includes_messaging',
+                    'includes_waitlist',
+                    'includes_custom_branding',
+                ),
             },
         ),
     )

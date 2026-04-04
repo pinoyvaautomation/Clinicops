@@ -270,6 +270,8 @@ class Plan(models.Model):
     monthly_appointment_limit = models.PositiveIntegerField(blank=True, null=True)
     includes_reminders = models.BooleanField(default=True)
     includes_notifications = models.BooleanField(default=True)
+    includes_messaging = models.BooleanField(default=True)
+    includes_waitlist = models.BooleanField(default=True)
     includes_custom_branding = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)

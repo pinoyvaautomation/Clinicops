@@ -483,6 +483,15 @@
                 </div>
               </form>
             </div>
+          {% elif messaging_permissions_locked %}
+            <div class="profile-line">
+              <span class="label">Messaging permissions</span>
+              <strong>Premium required</strong>
+              <p class="note" style="margin-top: 10px;">Secure clinic messaging and role-based inbox controls are available on the Premium plan. Upgrade the clinic to decide which roles can view messages and which roles can reply.</p>
+              <div class="actions" style="margin-top: 12px;">
+                <a class="btn-ghost" href="{% url 'billing' %}">Open billing</a>
+              </div>
+            </div>
           {% endif %}
 
           {% if clinic and clinic.slug and profile_type == 'staff' %}

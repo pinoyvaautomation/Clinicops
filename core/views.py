@@ -104,7 +104,9 @@ from .plan_limits import (
     clinic_can_add_service,
     clinic_can_add_staff,
     clinic_can_send_reminders,
+    clinic_can_use_messaging,
     clinic_can_use_notifications,
+    clinic_can_use_waitlist,
     clinic_usage_summary,
     get_current_subscription,
 )
@@ -1742,6 +1744,45 @@ def _require_staff_portal(request):
     return staff, None
 
 
+def _render_premium_feature_locked(
+    request,
+    *,
+    clinic: Clinic,
+    feature_name: str,
+    feature_summary: str,
+    feature_reason: str,
+    feature_points: list[dict],
+    current: str,
+    back_url: str,
+):
+    can_upgrade = bool(
+        getattr(request.user, 'is_authenticated', False)
+        and (
+            request.user.is_superuser
+            or request.user.groups.filter(name='Admin').exists()
+        )
+    )
+    return render(
+        request,
+        'core/premium_feature_locked.html',
+        {
+            'clinic': clinic,
+            'feature_name': feature_name,
+            'feature_summary': feature_summary,
+            'feature_reason': feature_reason,
+            'feature_points': feature_points,
+            'current': current,
+            'back_url': back_url,
+            'upgrade_url': reverse('billing') if can_upgrade else '',
+            'plan_usage': clinic_usage_summary(clinic),
+            'current_local_time': timezone.localtime(
+                timezone.now(),
+                ZoneInfo(clinic.timezone or 'UTC'),
+            ),
+        },
+    )
+
+
 def _build_schedule_summary(appointments, tz, start_date=None, end_date=None):
     now = timezone.now()
     today = timezone.localdate(now, tz)
@@ -2145,6 +2186,7 @@ def _clinic_booking(request, clinic: Clinic):
 
     slots = build_available_slots(clinic, staff_list, duration_minutes=duration_minutes)
     slot_choices = [(slot.value, slot.label) for slot in slots]
+    waitlist_enabled = clinic_can_use_waitlist(clinic, usage=plan_usage)
     waitlist_form = WaitlistEntryForm(
         prefix='waitlist',
         initial={
@@ -2152,16 +2194,24 @@ def _clinic_booking(request, clinic: Clinic):
         },
     )
     waitlist_success = request.GET.get('waitlist') == 'joined'
+    waitlist_notice = ''
 
     if request.method == 'POST':
         action = request.POST.get('form_action') or 'booking'
         if action == 'waitlist':
-            waitlist_form = WaitlistEntryForm(request.POST, prefix='waitlist')
             form = BookingForm(
                 slot_choices=slot_choices,
                 appointment_type_id=selected_type.id if selected_type else None,
             )
-            if waitlist_form.is_valid():
+            if not waitlist_enabled:
+                waitlist_notice = (
+                    'Waitlist access is available on the clinic Premium plan. '
+                    'Contact the clinic directly if you want to be notified when a slot opens.'
+                )
+                waitlist_form = None
+            else:
+                waitlist_form = WaitlistEntryForm(request.POST, prefix='waitlist')
+            if waitlist_enabled and waitlist_form.is_valid():
                 email = waitlist_form.cleaned_data['email']
                 waitlist_entry = waitlist_form.save(commit=False)
                 waitlist_entry.clinic = clinic
@@ -2305,7 +2355,9 @@ def _clinic_booking(request, clinic: Clinic):
             'slot_count': len(slot_choices),
             'embed_mode': embed_mode,
             'booking_public_url': _clinic_booking_public_url(request, clinic),
-            'waitlist_form': waitlist_form,
+            'waitlist_form': waitlist_form if waitlist_enabled else None,
+            'waitlist_enabled': waitlist_enabled,
+            'waitlist_notice': waitlist_notice,
             'waitlist_success': waitlist_success,
         },
     )
@@ -2358,6 +2410,8 @@ def appointment_manage(request, token: str):
         and appointment.start_at > timezone.now()
     )
     slot_choices = _self_service_slot_choices(appointment) if can_modify else []
+    plan_usage = clinic_usage_summary(clinic)
+    messaging_enabled = clinic_can_use_messaging(clinic, usage=plan_usage)
 
     intake_initial = {
         'intake_reason': appointment.intake_reason or '',
@@ -2373,6 +2427,7 @@ def appointment_manage(request, token: str):
     )
     message_thread = MessageThread.objects.filter(appointment=appointment).select_related('patient', 'clinic').first()
     message_form = MessageReplyForm(prefix='message')
+    messaging_notice = ''
 
     if request.method == 'POST':
         action = request.POST.get('action') or ''
@@ -2425,6 +2480,8 @@ def appointment_manage(request, token: str):
                         'reschedule_form': reschedule_form,
                         'cancel_form': cancel_form,
                         'message_form': message_form,
+                        'messaging_enabled': messaging_enabled,
+                        'messaging_notice': messaging_notice,
                         'message_thread': message_thread,
                         'thread_messages': list(message_thread.messages.select_related('sender_user').order_by('created_at')) if message_thread else [],
                         'manage_url': _appointment_manage_url(request, appointment),
@@ -2482,6 +2539,8 @@ def appointment_manage(request, token: str):
                         'reschedule_form': reschedule_form,
                         'cancel_form': cancel_form,
                         'message_form': message_form,
+                        'messaging_enabled': messaging_enabled,
+                        'messaging_notice': messaging_notice,
                         'message_thread': message_thread,
                         'thread_messages': list(message_thread.messages.select_related('sender_user').order_by('created_at')) if message_thread else [],
                         'manage_url': _appointment_manage_url(request, appointment),
@@ -2502,8 +2561,15 @@ def appointment_manage(request, token: str):
                 )
                 return redirect(f"{_appointment_manage_path(appointment)}?status=cancelled")
         elif action == 'message':
-            message_form = MessageReplyForm(request.POST, prefix='message')
-            if message_form.is_valid():
+            if not messaging_enabled:
+                message_form = MessageReplyForm(prefix='message')
+                messaging_notice = (
+                    'Secure clinic messaging is available on the clinic Premium plan. '
+                    'Contact the clinic directly for booking questions.'
+                )
+            else:
+                message_form = MessageReplyForm(request.POST, prefix='message')
+            if messaging_enabled and message_form.is_valid():
                 message_thread = get_or_create_appointment_thread(appointment)
                 patient_sender = appointment.patient.user if appointment.patient.user_id else None
                 message = append_message(
@@ -2533,6 +2599,8 @@ def appointment_manage(request, token: str):
             'reschedule_form': reschedule_form,
             'cancel_form': cancel_form,
             'message_form': message_form,
+            'messaging_enabled': messaging_enabled,
+            'messaging_notice': messaging_notice,
             'message_thread': message_thread,
             'thread_messages': thread_messages,
             'manage_url': _appointment_manage_url(request, appointment),
@@ -2627,6 +2695,52 @@ def messages_view(request, thread_id: int | None = None):
             return HttpResponseForbidden('Messaging access requires a staff or patient profile.')
         clinic = patient.clinic
         profile_type = 'patient'
+
+    plan_usage = clinic_usage_summary(clinic)
+    if not clinic_can_use_messaging(clinic, usage=plan_usage):
+        if profile_type == 'staff':
+            return _render_premium_feature_locked(
+                request,
+                clinic=clinic,
+                feature_name='Messages',
+                feature_summary='Keep patient questions, booking replies, and staff follow-up in one secure thread instead of relying on phone or external inboxes.',
+                feature_reason='Premium clinics use messaging to reduce front-desk callbacks, keep a single conversation history per patient, and make follow-up easier for the care team.',
+                feature_points=[
+                    {
+                        'title': 'Shared clinic inbox',
+                        'body': 'Patient messages and staff replies stay together in a single conversation thread.',
+                    },
+                    {
+                        'title': 'Secure patient replies',
+                        'body': 'Patients can reply from their portal or verified appointment link without exposing staff email addresses.',
+                    },
+                    {
+                        'title': 'Unread tracking',
+                        'body': 'The portal shows recent conversations and unread counts beside the notification bell.',
+                    },
+                ],
+                current='messages',
+                back_url=reverse('dashboard'),
+            )
+        return _render_premium_feature_locked(
+            request,
+            clinic=clinic,
+            feature_name='Messages',
+            feature_summary='This clinic keeps secure portal messaging on its Premium plan. You can still manage appointments and contact the clinic through its normal channels.',
+            feature_reason='Premium messaging lets clinics keep patient conversations inside the booking workflow instead of relying on external inboxes or phone-only follow-up.',
+            feature_points=[
+                {
+                    'title': 'Patient conversation history',
+                    'body': 'Each appointment and portal conversation stays in one secure thread for the clinic team.',
+                },
+                {
+                    'title': 'Fewer missed replies',
+                    'body': 'Unread counts and inbox previews help clinics respond faster to patient questions.',
+                },
+            ],
+            current='messages',
+            back_url=reverse('patient-portal'),
+        )
 
     tz = ZoneInfo(clinic.timezone or 'UTC')
     status_banner = _message_status_banner(request.GET.get('status'))
@@ -2927,9 +3041,20 @@ def settings_view(request):
     avatar_saved = False
     messaging_permissions_saved = False
     messaging_form = None
+    plan_usage = clinic_usage_summary(clinic) if clinic else None
+    messaging_feature_enabled = bool(clinic and clinic_can_use_messaging(clinic, usage=plan_usage))
 
     can_manage_messaging_permissions = bool(
-        clinic and profile_type == 'staff' and user_can_manage_messaging_settings(request.user, clinic)
+        clinic
+        and profile_type == 'staff'
+        and messaging_feature_enabled
+        and user_can_manage_messaging_settings(request.user, clinic)
+    )
+    messaging_permissions_locked = bool(
+        clinic
+        and profile_type == 'staff'
+        and not messaging_feature_enabled
+        and user_can_manage_messaging_settings(request.user, clinic)
     )
     if can_manage_messaging_permissions:
         messaging_form = MessagingRolePermissionForm(initial_access=clinic_messaging_access_map(clinic))
@@ -3003,10 +3128,13 @@ def settings_view(request):
             'can_manage_booking_embed': can_manage_booking_embed,
             'can_view_clinic_security_activity': can_view_clinic_security_activity,
             'can_manage_messaging_permissions': can_manage_messaging_permissions,
+            'messaging_permissions_locked': messaging_permissions_locked,
+            'messaging_feature_enabled': messaging_feature_enabled,
             'messaging_permissions_form': messaging_form,
             'messaging_permissions_saved': messaging_permissions_saved,
             'messaging_role_rows': messaging_role_rows(clinic) if clinic and profile_type == 'staff' else [],
             'is_clinic_owner': bool(clinic and user_is_clinic_owner(request.user, clinic)),
+            'plan_usage': plan_usage,
             'booking_public_url': booking_public_url,
             'booking_embed_url': booking_embed_url,
             'booking_embed_code': booking_embed_code,
@@ -3933,6 +4061,31 @@ def staff_waitlist(request):
         return HttpResponseForbidden('Only Admin or Front Desk can review the waitlist.')
 
     clinic = staff.clinic
+    plan_usage = clinic_usage_summary(clinic)
+    if not clinic_can_use_waitlist(clinic, usage=plan_usage):
+        return _render_premium_feature_locked(
+            request,
+            clinic=clinic,
+            feature_name='Waitlist',
+            feature_summary='Capture interested patients when the calendar is full, then move them from contact to booking without losing their service or availability preferences.',
+            feature_reason='Premium clinics use the waitlist to recover cancelled slots, reduce lost revenue, and give Front Desk teams one place to track who should be contacted next.',
+            feature_points=[
+                {
+                    'title': 'Full-schedule fallback',
+                    'body': 'Patients can leave their details when no slots are available instead of dropping out of the booking flow.',
+                },
+                {
+                    'title': 'Queue management',
+                    'body': 'Front Desk can move each request through active, contacted, booked, or closed stages.',
+                },
+                {
+                    'title': 'Better slot recovery',
+                    'body': 'Cancelled openings can be matched back to patient demand without scattered notes or spreadsheets.',
+                },
+            ],
+            current='staff-waitlist',
+            back_url=reverse('dashboard'),
+        )
     tz = ZoneInfo(clinic.timezone or 'UTC')
     valid_statuses = {choice[0] for choice in WaitlistEntry.Status.choices}
 

@@ -1245,7 +1245,7 @@
         </span>
         <span class="nav-link__label">Appointments</span>
       </a>
-      {% if nav_messages_enabled %}
+      {% if nav_messages_visible %}
         <a class="nav-link {% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}" aria-label="Messages" data-tooltip="Messages">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M6.75 6.75h10.5A2.25 2.25 0 0 1 19.5 9v5.25a2.25 2.25 0 0 1-2.25 2.25H11.5l-3.75 3v-3H6.75A2.25 2.25 0 0 1 4.5 14.25V9a2.25 2.25 0 0 1 2.25-2.25Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 10.25h7M8.5 13h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -1253,7 +1253,7 @@
           <span class="nav-link__label">Messages</span>
         </a>
       {% endif %}
-      {% if nav_can_manage_waitlist %}
+      {% if nav_waitlist_visible %}
         <a class="nav-link {% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}" aria-label="Waitlist" data-tooltip="Waitlist">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M6.75 7.75h10.5M6.75 12h7.5M6.75 16.25h5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17 13.75a2.25 2.25 0 1 0 0 4.5 2.25 2.25 0 0 0 0-4.5Z" stroke="currentColor" stroke-width="1.8"/><path d="m18.9 18.15 1.35 1.35" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -1294,7 +1294,7 @@
         </span>
         <span class="nav-link__label">Portal</span>
       </a>
-      {% if nav_messages_enabled %}
+      {% if nav_messages_visible %}
         <a class="nav-link {% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}" aria-label="Messages" data-tooltip="Messages">
           <span class="nav-link__icon" aria-hidden="true">
             <svg viewBox="0 0 24 24" fill="none"><path d="M6.75 6.75h10.5A2.25 2.25 0 0 1 19.5 9v5.25a2.25 2.25 0 0 1-2.25 2.25H11.5l-3.75 3v-3H6.75A2.25 2.25 0 0 1 4.5 14.25V9a2.25 2.25 0 0 1 2.25-2.25Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M8.5 10.25h7M8.5 13h4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -1616,10 +1616,10 @@
       <a class="{% if current == 'dashboard' %}active{% endif %}" href="{% url 'dashboard' %}">Dashboard</a>
       <a class="{% if current == 'calendar' %}active{% endif %}" href="{% url 'calendar' %}">Calendar</a>
       <a class="{% if current == 'staff-appointments' or current == 'staff-appointment-create' or current == 'staff-appointment-edit' or current == 'staff-appointment-history' %}active{% endif %}" href="{% url 'staff-appointments' %}">Appointments</a>
-      {% if nav_messages_enabled %}
+      {% if nav_messages_visible %}
         <a class="{% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}">Messages</a>
       {% endif %}
-      {% if nav_can_manage_waitlist %}
+      {% if nav_waitlist_visible %}
         <a class="{% if current == 'staff-waitlist' %}active{% endif %}" href="{% url 'staff-waitlist' %}">Waitlist</a>
       {% endif %}
       <a class="{% if current == 'staff-patients' or current == 'staff-patient-edit' %}active{% endif %}" href="{% url 'staff-patients' %}">Patients</a>
@@ -1630,7 +1630,7 @@
       {% endif %}
     {% else %}
       <a class="{% if current == 'patient-portal' %}active{% endif %}" href="{% url 'patient-portal' %}">Portal</a>
-      {% if nav_messages_enabled %}
+      {% if nav_messages_visible %}
         <a class="{% if current == 'messages' %}active{% endif %}" href="{% url 'messages' %}">Messages</a>
       {% endif %}
       {% if nav_patient_multi %}
