@@ -1980,6 +1980,13 @@ class PayPalWebhookTests(TestCase):
 
 
 class ClinicSignupTests(TestCase):
+    def test_signup_page_includes_browser_timezone_hint(self):
+        response = self.client.get(reverse('clinic-signup'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'timezone-detect-note')
+        self.assertContains(response, 'data-autodetect-enabled="true"', html=False)
+
     def test_signup_creates_clinic_and_user(self):
         Plan.objects.create(
             name='Basic',

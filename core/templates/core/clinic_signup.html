@@ -549,9 +549,19 @@
 
                 <div class="field full">
                   <label for="{{ form.timezone.id_for_label }}">Timezone</label>
-                  {{ form.timezone }}
+                  <div class="timezone-field-wrap">
+                    {{ form.timezone }}
+                  </div>
                   {{ form.timezone.errors }}
                   <div class="help">Use the clinic operating timezone so appointments, reminders, and billing dates stay aligned.</div>
+                  <div
+                    id="timezone-detect-note"
+                    class="help"
+                    style="display:none;"
+                    data-autodetect-enabled="{% if not form.is_bound %}true{% else %}false{% endif %}"
+                  >
+                    Using your browser timezone. Change this if your clinic operates elsewhere.
+                  </div>
                 </div>
 
                 <div class="field-grid">
@@ -898,6 +908,34 @@
         }
 
         startCarousel();
+      })();
+    </script>
+    <script>
+      (function() {
+        const timezoneSelect = document.getElementById('{{ form.timezone.id_for_label }}');
+        const note = document.getElementById('timezone-detect-note');
+        if (!timezoneSelect || !note) return;
+
+        const allowAutoDetect = note.dataset.autodetectEnabled === 'true';
+        if (!allowAutoDetect) return;
+        if (!window.Intl || !Intl.DateTimeFormat) return;
+
+        let detectedTimezone = '';
+        try {
+          detectedTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        } catch (error) {
+          detectedTimezone = '';
+        }
+        if (!detectedTimezone) return;
+
+        const matchingOption = Array.from(timezoneSelect.options).find(function(option) {
+          return option.value === detectedTimezone;
+        });
+        if (!matchingOption) return;
+
+        timezoneSelect.value = detectedTimezone;
+        note.textContent = 'Detected from your browser: ' + matchingOption.text + '. Change this if your clinic operates elsewhere.';
+        note.style.display = 'block';
       })();
     </script>
     {% include "core/partials/password_toggle_assets.html" %}
