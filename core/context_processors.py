@@ -168,11 +168,13 @@ def user_roles(request):
         'nav_notification_preview': notification_preview,
         'nav_messages_visible': messages_visible,
         'nav_messages_enabled': messages_enabled,
+        'nav_messages_locked': messages_visible and not messages_enabled,
         'nav_messages_unread_count': unread_messages,
         'nav_message_preview': message_preview,
         'nav_plan_usage': plan_usage,
         'nav_can_search': can_staff_search and is_staff_user,
         'nav_waitlist_visible': waitlist_visible,
         'nav_waitlist_enabled': waitlist_enabled,
+        'nav_waitlist_locked': waitlist_visible and not waitlist_enabled,
         'nav_can_manage_waitlist': waitlist_enabled,
     }
