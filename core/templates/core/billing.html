@@ -376,6 +376,15 @@
               <p id="plan-mode-note" class="helper" style="margin: 10px 0 0;">The selected plan controls whether this clinic activates locally or through PayPal.</p>
             </div>
 
+            <div class="field-block" style="margin-top: 18px;">
+              <label for="billing-promo-code">Promo code</label>
+              <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;">
+                <input id="billing-promo-code" type="text" autocomplete="off" placeholder="LAUNCH50">
+                <button id="billing-promo-apply" type="button" class="btn-ghost" style="min-width:110px;">Apply</button>
+              </div>
+              <p id="billing-promo-note" class="helper" style="margin: 10px 0 0;">Promo codes apply to Premium plans only.</p>
+            </div>
+
             <div class="plan-list">
               {% for plan in plans %}
                 <div class="plan-card">
@@ -466,11 +475,38 @@
         const freePlanContainer = document.getElementById('free-plan-container');
         const freePlanButton = document.getElementById('activate-free-plan');
         const planModeNote = document.getElementById('plan-mode-note');
+        const promoInput = document.getElementById('billing-promo-code');
+        const promoApplyButton = document.getElementById('billing-promo-apply');
+        const promoNote = document.getElementById('billing-promo-note');
         const csrfTokenInput = document.querySelector('#billing-csrf [name=csrfmiddlewaretoken]');
         const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
         const syncButton = document.getElementById('sync-button');
         const successBox = document.getElementById('billing-success');
         const errorBox = document.getElementById('billing-error');
+        let activeOffer = null;
+
+        function normalizePromoCode(value) {
+          return (value || '').trim().toUpperCase().replace(/\s+/g, '');
+        }
+
+        function promoDefaultNote() {
+          if (!planSelect || !planSelect.options.length) {
+            return 'Promo codes apply to Premium plans only.';
+          }
+          const selectedOption = planSelect.options[planSelect.selectedIndex];
+          if (!selectedOption) {
+            return 'Promo codes apply to Premium plans only.';
+          }
+          return selectedOption.getAttribute('data-plan-mode') === 'free'
+            ? 'Promo codes apply to Premium plans only.'
+            : 'Have a launch or campaign code? Apply it before PayPal checkout.';
+        }
+
+        function setPromoNote(message, state) {
+          if (!promoNote) return;
+          promoNote.textContent = message;
+          promoNote.style.color = state === 'error' ? '#b42318' : (state === 'success' ? '#166534' : '');
+        }
 
         function showError(message) {
           if (errorBox) {
@@ -503,6 +539,10 @@
           container.innerHTML = '';
 
           const selectedOption = planSelect.options[planSelect.selectedIndex];
+          if (activeOffer && String(activeOffer.plan_id) !== String(selectedOption ? selectedOption.value : '')) {
+            activeOffer = null;
+            setPromoNote(promoDefaultNote(), '');
+          }
           if (!selectedOption) {
             showError('Select a plan before starting checkout.');
             return;
@@ -520,6 +560,7 @@
             if (planModeNote) {
               planModeNote.textContent = 'Free activates instantly inside ClinicOps and skips PayPal.';
             }
+            setPromoNote(promoDefaultNote(), '');
             return;
           }
 
@@ -527,7 +568,9 @@
             freePlanContainer.style.display = 'none';
           }
           if (planModeNote) {
-            planModeNote.textContent = 'Premium stays on the PayPal subscription flow for recurring billing.';
+            planModeNote.textContent = activeOffer
+              ? activeOffer.message
+              : 'Premium stays on the PayPal subscription flow for recurring billing.';
           }
 
           if (!window.paypal || !paypal.Buttons) {
@@ -535,7 +578,11 @@
             return;
           }
 
-          if (!paypalPlanId) {
+          const checkoutPlanId = activeOffer && String(activeOffer.plan_id) === String(planId)
+            ? activeOffer.paypal_plan_id
+            : paypalPlanId;
+
+          if (!checkoutPlanId) {
             showError('Selected Premium plan is missing a PayPal plan ID.');
             return;
           }
@@ -543,7 +590,7 @@
           paypal.Buttons({
             createSubscription: function(data, actions) {
               return actions.subscription.create({
-                plan_id: paypalPlanId,
+                plan_id: checkoutPlanId,
                 custom_id: 'clinic-{{ clinic.id }}'
               });
             },
@@ -557,7 +604,8 @@
                 credentials: 'same-origin',
                 body: JSON.stringify({
                   plan_id: planId,
-                  subscription_id: data.subscriptionID
+                  subscription_id: data.subscriptionID,
+                  promo_code: activeOffer ? activeOffer.promo_code : ''
                 })
               }).then(async function(response) {
                 const text = await response.text();
@@ -570,6 +618,63 @@
               });
             }
           }).render('#paypal-button-container');
+        }
+
+        function applyPromoCode() {
+          if (!planSelect) return;
+          const selectedOption = planSelect.options[planSelect.selectedIndex];
+          if (!selectedOption) {
+            setPromoNote('Select a plan before applying a promo code.', 'error');
+            return;
+          }
+          if (selectedOption.getAttribute('data-plan-mode') === 'free') {
+            activeOffer = null;
+            setPromoNote('Promo codes apply to Premium plans only.', 'error');
+            renderButtons();
+            return;
+          }
+          const promoCode = normalizePromoCode(promoInput ? promoInput.value : '');
+          if (!promoCode) {
+            activeOffer = null;
+            setPromoNote('Enter a promo code before applying it.', 'error');
+            renderButtons();
+            return;
+          }
+          if (promoApplyButton) {
+            promoApplyButton.disabled = true;
+          }
+          clearMessages();
+          fetch('{% url "plan-offer-preview" %}', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              plan_id: selectedOption.value,
+              promo_code: promoCode
+            })
+          }).then(async function(response) {
+            const data = await response.json().catch(function() { return {}; });
+            if (!response.ok) {
+              throw new Error(data.error || 'Promo validation failed.');
+            }
+            activeOffer = data.promo_applied ? data : null;
+            if (promoInput && data.promo_code) {
+              promoInput.value = data.promo_code;
+            }
+            setPromoNote(data.message || 'Promo applied.', data.promo_applied ? 'success' : '');
+            renderButtons();
+          }).catch(function(err) {
+            activeOffer = null;
+            setPromoNote(err.message, 'error');
+            renderButtons();
+          }).finally(function() {
+            if (promoApplyButton) {
+              promoApplyButton.disabled = false;
+            }
+          });
         }
 
         if (freePlanButton) {
@@ -587,7 +692,8 @@
               },
               credentials: 'same-origin',
               body: JSON.stringify({
-                plan_id: planId
+                plan_id: planId,
+                promo_code: ''
               })
             }).then(async function(response) {
               const text = await response.text();
@@ -604,8 +710,38 @@
           });
         }
 
+        if (promoApplyButton) {
+          promoApplyButton.addEventListener('click', applyPromoCode);
+        }
+        if (promoInput) {
+          promoInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              applyPromoCode();
+            }
+          });
+          promoInput.addEventListener('input', function() {
+            const normalized = normalizePromoCode(promoInput.value);
+            if (!normalized) {
+              activeOffer = null;
+              setPromoNote(promoDefaultNote(), '');
+              renderButtons();
+              return;
+            }
+            if (activeOffer && normalized !== normalizePromoCode(activeOffer.promo_code)) {
+              activeOffer = null;
+              setPromoNote('Promo code changed. Apply it again to update checkout.', '');
+              renderButtons();
+            }
+          });
+        }
         if (planSelect) {
-          planSelect.addEventListener('change', renderButtons);
+          planSelect.addEventListener('change', function() {
+            activeOffer = null;
+            setPromoNote(promoDefaultNote(), '');
+            renderButtons();
+          });
+          setPromoNote(promoDefaultNote(), '');
           renderButtons();
         }
 

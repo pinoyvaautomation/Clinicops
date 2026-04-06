@@ -70,6 +70,8 @@ from .models import (
     PayPalWebhookEvent,
     Patient,
     Plan,
+    PromoCode,
+    PromoRedemption,
     SecurityEvent,
     Staff,
     WaitlistEntry,
@@ -135,6 +137,8 @@ User = get_user_model()
 ALLOWED_GROUPS = {'Admin', 'Doctor', 'Nurse', 'FrontDesk'}
 logger = logging.getLogger(__name__)
 _UNSET = object()
+_PROMO_SESSION_KEY = 'checkout_promo_offer'
+_PROMO_SESSION_TTL_SECONDS = 30 * 60
 
 
 class ClinicLoginView(LoginView):
@@ -1029,8 +1033,146 @@ def _activate_selected_plan(
         logger.warning(
             'PayPal subscription sync failed during client activation for %s',
             subscription_id,
-        )
+    )
     return subscription
+
+
+def _normalize_promo_code(value: str | None) -> str:
+    return ''.join((value or '').upper().split())
+
+
+def _money_label(currency: str, cents: int | None) -> str:
+    if cents is None:
+        return ''
+    return f'{currency} {cents / 100:.2f}'
+
+
+def _promo_lookup_for_plan(plan: Plan, promo_code_value: str | None) -> tuple[PromoCode | None, str]:
+    normalized = _normalize_promo_code(promo_code_value)
+    if not normalized:
+        return None, ''
+
+    promo = (
+        PromoCode.objects.select_related('base_plan')
+        .filter(code=normalized, base_plan=plan)
+        .first()
+    )
+    if not promo or not promo.is_active:
+        return None, 'This promo code is invalid for the selected plan.'
+
+    now = timezone.now()
+    if promo.starts_at and now < promo.starts_at:
+        return None, 'This promo code is not active yet.'
+    if promo.ends_at and now > promo.ends_at:
+        return None, 'This promo code has expired.'
+    return promo, ''
+
+
+def _promo_limit_reached(promo: PromoCode) -> bool:
+    if promo.max_redemptions is None:
+        return False
+    return promo.redemptions.count() >= promo.max_redemptions
+
+
+def _store_validated_promo_offer(request, *, plan: Plan, promo: PromoCode):
+    request.session[_PROMO_SESSION_KEY] = {
+        'plan_id': plan.id,
+        'promo_id': promo.id,
+        'code': promo.code,
+        'validated_at': int(timezone.now().timestamp()),
+    }
+    request.session.modified = True
+
+
+def _clear_validated_promo_offer(request):
+    if _PROMO_SESSION_KEY in request.session:
+        request.session.pop(_PROMO_SESSION_KEY, None)
+        request.session.modified = True
+
+
+def _has_recent_validated_promo_offer(request, *, plan: Plan, promo: PromoCode) -> bool:
+    payload = request.session.get(_PROMO_SESSION_KEY) or {}
+    if payload.get('plan_id') != plan.id or payload.get('promo_id') != promo.id or payload.get('code') != promo.code:
+        return False
+    validated_at = payload.get('validated_at')
+    if not validated_at:
+        return False
+    try:
+        validated_at = int(validated_at)
+    except (TypeError, ValueError):
+        return False
+    return int(timezone.now().timestamp()) - validated_at <= _PROMO_SESSION_TTL_SECONDS
+
+
+def _resolve_checkout_offer(
+    *,
+    request,
+    plan: Plan,
+    promo_code_value: str | None = None,
+    clinic: Clinic | None = None,
+    allow_soft_limit: bool = False,
+):
+    normalized_code = _normalize_promo_code(promo_code_value)
+    if plan.is_free:
+        if normalized_code:
+            return None, 'Promo codes apply to Premium plans only.'
+        return {
+            'plan': plan,
+            'promo': None,
+            'paypal_plan_id': '',
+            'price_cents': plan.price_cents,
+            'promo_code': '',
+        }, ''
+
+    promo = None
+    if normalized_code:
+        promo, error = _promo_lookup_for_plan(plan, normalized_code)
+        if error:
+            return None, error
+        if clinic and PromoRedemption.objects.filter(promo_code=promo, clinic=clinic).exists():
+            return None, 'This clinic has already used that promo code.'
+        if _promo_limit_reached(promo) and not allow_soft_limit:
+            return None, 'This promo code has already reached its redemption limit.'
+
+    effective_paypal_plan_id = promo.promo_paypal_plan_id if promo else plan.paypal_plan_id
+    if not effective_paypal_plan_id:
+        return None, 'Selected Premium plan is missing a PayPal plan ID.'
+
+    if promo and request is not None:
+        _store_validated_promo_offer(request, plan=plan, promo=promo)
+    elif request is not None:
+        _clear_validated_promo_offer(request)
+
+    return {
+        'plan': plan,
+        'promo': promo,
+        'paypal_plan_id': effective_paypal_plan_id,
+        'price_cents': promo.promo_price_cents if promo and promo.promo_price_cents is not None else plan.price_cents,
+        'promo_code': promo.code if promo else '',
+    }, ''
+
+
+def _record_promo_redemption(*, promo: PromoCode | None, clinic: Clinic, owner_user, subscription: ClinicSubscription):
+    if not promo:
+        return None
+    redemption, _ = PromoRedemption.objects.get_or_create(
+        promo_code=promo,
+        clinic=clinic,
+        defaults={
+            'owner_user': owner_user,
+            'subscription': subscription,
+        },
+    )
+    update_fields = []
+    if owner_user is not None and redemption.owner_user_id != owner_user.id:
+        redemption.owner_user = owner_user
+        update_fields.append('owner_user')
+    if redemption.subscription_id != subscription.id:
+        redemption.subscription = subscription
+        update_fields.append('subscription')
+    if update_fields:
+        redemption.save(update_fields=update_fields)
+    return redemption
 
 
 def _limit_reached_message(*, item: dict, resource_label: str, action_label: str) -> str:
@@ -4784,6 +4926,57 @@ def staff_patient_edit(request, patient_id: int):
 
 
 @require_POST
+def plan_offer_preview(request):
+    try:
+        payload = json.loads(request.body.decode('utf-8'))
+    except json.JSONDecodeError:
+        return HttpResponseBadRequest('Invalid JSON payload.')
+
+    plan_id = payload.get('plan_id')
+    if not plan_id:
+        return HttpResponseBadRequest('plan_id is required.')
+
+    plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
+    promo_code_value = payload.get('promo_code')
+    clinic = _get_user_clinic(request.user) if request.user.is_authenticated else None
+    offer, error = _resolve_checkout_offer(
+        request=request,
+        plan=plan,
+        promo_code_value=promo_code_value,
+        clinic=clinic,
+    )
+    if error:
+        _clear_validated_promo_offer(request)
+        return JsonResponse({'ok': False, 'error': error}, status=400)
+
+    promo = offer['promo']
+    if promo:
+        message = (
+            f'{promo.label or promo.code} applied. '
+            f'Checkout will use {plan.currency} {offer["price_cents"] / 100:.2f} / {plan.interval}.'
+        )
+    elif plan.is_free:
+        message = 'Promo codes do not apply to Free plans.'
+    else:
+        message = f'No promo applied. Premium will use {plan.currency} {plan.price_cents / 100:.2f} / {plan.interval}.'
+
+    return JsonResponse(
+        {
+            'ok': True,
+            'plan_id': plan.id,
+            'plan_name': plan.name,
+            'is_free': plan.is_free,
+            'promo_applied': bool(promo),
+            'promo_code': promo.code if promo else '',
+            'promo_label': promo.label if promo else '',
+            'paypal_plan_id': offer['paypal_plan_id'],
+            'price_display': _money_label(plan.currency, offer['price_cents']),
+            'message': message,
+        }
+    )
+
+
+@require_POST
 def signup_activate(request):
     try:
         payload = json.loads(request.body.decode('utf-8'))
@@ -4793,6 +4986,7 @@ def signup_activate(request):
     clinic_id = payload.get('clinic_id')
     plan_id = payload.get('plan_id')
     subscription_id = payload.get('subscription_id')
+    promo_code_value = payload.get('promo_code')
     if not clinic_id or not plan_id:
         return HttpResponseBadRequest('clinic_id and plan_id are required.')
 
@@ -4818,6 +5012,37 @@ def signup_activate(request):
             return HttpResponseForbidden('Signup session mismatch.')
 
     plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
+    offer, offer_error = _resolve_checkout_offer(
+        request=request,
+        plan=plan,
+        promo_code_value=promo_code_value,
+        clinic=clinic,
+        allow_soft_limit=False,
+    )
+    if offer_error:
+        if plan.is_free and _normalize_promo_code(promo_code_value):
+            return HttpResponseBadRequest(offer_error)
+        if not plan.is_free:
+            validated_promo, _ = _promo_lookup_for_plan(plan, promo_code_value)
+            allow_soft_limit = bool(
+                validated_promo
+                and _has_recent_validated_promo_offer(request, plan=plan, promo=validated_promo)
+            )
+            if not allow_soft_limit:
+                return HttpResponseBadRequest(offer_error)
+            offer, offer_error = _resolve_checkout_offer(
+                request=request,
+                plan=plan,
+                promo_code_value=promo_code_value,
+                clinic=clinic,
+                allow_soft_limit=True,
+            )
+            if offer_error:
+                return HttpResponseBadRequest(offer_error)
+        else:
+            return HttpResponseBadRequest(offer_error)
+
+    promo = offer['promo'] if offer else None
     if not plan.is_free and not subscription_id:
         return HttpResponseBadRequest('subscription_id is required for paid plans.')
 
@@ -4832,6 +5057,14 @@ def signup_activate(request):
         last_event_type='FREE_ACTIVATED' if plan.is_free else 'CLIENT_APPROVED',
         sync_event_type='CLIENT_SYNCED',
     )
+    if promo:
+        _record_promo_redemption(
+            promo=promo,
+            clinic=clinic,
+            owner_user=_get_clinic_owner_user(clinic),
+            subscription=subscription,
+        )
+    _clear_validated_promo_offer(request)
 
     if (
         previous_subscription is None
@@ -4855,6 +5088,8 @@ def signup_activate(request):
             'is_free': plan.is_free,
             'status': subscription.status,
             'plan_name': plan.name,
+            'promo_applied': bool(promo),
+            'promo_code': promo.code if promo else '',
         }
     )
 
@@ -4914,11 +5149,43 @@ def billing_activate(request):
 
     plan_id = payload.get('plan_id')
     subscription_id = payload.get('subscription_id')
+    promo_code_value = payload.get('promo_code')
     if not plan_id:
         return HttpResponseBadRequest('plan_id is required.')
 
     plan = get_object_or_404(Plan, pk=plan_id, is_active=True)
     clinic = staff.clinic
+    offer, offer_error = _resolve_checkout_offer(
+        request=request,
+        plan=plan,
+        promo_code_value=promo_code_value,
+        clinic=clinic,
+        allow_soft_limit=False,
+    )
+    if offer_error:
+        if plan.is_free and _normalize_promo_code(promo_code_value):
+            return HttpResponseBadRequest(offer_error)
+        if not plan.is_free:
+            validated_promo, _ = _promo_lookup_for_plan(plan, promo_code_value)
+            allow_soft_limit = bool(
+                validated_promo
+                and _has_recent_validated_promo_offer(request, plan=plan, promo=validated_promo)
+            )
+            if not allow_soft_limit:
+                return HttpResponseBadRequest(offer_error)
+            offer, offer_error = _resolve_checkout_offer(
+                request=request,
+                plan=plan,
+                promo_code_value=promo_code_value,
+                clinic=clinic,
+                allow_soft_limit=True,
+            )
+            if offer_error:
+                return HttpResponseBadRequest(offer_error)
+        else:
+            return HttpResponseBadRequest(offer_error)
+
+    promo = offer['promo'] if offer else None
     previous_subscription = get_current_subscription(clinic)
     previous_status = previous_subscription.status if previous_subscription else None
     previous_plan_id = previous_subscription.plan_id if previous_subscription else None
@@ -4933,6 +5200,14 @@ def billing_activate(request):
         last_event_type='FREE_ACTIVATED' if plan.is_free else 'CLIENT_APPROVED',
         sync_event_type='CLIENT_SYNCED',
     )
+    if promo:
+        _record_promo_redemption(
+            promo=promo,
+            clinic=clinic,
+            owner_user=_get_clinic_owner_user(clinic),
+            subscription=subscription,
+        )
+    _clear_validated_promo_offer(request)
 
     if (
         previous_subscription is None
@@ -4959,6 +5234,8 @@ def billing_activate(request):
             'is_free': plan.is_free,
             'status': subscription.status,
             'plan_name': plan.name,
+            'promo_applied': bool(promo),
+            'promo_code': promo.code if promo else '',
         }
     )
 

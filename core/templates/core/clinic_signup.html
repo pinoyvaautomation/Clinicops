@@ -673,6 +673,15 @@
                     <div id="signup-plan-note" class="help">Select the clinic plan, then continue with instant Free activation or PayPal for Premium billing.</div>
                   </div>
 
+                  <div class="field">
+                    <label for="signup-promo-code">Promo code</label>
+                    <div style="display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;">
+                      <input id="signup-promo-code" type="text" autocomplete="off" placeholder="LAUNCH50">
+                      <button id="signup-promo-apply" class="submit" type="button" style="width:auto;min-width:110px;padding-inline:18px;">Apply</button>
+                    </div>
+                    <div id="signup-promo-note" class="help">Promo codes apply to Premium plans only.</div>
+                  </div>
+
                   <div id="free-plan-container" style="display:none;">
                     <button id="activate-free-plan" class="submit" type="button">Start With Free Plan</button>
                     <div class="help">Free activates immediately and keeps the owner on the verify-email path before first sign in.</div>
@@ -706,12 +715,39 @@
         const freePlanContainer = document.getElementById('free-plan-container');
         const freePlanButton = document.getElementById('activate-free-plan');
         const planModeNote = document.getElementById('signup-plan-note');
+        const promoInput = document.getElementById('signup-promo-code');
+        const promoApplyButton = document.getElementById('signup-promo-apply');
+        const promoNote = document.getElementById('signup-promo-note');
         const csrfTokenInput = document.querySelector('#csrf-form input[name=csrfmiddlewaretoken]');
         const csrfToken = csrfTokenInput ? csrfTokenInput.value : '';
         const clinicId = {{ clinic.id }};
+        let activeOffer = null;
 
         const errorBox = document.getElementById('signup-error');
         const successBox = document.getElementById('signup-success');
+
+        function normalizePromoCode(value) {
+          return (value || '').trim().toUpperCase().replace(/\s+/g, '');
+        }
+
+        function promoDefaultNote() {
+          if (!planSelect || !planSelect.options.length) {
+            return 'Promo codes apply to Premium plans only.';
+          }
+          const selectedOption = planSelect.options[planSelect.selectedIndex];
+          if (!selectedOption) {
+            return 'Promo codes apply to Premium plans only.';
+          }
+          return selectedOption.getAttribute('data-plan-mode') === 'free'
+            ? 'Promo codes apply to Premium plans only.'
+            : 'Have a launch or campaign code? Apply it before PayPal checkout.';
+        }
+
+        function setPromoNote(message, state) {
+          if (!promoNote) return;
+          promoNote.textContent = message;
+          promoNote.style.color = state === 'error' ? '#b42318' : (state === 'success' ? '#166534' : '');
+        }
 
         function showError(message) {
           if (errorBox) {
@@ -738,6 +774,10 @@
           const selectedOption = planSelect.options[planSelect.selectedIndex];
           container.innerHTML = '';
           clearMessages();
+          if (activeOffer && String(activeOffer.plan_id) !== String(selectedOption ? selectedOption.value : '')) {
+            activeOffer = null;
+            setPromoNote(promoDefaultNote(), '');
+          }
           if (!selectedOption) {
             showError('Select a plan before continuing.');
             return;
@@ -754,6 +794,7 @@
             if (planModeNote) {
               planModeNote.textContent = 'Free activates instantly and keeps the owner on the email verification path before first sign in.';
             }
+            setPromoNote(promoDefaultNote(), '');
             return;
           }
 
@@ -761,7 +802,9 @@
             freePlanContainer.style.display = 'none';
           }
           if (planModeNote) {
-            planModeNote.textContent = 'Premium continues through PayPal so recurring billing can be approved immediately.';
+            planModeNote.textContent = activeOffer
+              ? activeOffer.message
+              : 'Premium continues through PayPal so recurring billing can be approved immediately.';
           }
 
           if (!window.paypal || !paypal.Buttons) {
@@ -769,7 +812,11 @@
             return;
           }
 
-          if (!paypalPlanId) {
+          const checkoutPlanId = activeOffer && String(activeOffer.plan_id) === String(planId)
+            ? activeOffer.paypal_plan_id
+            : paypalPlanId;
+
+          if (!checkoutPlanId) {
             container.innerHTML = '<p class="help">Selected Premium plan is missing a PayPal plan ID.</p>';
             return;
           }
@@ -777,7 +824,7 @@
           paypal.Buttons({
             createSubscription: function(data, actions) {
               return actions.subscription.create({
-                plan_id: paypalPlanId,
+                plan_id: checkoutPlanId,
                 custom_id: 'clinic-' + clinicId
               });
             },
@@ -792,7 +839,8 @@
                 body: JSON.stringify({
                   clinic_id: clinicId,
                   plan_id: planId,
-                  subscription_id: data.subscriptionID
+                  subscription_id: data.subscriptionID,
+                  promo_code: activeOffer ? activeOffer.promo_code : ''
                 })
               }).then(async function(response) {
                 const text = await response.text();
@@ -816,6 +864,63 @@
           }).render('#paypal-button-container');
         }
 
+        function applyPromoCode() {
+          if (!planSelect) return;
+          const selectedOption = planSelect.options[planSelect.selectedIndex];
+          if (!selectedOption) {
+            setPromoNote('Select a plan before applying a promo code.', 'error');
+            return;
+          }
+          if (selectedOption.getAttribute('data-plan-mode') === 'free') {
+            activeOffer = null;
+            setPromoNote('Promo codes apply to Premium plans only.', 'error');
+            renderButtons();
+            return;
+          }
+          const promoCode = normalizePromoCode(promoInput ? promoInput.value : '');
+          if (!promoCode) {
+            activeOffer = null;
+            setPromoNote('Enter a promo code before applying it.', 'error');
+            renderButtons();
+            return;
+          }
+          if (promoApplyButton) {
+            promoApplyButton.disabled = true;
+          }
+          clearMessages();
+          fetch('{% url "plan-offer-preview" %}', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-CSRFToken': csrfToken
+            },
+            credentials: 'same-origin',
+            body: JSON.stringify({
+              plan_id: selectedOption.value,
+              promo_code: promoCode
+            })
+          }).then(async function(response) {
+            const data = await response.json().catch(function() { return {}; });
+            if (!response.ok) {
+              throw new Error(data.error || 'Promo validation failed.');
+            }
+            activeOffer = data.promo_applied ? data : null;
+            if (promoInput && data.promo_code) {
+              promoInput.value = data.promo_code;
+            }
+            setPromoNote(data.message || 'Promo applied.', data.promo_applied ? 'success' : '');
+            renderButtons();
+          }).catch(function(err) {
+            activeOffer = null;
+            setPromoNote(err.message, 'error');
+            renderButtons();
+          }).finally(function() {
+            if (promoApplyButton) {
+              promoApplyButton.disabled = false;
+            }
+          });
+        }
+
         if (freePlanButton) {
           freePlanButton.addEventListener('click', function() {
             clearMessages();
@@ -832,7 +937,8 @@
               credentials: 'same-origin',
               body: JSON.stringify({
                 clinic_id: clinicId,
-                plan_id: planId
+                plan_id: planId,
+                promo_code: ''
               })
             }).then(async function(response) {
               const text = await response.text();
@@ -854,8 +960,38 @@
           });
         }
 
+        if (promoApplyButton) {
+          promoApplyButton.addEventListener('click', applyPromoCode);
+        }
+        if (promoInput) {
+          promoInput.addEventListener('keydown', function(event) {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              applyPromoCode();
+            }
+          });
+          promoInput.addEventListener('input', function() {
+            const normalized = normalizePromoCode(promoInput.value);
+            if (!normalized) {
+              activeOffer = null;
+              setPromoNote(promoDefaultNote(), '');
+              renderButtons();
+              return;
+            }
+            if (activeOffer && normalized !== normalizePromoCode(activeOffer.promo_code)) {
+              activeOffer = null;
+              setPromoNote('Promo code changed. Apply it again to update checkout.', '');
+              renderButtons();
+            }
+          });
+        }
         if (planSelect) {
-          planSelect.addEventListener('change', renderButtons);
+          planSelect.addEventListener('change', function() {
+            activeOffer = null;
+            setPromoNote(promoDefaultNote(), '');
+            renderButtons();
+          });
+          setPromoNote(promoDefaultNote(), '');
           renderButtons();
         }
       </script>

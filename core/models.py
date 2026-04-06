@@ -288,6 +288,92 @@ class Plan(models.Model):
         return self.price_cents / 100
 
 
+class PromoCode(models.Model):
+    code = models.CharField(max_length=40, unique=True)
+    label = models.CharField(max_length=120, blank=True)
+    is_active = models.BooleanField(default=True)
+    base_plan = models.ForeignKey(Plan, on_delete=models.CASCADE, related_name='promo_codes')
+    promo_paypal_plan_id = models.CharField(max_length=64)
+    promo_price_cents = models.PositiveIntegerField(blank=True, null=True)
+    max_redemptions = models.PositiveIntegerField(blank=True, null=True)
+    starts_at = models.DateTimeField(blank=True, null=True)
+    ends_at = models.DateTimeField(blank=True, null=True)
+    notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    history = HistoricalRecords()
+
+    class Meta:
+        ordering = ['base_plan_id', 'code']
+        indexes = [
+            models.Index(fields=['is_active', 'base_plan']),
+            models.Index(fields=['starts_at', 'ends_at']),
+        ]
+
+    def __str__(self) -> str:
+        if self.label:
+            return f'{self.code} ({self.label})'
+        return self.code
+
+    def clean(self):
+        errors = {}
+        if self.base_plan_id and self.base_plan.is_free:
+            errors['base_plan'] = 'Promo codes can only target paid plans.'
+        if self.ends_at and self.starts_at and self.ends_at <= self.starts_at:
+            errors['ends_at'] = 'End time must be later than the start time.'
+        if self.promo_price_cents is not None and self.base_plan_id and self.promo_price_cents >= self.base_plan.price_cents:
+            errors['promo_price_cents'] = 'Promo price should be lower than the base plan price.'
+        if errors:
+            raise ValidationError(errors)
+
+    def save(self, *args, **kwargs):
+        self.code = ''.join((self.code or '').upper().split())
+        super().save(*args, **kwargs)
+
+    @property
+    def price_dollars(self) -> float | None:
+        if self.promo_price_cents is None:
+            return None
+        return self.promo_price_cents / 100
+
+    @property
+    def redemption_count(self) -> int:
+        return self.redemptions.count()
+
+
+class PromoRedemption(models.Model):
+    promo_code = models.ForeignKey(PromoCode, on_delete=models.PROTECT, related_name='redemptions')
+    clinic = models.ForeignKey(Clinic, on_delete=models.CASCADE, related_name='promo_redemptions')
+    owner_user = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        related_name='promo_redemptions',
+        blank=True,
+        null=True,
+    )
+    subscription = models.ForeignKey(
+        'ClinicSubscription',
+        on_delete=models.SET_NULL,
+        related_name='promo_redemptions',
+        blank=True,
+        null=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(fields=['promo_code', 'clinic'], name='uniq_promo_redemption_clinic'),
+        ]
+        indexes = [
+            models.Index(fields=['promo_code', '-created_at']),
+            models.Index(fields=['clinic', '-created_at']),
+        ]
+
+    def __str__(self) -> str:
+        return f'{self.promo_code.code} redeemed by {self.clinic.name}'
+
+
 class ClinicSubscription(models.Model):
     class Status(models.TextChoices):
         PENDING = 'pending', 'Pending'

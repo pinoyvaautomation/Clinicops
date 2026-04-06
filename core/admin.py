@@ -18,6 +18,8 @@ from .models import (
     MessageThreadReadState,
     Patient,
     Plan,
+    PromoCode,
+    PromoRedemption,
     SecurityAccessRule,
     SecurityEvent,
     Staff,
@@ -359,6 +361,72 @@ class ClinicSubscriptionAdmin(ClinicScopedAdmin, SimpleHistoryAdmin):
     list_display = ('clinic', 'plan', 'status', 'paypal_subscription_id', 'created_at')
     list_filter = ('status', 'plan')
     search_fields = ('clinic__name', 'paypal_subscription_id')
+
+
+@admin.register(PromoCode)
+class PromoCodeAdmin(SimpleHistoryAdmin):
+    list_display = (
+        'code',
+        'label',
+        'base_plan',
+        'promo_price_display',
+        'max_redemptions',
+        'redemption_count_display',
+        'starts_at',
+        'ends_at',
+        'is_active',
+    )
+    list_filter = ('is_active', 'base_plan')
+    search_fields = ('code', 'label', 'promo_paypal_plan_id')
+    fieldsets = (
+        (
+            'Promo',
+            {
+                'fields': ('code', 'label', 'is_active', 'base_plan'),
+                'description': 'Promo codes keep the existing Premium plan but swap in a discounted PayPal plan during checkout.',
+            },
+        ),
+        (
+            'Checkout override',
+            {
+                'fields': ('promo_paypal_plan_id', 'promo_price_cents', 'max_redemptions'),
+                'description': 'Use the separate discounted PayPal plan ID created for this offer. Max redemptions can be left empty for unlimited use.',
+            },
+        ),
+        (
+            'Availability window',
+            {
+                'fields': ('starts_at', 'ends_at'),
+            },
+        ),
+        (
+            'Notes',
+            {
+                'fields': ('notes',),
+            },
+        ),
+    )
+
+    @admin.display(description='Promo price')
+    def promo_price_display(self, obj):
+        if obj.promo_price_cents is None:
+            return 'Uses base price'
+        return f'{obj.base_plan.currency} {obj.promo_price_cents / 100:.2f}'
+
+    @admin.display(description='Redeemed')
+    def redemption_count_display(self, obj):
+        return obj.redemptions.count()
+
+
+@admin.register(PromoRedemption)
+class PromoRedemptionAdmin(admin.ModelAdmin):
+    list_display = ('promo_code', 'clinic', 'owner_user', 'subscription', 'created_at')
+    list_filter = ('promo_code', 'created_at')
+    search_fields = ('promo_code__code', 'clinic__name', 'owner_user__email', 'owner_user__username')
+    readonly_fields = ('promo_code', 'clinic', 'owner_user', 'subscription', 'created_at')
+
+    def has_add_permission(self, request):
+        return False
 
 
 @admin.register(ClinicMessagingPermission)

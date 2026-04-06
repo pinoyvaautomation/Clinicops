@@ -48,6 +48,8 @@ from .models import (
     PayPalWebhookEvent,
     Patient,
     Plan,
+    PromoCode,
+    PromoRedemption,
     SecurityAccessRule,
     SecurityEvent,
     Staff,
@@ -1689,6 +1691,111 @@ class BillingActivateTests(TestCase):
         notification = Notification.objects.get(recipient=user)
         self.assertEqual(notification.link, reverse('billing'))
         self.assertIn(notification.title, {'Subscription activation recorded', 'Subscription activated'})
+
+
+class PromoCodeBillingTests(TestCase):
+    def setUp(self):
+        self.clinic = Clinic.objects.create(name='Promo Clinic', timezone='UTC')
+        self.user = User.objects.create_user(
+            username='promo-owner@example.com',
+            email='promo-owner@example.com',
+            password='password',
+        )
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+        self.user.groups.add(admin_group)
+        Staff.objects.create(user=self.user, clinic=self.clinic)
+        self.plan = Plan.objects.create(
+            name='Premium',
+            paypal_plan_id='P-PREMIUM-BASE',
+            interval=Plan.Interval.MONTH,
+            price_cents=2900,
+        )
+        self.promo = PromoCode.objects.create(
+            code='launch50',
+            label='Launch 50% off',
+            base_plan=self.plan,
+            promo_paypal_plan_id='P-PREMIUM-LAUNCH50',
+            promo_price_cents=1450,
+            max_redemptions=100,
+        )
+
+    def test_plan_offer_preview_returns_discounted_paypal_plan(self):
+        response = self.client.post(
+            reverse('plan-offer-preview'),
+            data=json.dumps({'plan_id': self.plan.id, 'promo_code': ' launch50 '}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload['promo_applied'])
+        self.assertEqual(payload['promo_code'], 'LAUNCH50')
+        self.assertEqual(payload['paypal_plan_id'], 'P-PREMIUM-LAUNCH50')
+        self.assertEqual(payload['price_display'], 'USD 14.50')
+
+    def test_plan_offer_preview_rejects_exhausted_promo(self):
+        self.promo.max_redemptions = 1
+        self.promo.save(update_fields=['max_redemptions'])
+        PromoRedemption.objects.create(promo_code=self.promo, clinic=self.clinic, owner_user=self.user)
+
+        other_clinic = Clinic.objects.create(name='Second Promo Clinic', timezone='UTC')
+        response = self.client.post(
+            reverse('plan-offer-preview'),
+            data=json.dumps({'plan_id': self.plan.id, 'promo_code': 'LAUNCH50'}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn('reached its redemption limit', response.json()['error'])
+
+    def test_billing_activate_records_promo_redemption(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('billing-activate'),
+            data=json.dumps(
+                {
+                    'plan_id': self.plan.id,
+                    'subscription_id': 'I-PROMO-123',
+                    'promo_code': 'LAUNCH50',
+                }
+            ),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        subscription = ClinicSubscription.objects.get(paypal_subscription_id='I-PROMO-123')
+        self.assertEqual(subscription.plan_id, self.plan.id)
+        redemption = PromoRedemption.objects.get(promo_code=self.promo, clinic=self.clinic)
+        self.assertEqual(redemption.subscription_id, subscription.id)
+        self.assertEqual(redemption.owner_user_id, self.user.id)
+
+    def test_signup_activate_records_promo_redemption(self):
+        session = self.client.session
+        session['signup_clinic_id'] = self.clinic.id
+        session.save()
+
+        response = self.client.post(
+            reverse('signup-activate'),
+            data=json.dumps(
+                {
+                    'clinic_id': self.clinic.id,
+                    'plan_id': self.plan.id,
+                    'subscription_id': 'I-PROMO-SIGNUP',
+                    'promo_code': 'LAUNCH50',
+                }
+            ),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(
+            PromoRedemption.objects.filter(
+                promo_code=self.promo,
+                clinic=self.clinic,
+                subscription__paypal_subscription_id='I-PROMO-SIGNUP',
+            ).exists()
+        )
 
 
 class FreemiumPlanTests(TestCase):

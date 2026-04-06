@@ -24,6 +24,7 @@ urlpatterns = [
     path('clinic/<slug:clinic_slug>/', views.clinic_booking_slug, name='clinic-booking-slug'),
     path('clinic/<slug:clinic_slug>/patient-signup/', views.patient_signup_slug, name='patient-signup-slug'),
     path('signup/', views.clinic_signup, name='clinic-signup'),
+    path('plans/offer-preview/', views.plan_offer_preview, name='plan-offer-preview'),
     path('signup/activate/', views.signup_activate, name='signup-activate'),
     path('verify-email/<uidb64>/<token>/', views.verify_email, name='verify-email'),
     path('resend-verification/', views.resend_verification, name='resend-verification'),
