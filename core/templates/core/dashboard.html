@@ -46,6 +46,137 @@
         border-radius: 26px;
         box-shadow: 0 18px 44px rgba(148, 163, 184, 0.14);
       }
+      .onboarding-panel {
+        margin-top: 18px;
+        padding: 24px;
+        background:
+          radial-gradient(circle at top right, rgba(14, 165, 166, 0.08), transparent 28%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(255, 255, 255, 0.94));
+      }
+      .onboarding-grid {
+        display: grid;
+        gap: 18px;
+        grid-template-columns: minmax(280px, 0.9fr) minmax(0, 1.1fr);
+      }
+      .onboarding-copy h2 {
+        margin: 16px 0 10px;
+        font-size: clamp(1.8rem, 4vw, 2.4rem);
+        line-height: 1.04;
+      }
+      .onboarding-copy p {
+        margin: 0;
+        color: var(--ink-soft);
+        line-height: 1.65;
+        max-width: 580px;
+      }
+      .progress-track {
+        margin-top: 18px;
+        width: 100%;
+        height: 12px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(148, 163, 184, 0.16);
+      }
+      .progress-fill {
+        height: 100%;
+        width: var(--progress);
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--brand), #0f172a 170%);
+      }
+      .progress-note {
+        margin-top: 10px;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 600;
+      }
+      .next-step-card {
+        margin-top: 18px;
+        padding: 16px 18px;
+        border-radius: 20px;
+        border: 1px solid rgba(14, 165, 166, 0.18);
+        background: rgba(14, 165, 166, 0.08);
+      }
+      .next-step-card strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 1.02rem;
+      }
+      .next-step-card p {
+        margin-bottom: 12px;
+      }
+      .onboarding-steps {
+        display: grid;
+        gap: 12px;
+      }
+      .onboarding-step {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr) auto;
+        gap: 14px;
+        align-items: flex-start;
+        padding: 16px 18px;
+        border-radius: 22px;
+        border: 1px solid rgba(148, 163, 184, 0.18);
+        background: #fff;
+      }
+      .onboarding-step.is-complete {
+        border-color: rgba(23, 123, 87, 0.18);
+        background: linear-gradient(180deg, #f8fffb, #f2fbf6);
+      }
+      .step-index {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 38px;
+        height: 38px;
+        border-radius: 14px;
+        background: rgba(15, 23, 42, 0.06);
+        color: var(--ink-soft);
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .onboarding-step.is-complete .step-index {
+        background: rgba(23, 123, 87, 0.12);
+        color: var(--success);
+      }
+      .step-body strong {
+        display: block;
+        margin-bottom: 6px;
+        font-size: 1rem;
+      }
+      .step-body p {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.55;
+      }
+      .step-side {
+        display: grid;
+        justify-items: end;
+        gap: 10px;
+      }
+      .step-status {
+        min-height: 30px;
+        padding: 6px 10px;
+        border-radius: 999px;
+        background: rgba(15, 23, 42, 0.06);
+        color: var(--ink-soft);
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .onboarding-step.is-complete .step-status {
+        background: var(--success-bg);
+        color: var(--success);
+      }
+      .step-link {
+        min-height: 36px;
+        padding: 8px 12px;
+        border-radius: 12px;
+        border: 1px solid rgba(148, 163, 184, 0.26);
+        background: #fff;
+        color: var(--ink);
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+      }
       .hero {
         overflow: hidden;
         padding: 30px;
@@ -328,7 +459,7 @@
         background: linear-gradient(180deg, #fff, #f8fafc);
       }
       @media (max-width: 1080px) {
-        .hero-grid, .dashboard-grid, .lower-grid { grid-template-columns: 1fr; }
+        .hero-grid, .dashboard-grid, .lower-grid, .onboarding-grid { grid-template-columns: 1fr; }
       }
       @media (max-width: 820px) {
         .wrap { padding: 18px 16px 44px; }
@@ -336,6 +467,8 @@
         .preview-row { grid-template-columns: 1fr; }
         .preview-side { text-align: left; }
         .agenda-item { grid-template-columns: 1fr; }
+        .onboarding-step { grid-template-columns: 1fr; }
+        .step-side { justify-items: start; }
       }
       @media (max-width: 560px) {
         .filter-grid, .stats-grid { grid-template-columns: 1fr; }
@@ -397,6 +530,56 @@
           </div>
         </div>
       </section>
+
+      {% if owner_onboarding and owner_onboarding.show %}
+        <section class="panel onboarding-panel">
+          <div class="onboarding-grid">
+            <div class="onboarding-copy">
+              <div class="eyebrow" style="background: rgba(15, 23, 42, 0.08); color: var(--ink);">New clinic setup guide</div>
+              <h2>Set up this clinic in a few clear steps.</h2>
+              <p>Use this owner checklist to move from signup to a working clinic workspace. Each step links to the right screen and marks itself complete automatically once the setup exists.</p>
+              <div class="progress-track" aria-label="Onboarding progress">
+                <div class="progress-fill" style="--progress: {{ owner_onboarding.progress_percent }}%;"></div>
+              </div>
+              <div class="progress-note">{{ owner_onboarding.completed_count }} of {{ owner_onboarding.total_steps }} setup steps complete</div>
+              {% if owner_onboarding.next_step %}
+                <div class="next-step-card">
+                  <strong>Recommended next step: {{ owner_onboarding.next_step.title }}</strong>
+                  <p>{{ owner_onboarding.next_step.description }}</p>
+                  <a
+                    class="btn"
+                    href="{{ owner_onboarding.next_step.href }}"
+                    {% if owner_onboarding.next_step.opens_new_tab %}target="_blank" rel="noopener"{% endif %}
+                  >
+                    {{ owner_onboarding.next_step.cta_label }}
+                  </a>
+                </div>
+              {% endif %}
+            </div>
+            <div class="onboarding-steps">
+              {% for step in owner_onboarding.steps %}
+                <article class="onboarding-step {% if step.is_complete %}is-complete{% endif %}">
+                  <div class="step-index">{% if step.is_complete %}✓{% else %}{{ forloop.counter }}{% endif %}</div>
+                  <div class="step-body">
+                    <strong>{{ step.title }}</strong>
+                    <p>{{ step.description }}</p>
+                  </div>
+                  <div class="step-side">
+                    <span class="step-status">{% if step.is_complete %}Complete{% else %}Start here{% endif %}</span>
+                    <a
+                      class="step-link"
+                      href="{{ step.href }}"
+                      {% if step.opens_new_tab %}target="_blank" rel="noopener"{% endif %}
+                    >
+                      {{ step.cta_label }}
+                    </a>
+                  </div>
+                </article>
+              {% endfor %}
+            </div>
+          </div>
+        </section>
+      {% endif %}
 
       <section class="panel">
         <div class="panel-head">

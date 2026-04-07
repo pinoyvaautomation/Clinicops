@@ -1835,6 +1835,65 @@ def _get_clinic_owner_user(clinic: Clinic):
     return fallback_staff.user if fallback_staff else None
 
 
+def _dashboard_owner_onboarding(*, clinic: Clinic, user, staff_list, plan_usage):
+    if not user_is_clinic_owner(user, clinic):
+        return None
+
+    has_services = bool(plan_usage['services']['used'])
+    has_teammate = len(staff_list) > 1
+    has_booking = Appointment.objects.filter(clinic=clinic).exists()
+    has_plan = bool(plan_usage['has_plan'])
+
+    steps = [
+        {
+            'key': 'plan',
+            'title': 'Confirm your clinic plan',
+            'description': 'Review the current plan, usage limits, and upgrade path before opening booking at scale.',
+            'is_complete': has_plan,
+            'href': reverse('billing'),
+            'cta_label': 'Open billing',
+        },
+        {
+            'key': 'services',
+            'title': 'Create your first service',
+            'description': 'Add the appointment types patients should see on your public booking page.',
+            'is_complete': has_services,
+            'href': reverse('appointment-types'),
+            'cta_label': 'Add services',
+        },
+        {
+            'key': 'team',
+            'title': 'Add your first teammate',
+            'description': 'Invite a Front Desk, Doctor, or Nurse account so the clinic team can work inside the portal.',
+            'is_complete': has_teammate,
+            'href': reverse('staff-members'),
+            'cta_label': 'Manage staff',
+        },
+        {
+            'key': 'booking',
+            'title': 'Run your first booking',
+            'description': 'Open the booking page, test the patient flow, and confirm that appointments land in the dashboard.',
+            'is_complete': has_booking,
+            'href': reverse('clinic-booking-slug', args=[clinic.slug]),
+            'cta_label': 'Open booking page',
+            'opens_new_tab': True,
+        },
+    ]
+
+    completed_count = sum(1 for step in steps if step['is_complete'])
+    total_steps = len(steps)
+    next_step = next((step for step in steps if not step['is_complete']), None)
+
+    return {
+        'steps': steps,
+        'completed_count': completed_count,
+        'total_steps': total_steps,
+        'progress_percent': int(round((completed_count / total_steps) * 100)) if total_steps else 0,
+        'next_step': next_step,
+        'show': completed_count < total_steps,
+    }
+
+
 def _get_active_patient_profile(request):
     profiles = Patient.objects.filter(user=request.user).select_related('clinic')
     if not profiles.exists():
@@ -2271,6 +2330,12 @@ def dashboard_view(request):
             'current_subscription': current_subscription,
             'plan_usage': plan_usage,
             'is_admin': is_admin,
+            'owner_onboarding': _dashboard_owner_onboarding(
+                clinic=clinic,
+                user=request.user,
+                staff_list=staff_list,
+                plan_usage=plan_usage,
+            ),
         }
         return render(request, 'core/dashboard.html', context)
 

@@ -139,6 +139,116 @@ class ClinicSignupFormTests(TestCase):
         self.assertIn('Philippines', choices['Asia/Manila'])
 
 
+class DashboardOnboardingTests(TestCase):
+    def setUp(self):
+        self.client = Client()
+        self.clinic = Clinic.objects.create(name='Onboarding Clinic', timezone='UTC')
+        admin_group, _ = Group.objects.get_or_create(name='Admin')
+
+        self.owner_user = User.objects.create_user(
+            username='owner-onboarding@example.com',
+            email='owner-onboarding@example.com',
+            password='password',
+            is_active=True,
+        )
+        self.owner_user.groups.add(admin_group)
+        self.owner_staff = Staff.objects.create(
+            user=self.owner_user,
+            clinic=self.clinic,
+            is_active=True,
+        )
+        self.clinic.owner_user = self.owner_user
+        self.clinic.save(update_fields=['owner_user'])
+
+    def test_clinic_owner_sees_dashboard_onboarding(self):
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'New clinic setup guide')
+        self.assertContains(response, 'Create your first service')
+        self.assertContains(response, 'Add your first teammate')
+        self.assertContains(response, 'Run your first booking')
+        self.assertIsNotNone(response.context['owner_onboarding'])
+        self.assertEqual(response.context['owner_onboarding']['completed_count'], 0)
+
+    def test_non_owner_does_not_see_dashboard_onboarding(self):
+        admin_group = Group.objects.get(name='Admin')
+        other_admin = User.objects.create_user(
+            username='other-admin@example.com',
+            email='other-admin@example.com',
+            password='password',
+            is_active=True,
+        )
+        other_admin.groups.add(admin_group)
+        Staff.objects.create(user=other_admin, clinic=self.clinic, is_active=True)
+
+        self.client.force_login(other_admin)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'New clinic setup guide')
+        self.assertIsNone(response.context['owner_onboarding'])
+
+    def test_dashboard_onboarding_hides_once_setup_is_complete(self):
+        teammate_user = User.objects.create_user(
+            username='teammate@example.com',
+            email='teammate@example.com',
+            password='password',
+            is_active=True,
+        )
+        frontdesk_group, _ = Group.objects.get_or_create(name='FrontDesk')
+        teammate_user.groups.add(frontdesk_group)
+        Staff.objects.create(user=teammate_user, clinic=self.clinic, is_active=True)
+
+        appointment_type = AppointmentType.objects.create(
+            clinic=self.clinic,
+            name='Consultation',
+            duration_minutes=30,
+            price_cents=5000,
+        )
+        patient = Patient.objects.create(
+            clinic=self.clinic,
+            first_name='Pat',
+            last_name='Setup',
+            email='pat.setup@example.com',
+            phone='555-0100',
+        )
+        start = timezone.now() + timedelta(days=1)
+        Appointment.objects.create(
+            clinic=self.clinic,
+            appointment_type=appointment_type,
+            staff=self.owner_staff,
+            patient=patient,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+        )
+        plan = Plan.objects.create(
+            name='Starter Plan',
+            is_free=True,
+            price_cents=0,
+            currency='USD',
+        )
+        ClinicSubscription.objects.create(
+            clinic=self.clinic,
+            plan=plan,
+            paypal_subscription_id='sub-onboarding-complete',
+            status=ClinicSubscription.Status.ACTIVE,
+            started_at=timezone.now(),
+        )
+
+        self.client.force_login(self.owner_user)
+
+        response = self.client.get(reverse('dashboard'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'New clinic setup guide')
+        self.assertIsNotNone(response.context['owner_onboarding'])
+        self.assertFalse(response.context['owner_onboarding']['show'])
+
+
 class ReminderTaskTests(TestCase):
     @override_settings(
         EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
