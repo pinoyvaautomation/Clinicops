@@ -867,8 +867,13 @@
     display: flex;
     align-items: center;
     gap: 14px;
-    flex: 0 0 280px;
+    flex: 1 1 280px;
+    max-width: 280px;
     min-width: 0;
+    overflow: hidden;
+  }
+  .topbar-left.no-logo {
+    gap: 10px;
   }
   .topbar-brand-mark {
     width: 48px;
@@ -896,6 +901,7 @@
     display: grid;
     gap: 4px;
     min-width: 0;
+    overflow: hidden;
   }
   .topbar-eyebrow {
     display: none;
@@ -923,6 +929,7 @@
     position: relative;
     flex: 1 1 520px;
     max-width: 520px;
+    min-width: 0;
     margin: 0 auto;
   }
   .topbar-search form {
@@ -1244,6 +1251,10 @@
       padding: 14px 0 0;
     }
     .top-nav {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      column-gap: 10px;
       left: 12px;
       right: 12px;
       padding: 12px 14px;
@@ -1258,9 +1269,16 @@
     }
     .topbar-search__shortcut {
       display: inline-flex;
+      min-width: 56px;
+      padding: 0 10px;
     }
     .topbar-left {
       flex: 1 1 auto;
+      max-width: none;
+      gap: 10px;
+    }
+    .topbar-left.no-logo {
+      gap: 8px;
     }
     .topbar-brand-mark {
       width: 40px;
@@ -1276,6 +1294,42 @@
     }
   }
   @media (max-width: 520px) {
+    .top-nav {
+      column-gap: 8px;
+      padding: 10px 12px;
+    }
+    .topbar-left {
+      gap: 8px;
+    }
+    .topbar-left.no-logo {
+      gap: 6px;
+    }
+    .topbar-brand-mark {
+      width: 38px;
+      height: 38px;
+      border-radius: 13px;
+      flex-basis: 38px;
+    }
+    .topbar-title {
+      font-size: 0.96rem;
+    }
+    .topbar-meta {
+      display: none;
+    }
+    .nav-actions {
+      gap: 6px;
+    }
+    .topbar-search__shortcut {
+      min-width: 40px;
+      padding: 0;
+      font-size: 0;
+      gap: 0;
+    }
+    .notification-btn,
+    .avatar-btn {
+      width: 40px;
+      height: 40px;
+    }
     .nav-drawer {
       top: 0;
       bottom: 0;
@@ -1466,17 +1520,15 @@
 <div class="sidebar-hover-tooltip" id="sidebar-hover-tooltip" aria-hidden="true"></div>
 
 <div class="top-nav">
-  <div class="topbar-left">
+  <div class="topbar-left{% if not nav_clinic or not nav_clinic.logo_url %} no-logo{% endif %}">
     <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
       <span></span>
     </button>
-    <div class="topbar-brand-mark" aria-hidden="true">
-      {% if nav_clinic and nav_clinic.logo_url %}
+    {% if nav_clinic and nav_clinic.logo_url %}
+      <div class="topbar-brand-mark" aria-hidden="true">
         <img src="{{ nav_clinic.logo_url }}" alt="">
-      {% else %}
-        <div class="topbar-brand-mark__placeholder"></div>
-      {% endif %}
-    </div>
+      </div>
+    {% endif %}
     <div class="topbar-context">
       <div class="topbar-title">ClinicOps</div>
       <div class="topbar-meta">
