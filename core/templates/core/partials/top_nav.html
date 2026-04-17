@@ -1330,6 +1330,40 @@
       width: 40px;
       height: 40px;
     }
+    .top-nav--searchable {
+      grid-template-columns: auto minmax(0, 1fr) auto;
+    }
+    .top-nav--searchable .topbar-left,
+    .top-nav--searchable .topbar-left.no-logo {
+      flex: 0 0 auto;
+      gap: 0;
+    }
+    .top-nav--searchable .topbar-context {
+      display: none;
+    }
+    .top-nav--searchable .topbar-search {
+      display: block;
+      flex: 1 1 auto;
+      max-width: none;
+      min-width: 0;
+      margin: 0;
+    }
+    .top-nav--searchable .topbar-search form {
+      border-radius: 12px;
+    }
+    .top-nav--searchable .topbar-search__field {
+      min-height: 40px;
+      padding: 0 12px;
+      font-size: 14px;
+    }
+    .top-nav--searchable .topbar-search__button {
+      min-width: 40px;
+      min-height: 40px;
+      padding: 0;
+    }
+    .top-nav--searchable .topbar-search__shortcut {
+      display: none;
+    }
     .nav-drawer {
       top: 0;
       bottom: 0;
@@ -1519,7 +1553,7 @@
 
 <div class="sidebar-hover-tooltip" id="sidebar-hover-tooltip" aria-hidden="true"></div>
 
-<div class="top-nav">
+<div class="top-nav{% if nav_can_search %} top-nav--searchable{% endif %}">
   <div class="topbar-left{% if not nav_clinic or not nav_clinic.logo_url %} no-logo{% endif %}">
     <button type="button" class="nav-toggle" id="nav-toggle" aria-label="Open menu" aria-expanded="false" aria-controls="nav-drawer">
       <span></span>
