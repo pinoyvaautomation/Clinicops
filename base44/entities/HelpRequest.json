@@ -1,0 +1,80 @@
+{
+  "name": "HelpRequest",
+  "type": "object",
+  "title": "Help Request",
+  "description": "Support or feature request submitted from the clinic portal.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "submitted_by_user_id": {
+      "type": "string"
+    },
+    "request_type": {
+      "type": "string",
+      "enum": ["support", "feature"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["new", "in_review", "planned", "resolved", "closed"],
+      "default": "new"
+    },
+    "category": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "urgent"],
+      "default": "medium"
+    },
+    "subject": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140
+    },
+    "details": {
+      "type": "string",
+      "minLength": 1
+    },
+    "business_impact": {
+      "type": "string"
+    },
+    "page_url": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "user_agent": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "reporter_name": {
+      "type": "string",
+      "maxLength": 150
+    },
+    "reporter_email": {
+      "type": "string",
+      "format": "email"
+    },
+    "staff_role": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "internal_notes": {
+      "type": "string"
+    },
+    "resolved_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["clinic_id", "request_type", "subject", "details"]
+}

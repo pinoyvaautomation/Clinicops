@@ -1,0 +1,44 @@
+{
+  "name": "ClinicSubscription",
+  "type": "object",
+  "title": "Clinic Subscription",
+  "description": "Clinic subscription synced from PayPal.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "plan_id": {
+      "type": "string"
+    },
+    "paypal_subscription_id": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "active", "cancelled", "suspended", "expired"],
+      "default": "pending"
+    },
+    "started_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "current_period_end": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancel_at_period_end": {
+      "type": "boolean",
+      "default": false
+    },
+    "last_event_type": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["clinic_id", "plan_id", "paypal_subscription_id"]
+}

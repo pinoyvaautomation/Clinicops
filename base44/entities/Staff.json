@@ -1,0 +1,31 @@
+{
+  "name": "Staff",
+  "type": "object",
+  "title": "Staff",
+  "description": "Clinic staff profile linked to a Base44 user.",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "clinic_id": {
+      "type": "string"
+    },
+    "staff_role": {
+      "type": "string",
+      "enum": ["Admin", "Doctor", "Nurse", "FrontDesk"]
+    },
+    "avatar": {
+      "type": "string",
+      "format": "uri"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["user_id", "clinic_id", "staff_role"]
+}

@@ -1,0 +1,67 @@
+{
+  "name": "Notification",
+  "type": "object",
+  "title": "Notification",
+  "description": "In-app notification delivered to a clinic user.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "recipient_user_id": {
+      "type": "string"
+    },
+    "actor_user_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "generic",
+        "online_booking_created",
+        "appointment_created",
+        "appointment_updated",
+        "staff_added",
+        "staff_updated",
+        "service_added",
+        "service_updated",
+        "patient_signed_up",
+        "subscription_activated",
+        "subscription_updated"
+      ],
+      "default": "generic"
+    },
+    "level": {
+      "type": "string",
+      "enum": ["info", "success", "warning", "error"],
+      "default": "info"
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 140
+    },
+    "body": {
+      "type": "string"
+    },
+    "link": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "is_read": {
+      "type": "boolean",
+      "default": false
+    },
+    "read_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["recipient_user_id", "title"]
+}

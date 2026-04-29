@@ -1,0 +1,25 @@
+{
+  "name": "PromoRedemption",
+  "type": "object",
+  "title": "Promo Redemption",
+  "description": "Record of a clinic redeeming a promo code.",
+  "properties": {
+    "promo_code_id": {
+      "type": "string"
+    },
+    "clinic_id": {
+      "type": "string"
+    },
+    "owner_user_id": {
+      "type": "string"
+    },
+    "subscription_id": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["promo_code_id", "clinic_id"]
+}

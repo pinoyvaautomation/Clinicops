@@ -1,0 +1,47 @@
+{
+  "name": "SecurityAccessRule",
+  "type": "object",
+  "title": "Security Access Rule",
+  "description": "Allow or block rule for IP or country-based access control.",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "action": {
+      "type": "string",
+      "enum": ["allow", "block"]
+    },
+    "target_type": {
+      "type": "string",
+      "enum": ["ip", "country"]
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["auth", "global"],
+      "default": "auth"
+    },
+    "value": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "note": {
+      "type": "string"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["name", "action", "target_type", "scope", "value"]
+}

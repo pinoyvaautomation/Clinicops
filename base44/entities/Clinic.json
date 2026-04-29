@@ -1,0 +1,51 @@
+{
+  "name": "Clinic",
+  "type": "object",
+  "title": "Clinic",
+  "description": "Tenant record for a clinic workspace.",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "slug": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "timezone": {
+      "type": "string",
+      "maxLength": 64,
+      "default": "UTC"
+    },
+    "email": {
+      "type": "string",
+      "format": "email"
+    },
+    "phone": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "owner_user_id": {
+      "type": "string"
+    },
+    "logo_url": {
+      "type": "string",
+      "format": "uri"
+    },
+    "brand_color": {
+      "type": "string",
+      "pattern": "^#[0-9A-Fa-f]{6}$",
+      "default": "#1d4ed8"
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["name"]
+}

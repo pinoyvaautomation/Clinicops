@@ -1,0 +1,46 @@
+{
+  "name": "Patient",
+  "type": "object",
+  "title": "Patient",
+  "description": "Patient profile scoped to a clinic and optionally linked to a Base44 user.",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "clinic_id": {
+      "type": "string"
+    },
+    "avatar": {
+      "type": "string",
+      "format": "uri"
+    },
+    "first_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "last_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "maxLength": 254
+    },
+    "phone": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "dob": {
+      "type": "string",
+      "format": "date"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["clinic_id", "first_name", "last_name", "email", "phone"]
+}

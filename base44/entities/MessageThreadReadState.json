@@ -1,0 +1,19 @@
+{
+  "name": "MessageThreadReadState",
+  "type": "object",
+  "title": "Message Thread Read State",
+  "description": "Tracks when a user last read a specific thread.",
+  "properties": {
+    "thread_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "last_read_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["thread_id", "user_id"]
+}

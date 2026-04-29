@@ -1,0 +1,30 @@
+{
+  "name": "TwoFactorRecoveryCode",
+  "type": "object",
+  "title": "Two-Factor Recovery Code",
+  "description": "Hashed recovery code for two-factor authentication fallback.",
+  "properties": {
+    "user_id": {
+      "type": "string"
+    },
+    "code_hash": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 64
+    },
+    "code_suffix": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 6
+    },
+    "consumed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["user_id", "code_hash", "code_suffix"]
+}

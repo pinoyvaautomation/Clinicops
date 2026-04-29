@@ -1,0 +1,52 @@
+{
+  "name": "PayPalWebhookEvent",
+  "type": "object",
+  "title": "PayPal Webhook Event",
+  "description": "Inbound PayPal webhook payload and processing status.",
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "event_type": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "resource_type": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "resource_id": {
+      "type": "string",
+      "maxLength": 128
+    },
+    "summary": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "status": {
+      "type": "string",
+      "enum": ["received", "processed", "ignored", "failed"],
+      "default": "received"
+    },
+    "payload": {
+      "type": "object"
+    },
+    "error_message": {
+      "type": "string"
+    },
+    "clinic_subscription_id": {
+      "type": "string"
+    },
+    "received_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "processed_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["event_id"]
+}

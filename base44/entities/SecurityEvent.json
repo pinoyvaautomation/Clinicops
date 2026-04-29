@@ -1,0 +1,59 @@
+{
+  "name": "SecurityEvent",
+  "type": "object",
+  "title": "Security Event",
+  "description": "Audit record for login, rate-limit, access, and two-factor events.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "user_id": {
+      "type": "string"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "login_success",
+        "login_failed",
+        "logout",
+        "password_changed",
+        "rate_limited",
+        "access_blocked",
+        "two_factor_enabled",
+        "two_factor_disabled",
+        "two_factor_challenge_passed",
+        "two_factor_challenge_failed",
+        "two_factor_recovery_used",
+        "two_factor_reset"
+      ]
+    },
+    "identifier": {
+      "type": "string",
+      "maxLength": 254
+    },
+    "ip_address": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "country_code": {
+      "type": "string",
+      "maxLength": 8
+    },
+    "user_agent": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "path": {
+      "type": "string",
+      "maxLength": 255
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["event_type"]
+}

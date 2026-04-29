@@ -1,0 +1,61 @@
+{
+  "name": "WaitlistEntry",
+  "type": "object",
+  "title": "Waitlist Entry",
+  "description": "Prospective booking request for patients waiting for an opening.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "appointment_type_id": {
+      "type": "string"
+    },
+    "patient_id": {
+      "type": "string"
+    },
+    "first_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "last_name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "email": {
+      "type": "string",
+      "format": "email",
+      "maxLength": 254
+    },
+    "phone": {
+      "type": "string",
+      "maxLength": 32
+    },
+    "preferred_start_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "preferred_end_date": {
+      "type": "string",
+      "format": "date"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "consent_to_contact": {
+      "type": "boolean",
+      "default": true
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "contacted", "booked", "closed"],
+      "default": "active"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["clinic_id", "first_name", "last_name", "email", "phone"]
+}

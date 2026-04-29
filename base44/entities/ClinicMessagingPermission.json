@@ -1,0 +1,25 @@
+{
+  "name": "ClinicMessagingPermission",
+  "type": "object",
+  "title": "Clinic Messaging Permission",
+  "description": "Messaging access level granted to a clinic staff role.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "role": {
+      "type": "string",
+      "enum": ["Admin", "Doctor", "Nurse", "FrontDesk"]
+    },
+    "access_level": {
+      "type": "string",
+      "enum": ["none", "view", "reply"],
+      "default": "none"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["clinic_id", "role"]
+}

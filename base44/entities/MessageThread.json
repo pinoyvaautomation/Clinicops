@@ -1,0 +1,53 @@
+{
+  "name": "MessageThread",
+  "type": "object",
+  "title": "Message Thread",
+  "description": "Conversation thread between staff and patient, optionally linked to an appointment.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "patient_id": {
+      "type": "string"
+    },
+    "appointment_id": {
+      "type": "string"
+    },
+    "subject": {
+      "type": "string",
+      "maxLength": 140
+    },
+    "source": {
+      "type": "string",
+      "enum": ["appointment", "portal"],
+      "default": "portal"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "closed"],
+      "default": "open"
+    },
+    "last_message_sender_type": {
+      "type": "string",
+      "enum": ["patient", "staff", "system"],
+      "default": "patient"
+    },
+    "last_message_excerpt": {
+      "type": "string",
+      "maxLength": 180
+    },
+    "last_message_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["clinic_id", "patient_id"]
+}

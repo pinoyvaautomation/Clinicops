@@ -1,0 +1,56 @@
+{
+  "name": "PromoCode",
+  "type": "object",
+  "title": "Promo Code",
+  "description": "Promo mapping from a base plan to a discounted PayPal plan.",
+  "properties": {
+    "code": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 40
+    },
+    "label": {
+      "type": "string",
+      "maxLength": 120
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "base_plan_id": {
+      "type": "string"
+    },
+    "promo_paypal_plan_id": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "promo_price_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "max_redemptions": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "starts_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "ends_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["code", "base_plan_id", "promo_paypal_plan_id"]
+}

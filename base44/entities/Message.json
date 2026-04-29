@@ -1,0 +1,31 @@
+{
+  "name": "Message",
+  "type": "object",
+  "title": "Message",
+  "description": "Individual message inside a thread.",
+  "properties": {
+    "thread_id": {
+      "type": "string"
+    },
+    "sender_user_id": {
+      "type": "string"
+    },
+    "sender_type": {
+      "type": "string",
+      "enum": ["patient", "staff", "system"]
+    },
+    "sender_label": {
+      "type": "string",
+      "maxLength": 150
+    },
+    "body": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["thread_id", "sender_type", "body"]
+}

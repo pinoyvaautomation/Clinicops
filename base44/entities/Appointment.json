@@ -1,0 +1,74 @@
+{
+  "name": "Appointment",
+  "type": "object",
+  "title": "Appointment",
+  "description": "Scheduled clinic appointment linking patient, staff, and service.",
+  "properties": {
+    "clinic_id": {
+      "type": "string"
+    },
+    "appointment_type_id": {
+      "type": "string"
+    },
+    "staff_id": {
+      "type": "string"
+    },
+    "patient_id": {
+      "type": "string"
+    },
+    "start_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "end_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["scheduled", "completed", "cancelled"],
+      "default": "scheduled"
+    },
+    "notes": {
+      "type": "string"
+    },
+    "intake_reason": {
+      "type": "string"
+    },
+    "intake_details": {
+      "type": "string"
+    },
+    "consent_to_treatment": {
+      "type": "boolean",
+      "default": false
+    },
+    "consent_to_privacy": {
+      "type": "boolean",
+      "default": false
+    },
+    "consent_signature_name": {
+      "type": "string",
+      "maxLength": 150
+    },
+    "consent_signed_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "cancel_reason": {
+      "type": "string"
+    },
+    "confirmation_code": {
+      "type": "string",
+      "maxLength": 12
+    },
+    "reminder_sent_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["clinic_id", "staff_id", "patient_id", "start_at", "end_at"]
+}

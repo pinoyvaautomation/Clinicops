@@ -1,0 +1,27 @@
+{
+  "name": "AdminBranding",
+  "type": "object",
+  "title": "Admin Branding",
+  "description": "Singleton branding settings for the internal admin surface.",
+  "properties": {
+    "site_header": {
+      "type": "string",
+      "maxLength": 100,
+      "default": "ClinicOps Admin"
+    },
+    "site_title": {
+      "type": "string",
+      "maxLength": 100,
+      "default": "ClinicOps Admin"
+    },
+    "index_title": {
+      "type": "string",
+      "maxLength": 200,
+      "default": "ClinicOps Administration"
+    },
+    "updated_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  }
+}

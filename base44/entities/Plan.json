@@ -1,0 +1,76 @@
+{
+  "name": "Plan",
+  "type": "object",
+  "title": "Plan",
+  "description": "Subscription plan and feature-limit definition.",
+  "properties": {
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 100
+    },
+    "is_free": {
+      "type": "boolean",
+      "default": false
+    },
+    "paypal_plan_id": {
+      "type": "string",
+      "maxLength": 64
+    },
+    "interval": {
+      "type": "string",
+      "enum": ["month", "year"],
+      "default": "month"
+    },
+    "price_cents": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "currency": {
+      "type": "string",
+      "maxLength": 10,
+      "default": "USD"
+    },
+    "staff_limit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "service_limit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "monthly_appointment_limit": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "includes_reminders": {
+      "type": "boolean",
+      "default": true
+    },
+    "includes_notifications": {
+      "type": "boolean",
+      "default": true
+    },
+    "includes_messaging": {
+      "type": "boolean",
+      "default": true
+    },
+    "includes_waitlist": {
+      "type": "boolean",
+      "default": true
+    },
+    "includes_custom_branding": {
+      "type": "boolean",
+      "default": true
+    },
+    "is_active": {
+      "type": "boolean",
+      "default": true
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "required": ["name", "price_cents"]
+}
